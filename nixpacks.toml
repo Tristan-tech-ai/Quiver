@@ -1,0 +1,9 @@
+# FULL chart tier needs a real headless Chromium. Ubuntu's apt "chromium" is a snap wrapper that
+# crashes in a container, so we use Playwright's own downloaded Chromium (a real static build) with
+# its correctly-named system deps. npm ci skips the browser download (fast); the build phase pulls
+# only chromium. If this ever fails, chartPress catches it and serves the FAST tier — never errors.
+[variables]
+PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1"
+
+[phases.build]
+cmds = ["PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0 npx playwright install --with-deps chromium"]

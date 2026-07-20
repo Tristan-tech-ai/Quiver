@@ -131,4 +131,4 @@ export function verifyEip712(domain, types, value, signature) {
   try { return verifyTypedData(domain, types, value, signature); } catch { return null; }
 }
 
-export const _internal = { canonical, buildId, sha256 };
+export const _internal = { canonical, buildId, sha256, signerAddress: () => signer()?.address || null };

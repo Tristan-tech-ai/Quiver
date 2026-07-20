@@ -1,9 +1,9 @@
 {
-  "name": "veritape",
+  "name": "quiver",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Veritape — on-chain authenticity forensics: wash-volume and track-record verification, pay-per-call via x402.",
+  "description": "Quiver — the verifiable risk brain for autonomous agents: 22 deterministic, proof-carrying risk computations, pay-per-call via x402 (X Layer + Base), free remote MCP.",
   "engines": {
     "node": ">=20"
   },

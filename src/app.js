@@ -27,14 +27,66 @@ app.use((req, res, next) => {
   next();
 });
 
+// Machine-facing self-description: binds this domain to the ERC-8004 identity and advertises EVERY payment
+// rail (an automated screener must be able to link service ↔ agent #5152 ↔ payTo without leaving the domain).
+const IDENTITY = () => ({
+  erc8004AgentId: 5152,
+  registryChain: 'eip155:196',
+  owner: '0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b',
+  proofSigner: _internal.signerAddress(),
+});
+const PAYMENT = () => ({
+  protocol: 'x402 v2',
+  scheme: 'exact',
+  rails: config.networks.map((n) => ({ network: n.network, asset: n.asset, decimals: n.assetDecimals, payTo: n.payTo })),
+  // legacy flat fields (primary rail) kept for existing consumers
+  network: config.network,
+  asset: 'USDT (X Layer)',
+});
 app.get('/', (_req, res) => res.json({
   name: 'Quiver',
   tagline: 'A quiver of agent tools — one call.',
+  identity: IDENTITY(),
   services: Object.fromEntries(SERVICES.filter((s) => s.register !== false).map((s) => [`POST ${s.path}`, `${s.blurb} — ${s.price} USDT/call`])),
-  payment: { protocol: 'x402 v2', scheme: 'exact', network: config.network, asset: 'USDT (X Layer)' },
-  mcp: 'POST /mcp — Streamable HTTP MCP endpoint; add this URL to any MCP client (Claude/Cursor/LangChain) to call the verifiable risk brain',
+  payment: PAYMENT(),
+  mcp: 'POST /mcp — Streamable HTTP MCP endpoint; add this URL to any MCP client (Claude/Cursor/LangChain) to call the verifiable risk brain (free, fair-use daily quota)',
+  docs: '/paper',
+  build: '/build',
+  agentCard: '/.well-known/agent-card.json',
+  llms: '/llms.txt',
+  repo: 'https://github.com/Tristan-tech-ai/Quiver',
   version: config.version,
 }));
+
+// Agent card — the discovery endpoint identity-scanners look for (also aliased at /agent.json).
+app.get(['/.well-known/agent-card.json', '/agent.json'], (_req, res) => res.json({
+  name: 'Quiver',
+  description: 'The verifiable risk brain for autonomous agents — deterministic, proof-carrying risk computation over x402 + MCP.',
+  identity: IDENTITY(),
+  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', build: '/build' },
+  payment: PAYMENT(),
+  repo: 'https://github.com/Tristan-tech-ai/Quiver',
+  version: config.version,
+}));
+
+// llms.txt — plain-text summary so LLM/agent crawlers get the essentials without parsing HTML.
+app.get('/llms.txt', (_req, res) => {
+  const svc = SERVICES.filter((s) => s.register !== false).map((s) => `- POST ${s.path} — ${s.blurb} (${s.price} USDT/call)`).join('\n');
+  res.set('content-type', 'text/plain; charset=utf-8').send(`# Quiver — the verifiable risk brain for autonomous agents
+
+Deterministic risk computation where every answer carries a re-runnable, self-checked proof
+(echoed inputs + engine codeHash + contentHash + ground-truth self-checks). Re-run the open
+engine on the inputs to reproduce the result byte-for-byte: correctness you re-derive, not trust.
+
+Identity: ERC-8004 agent #5152 on X Layer (eip155:196), owner 0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b
+Payment: x402 v2 exact — USD₮0 on X Layer (eip155:196) and USDC on Base (eip155:8453); unpaid requests get the 402 challenge with both rails
+Free tier: POST /mcp (Streamable HTTP MCP, 9 risk tools, fair-use daily quota)
+Docs: /paper (technical documentation) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
+
+## Paid services (x402)
+${svc}
+`);
+});
 app.get('/healthz', (_req, res) => res.json({ ok: true, version: config.version, services: SERVICES.filter((s) => s.register !== false).length }));
 
 // Build provenance — makes "re-run bit-for-bit" CHECKABLE, not a promise. `codeHash` is the sha256 of the
@@ -59,10 +111,29 @@ app.get('/build', (_req, res) => res.json({
 const MCP_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, accept, mcp-protocol-version, mcp-session-id, authorization', 'Access-Control-Max-Age': '86400' };
 app.options('/mcp', (_req, res) => res.set(MCP_CORS).status(204).end());
 app.get('/mcp', (_req, res) => res.set(MCP_CORS).set('Allow', 'POST').status(405).json({ error: 'Stateless MCP endpoint — POST a JSON-RPC message. No SSE stream is offered here.' }));
+// Free-tier metering: a generous daily per-IP quota on tool CALLS only (initialize/tools-list stay unmetered),
+// with the paid x402 routes offered in-band as the overflow path — the free tier stays a wedge, not an open tap.
+const MCP_DAILY_CALLS = Number(process.env.MCP_DAILY_CALLS || 300);
+const mcpQuota = new Map(); // ip -> { day, count }
+function mcpCallAllowed(ip) {
+  const day = new Date().toISOString().slice(0, 10);
+  let q = mcpQuota.get(ip);
+  if (!q || q.day !== day) {
+    if (mcpQuota.size > 50000) mcpQuota.clear(); // unbounded-map guard
+    q = { day, count: 0 };
+    mcpQuota.set(ip, q);
+  }
+  q.count += 1;
+  return q.count <= MCP_DAILY_CALLS;
+}
+
 app.post('/mcp', async (req, res) => {
   res.set(MCP_CORS);
   const msg = req.body;
   if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'expected a single JSON-RPC message object' } });
+  if (msg.method === 'tools/call' && !mcpCallAllowed(req.ip || 'unknown')) {
+    return res.status(200).json({ jsonrpc: '2.0', id: msg.id ?? null, error: { code: -32000, message: `free-tier daily quota reached (${MCP_DAILY_CALLS} tool calls/day/IP). The same engines run pay-per-call over x402 at POST /api/<service> (0.005-0.05 per call, X Layer USDT0 or Base USDC) — an unpaid request returns the 402 challenge with both rails.` } });
+  }
   if (msg.id === undefined) { try { await handleRpc(msg); } catch { /* notifications never error back */ } return res.status(202).end(); }
   try {
     const resp = await handleRpc(msg);
@@ -221,6 +292,11 @@ app.get('/diag/rest', async (req, res) => {
 });
 
 // ---- paid service routes (from the registry) ----
+// Browser-resident agents must be able to READ the 402 challenge — expose the payment headers via CORS
+// (a strict CSP page can fetch /api/* but cannot see PAYMENT-REQUIRED unless it is explicitly exposed).
+const API_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, payment-signature, x-payment', 'Access-Control-Expose-Headers': 'PAYMENT-REQUIRED, PAYMENT-RESPONSE', 'Access-Control-Max-Age': '86400' };
+app.use('/api', (req, res, next) => { res.set(API_CORS); if (req.method === 'OPTIONS') return res.status(204).end(); next(); });
+
 // x402 CONTRACT: the payment gate MUST fire first (before any business-input validation) and on BOTH
 // GET and POST, so an unpaid probe of ANY method/body always gets the mandatory HTTP 402 challenge —
 // never a 404 (no route) or 400 (bad input). This is exactly what `onchainos agent x402-check` probes.
@@ -242,6 +318,9 @@ for (const s of SERVICES) {
   app.get(s.path, handler);   // unpaid GET probe -> 402 (was 404)
   app.post(s.path, handler);  // unpaid/empty POST -> 402 (was 400)
 }
+
+// Unknown path -> JSON 404 (never the Express HTML page), so machine callers always get a parseable error.
+app.use((req, res) => res.status(404).json({ error: 'not_found', note: `no route ${req.method} ${req.path}`, index: '/', docs: '/paper' }));
 
 app.use((err, _req, res, _next) => res.status(500).json({ error: 'internal', note: String(err?.message || err).slice(0, 200) }));
 

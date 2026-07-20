@@ -63,5 +63,7 @@ rb.verifyInclusion(leaf, proof, root);                 // anyone checks a comput
 - **hosted** — `createRiskBrain({ mode: 'hosted' })` calls the x402-paid endpoints. Endpoints are
   payment-gated, so pass a `fetchImpl` that adds a `PAYMENT-SIGNATURE` header (the SDK never holds keys).
 
-Available over MCP too (`perp_gate`, `size_gate`, `exec_verify`, `options_risk`, `lp_risk`, `treasury_risk`,
-`risk_attest`), so any LangChain / CrewAI / Claude agent can call the risk brain directly.
+Available over a remote MCP endpoint too — 9 tools (`perp_gate`, `portfolio_gate`, `size_gate`, `exec_verify`,
+`options_risk`, `lp_risk`, `treasury_risk`, `risk_attest`, `event_vol`) at
+`https://quiver-production-c3a8.up.railway.app/mcp` — so any LangChain / CrewAI / Claude / Cursor agent can
+call the risk brain directly.

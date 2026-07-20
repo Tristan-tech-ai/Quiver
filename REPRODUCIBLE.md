@@ -15,7 +15,7 @@ envelope; here is exactly how a third party checks it — no trust in Quiver req
 ## 1. Verify the code identity — rebuild → identical codeHash
 The codeHash is a sha256 of the engine source files, so it is deterministic and rebuild-checkable:
 ```
-git clone https://github.com/Tristan-tech-ai/Quiver && cd Quiver/veritape && npm ci
+git clone https://github.com/Tristan-tech-ai/Quiver && cd Quiver && npm ci
 # codeHash = 'q1-' + sha256( for each src/engine/*.js sorted by name: `${filename}:${contents}` joined by "\n" ).slice(0,16)
 ```
 Compare it against `GET /build` on the live server (which reports `codeHash` **and the Node version it runs on**)

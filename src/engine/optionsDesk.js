@@ -7,7 +7,7 @@ import * as deribit from '../adapters/deribit.js';
 import * as okxopt from '../adapters/okx-options.js';
 import { config } from '../config.js';
 import { round, clamp01 } from './stats.js';
-import { black76, ivAtDelta, atmForwardIv, probAbove, probAboveSmile, rndDensity, rndDistribution } from './black76.js';
+import { black76, ivAtDelta, atmForwardIv, probAbove, probAboveSmile, rndDensity, rndDistribution, butterflyPolice } from './black76.js';
 import { computeGex } from './optionsGex.js';
 import { ivRank } from './ivRank.js';
 import { deltaOi } from './oiStore.js';
@@ -15,6 +15,7 @@ import { eventsBetween } from './macroSentry.js';
 import { optionsVsPrediction } from './crossMarket.js';
 import { estimateVrp, realWorldVol, realizedVolPct } from './vrp.js';
 import { fitSVI, sviIvFn } from './ssvi.js';
+import { motBounds } from './mot.js';
 
 const num = (x) => (x === undefined || x === null || x === '' ? null : Number(x));
 const DAY = 86400000;
@@ -148,26 +149,17 @@ function impliedView(enriched, spot, now, vrp, surfaceFit) {
 
     // Butterfly-arbitrage police: a negative risk-neutral density means the smile is not arbitrage-free
     // there and probabilities read off it are unsound. Measured, disclosed — never silently served.
-    let negs = 0, gridN = 0, minDensity = Infinity;
-    const step = (kMax - kMin) / 120;
-    for (let K = kMin + step; K < kMax - step; K += step) {
-      const d = rndDensity(F, K, T, ivFn, r);
-      if (d == null) continue;
-      gridN += 1; if (d < 0) negs += 1; if (d < minDensity) minDensity = d;
-    }
-    const arb = gridN ? {
-      densityNonNegative: negs === 0,
-      violationGridPoints: negs, gridPoints: gridN,
-      minDensity: Number.isFinite(minDensity) ? Number(minDensity.toExponential(2)) : null,
-      note: negs === 0
-        ? 'Risk-neutral density is non-negative across the traded strike range — no butterfly arbitrage detected on this slice.'
-        : `Density goes NEGATIVE at ${negs}/${gridN} grid points — this slice is not arbitrage-free under interpolation, so probabilities near those strikes are unsound. Disclosed rather than hidden; an arbitrage-free (SSVI) fit is the correct remedy.`,
-    } : null;
+    // Lives in black76.js so a test can reach it and make it FAIL; it reports the strike range it actually
+    // covered and withholds the verdict (certified: null) when too much of the smile was unevaluable.
+    const arb = butterflyPolice(F, T, ivFn, kMin, kMax, r);
     // FULL risk-neutral distribution (gap D7): quantiles, tail expected-shortfall, RND skew/kurtosis — the
     // whole terminal-price distribution, not just point probabilities. Only emitted when the density is a
     // proper (arbitrage-free) density on this slice; otherwise it would be integrating a non-density.
+    // `certified === true` is strictly stronger than the old `densityNonNegative`: it also requires that we
+    // actually scanned enough of the smile to be entitled to the claim. Integrating a density we could not
+    // evaluate in the wings is exactly how a confident wrong number gets shipped.
     let distribution = null;
-    if (arb && arb.densityNonNegative) {
+    if (arb && arb.certified === true) {
       const dist = rndDistribution(F, T, ivFn, r);
       if (dist && dist.mass > 0.9 && dist.mass < 1.1) { // raw integral must be ~1 for a trustworthy distribution
         distribution = {
@@ -505,6 +497,29 @@ export async function optionsDesk(currency = 'BTC', { focus = 'all' } = {}) {
     .filter((s) => s.pts.length >= 3);
   const surfaceFit = ssviSlices.length ? fitSVI(ssviSlices) : { ok: false, reason: 'no usable slices' };
 
+  // MODEL-FREE calendar bounds (Martingale Optimal Transport). For each ADJACENT pair of accepted slices,
+  // the two fitted marginals alone pin an arbitrage-free RANGE for a forward-start payoff — no model, no
+  // dynamics assumption. Where Strassen's precondition fails (the marginals are not in convex order, i.e.
+  // calendar arbitrage) there is no arbitrage-free price at all, and we say so instead of inventing one.
+  const motPairs = (() => {
+    const ok = (surfaceFit.perSlice || []).filter((s) => s.ok && s.params);
+    const Pof = (s) => ({ a: s.params.a, b: s.params.b, rho: s.params.rho, m: s.params.m, sig: s.params.sigma });
+    const Ffor = (T) => { let best = null; for (const e of enriched) { if (!(e._F > 0)) continue; if (!best || Math.abs(e._T - T) < Math.abs(best.T - T)) best = { T: e._T, F: e._F }; } return best ? best.F : spot; };
+    const out = [];
+    for (let i = 0; i < ok.length - 1 && out.length < 4; i++) {
+      const A = ok[i], B = ok[i + 1];
+      const r = motBounds(Pof(A), Ffor(A.T), A.T, Pof(B), Ffor(B.T), B.T, (x, y) => Math.max(y - x, 0));
+      out.push({
+        fromDays: round(A.T * 365, 1), toDays: round(B.T * 365, 1),
+        payoff: 'forward-start ATM call (S_T2/F2 − S_T1/F1)+, quoted as a fraction of forward',
+        ...(r.ok
+          ? { ok: true, lowerPct: round(r.lower * 100, 4), upperPct: round(r.upper * 100, 4), widthPct: round(r.width * 100, 4), selfChecks: r.selfChecks, interpretation: r.interpretation }
+          : { ok: false, refused: !!r.refused, reason: r.reason }),
+      });
+    }
+    return out.length ? out : null;
+  })();
+
   // Options-market implied view: expected move + risk-neutral price-level odds + macro-event overlay (novel cross-domain read).
   const implied = impliedView(enriched, spot, now, vrp, surfaceFit);
 
@@ -565,6 +580,7 @@ export async function optionsDesk(currency = 'BTC', { focus = 'all' } = {}) {
     spotOutlook: gammaSpotOutlook,
     consensus,
     volSurfaceModel: surfaceFit,
+    calendarBoundsMOT: motPairs,
     vrpModel: vrp,
     crossMarket: focus === 'headline' ? undefined : crossMarket,
     flow,

@@ -57,6 +57,8 @@
   .toc .n { color: var(--accent); display: inline-block; min-width: 26px; }
   /* Figures / callouts */
   .box { border: 1px solid var(--line); border-radius: 4px; padding: 9px 12px; margin: 10px 0; background: #fbfcfe; page-break-inside: avoid; }
+  figure { break-inside: avoid; page-break-inside: avoid; }
+  figure svg { max-width: 100%; height: auto; display: block; margin: 0 auto; }
   .box .cap { font-size: 8.6pt; color: var(--muted); font-variant: small-caps; letter-spacing: 0.05em; margin-bottom: 4px; }
   pre { background: var(--code-bg); border: 1px solid var(--line2); border-radius: 4px; padding: 9px 11px; overflow: hidden; font-family: "SFMono-Regular", Consolas, monospace; font-size: 8.3pt; line-height: 1.42; color: var(--code-ink); white-space: pre-wrap; word-break: break-word; page-break-inside: avoid; text-align: left; }
   .kv { margin: 6px 0; }
@@ -106,7 +108,7 @@
 <!-- ============================== ABSTRACT ============================== -->
 <div class="unnum">
 <h2 style="counter-increment:none;">Abstract</h2>
-<p class="abstract">Autonomous trading and wallet agents increasingly transact on-chain, yet they lack a supply of financial and security computations they can pay for, trust, and verify. Off-chain quantitative tooling is not agent-callable, and most agent-facing services return numbers whose derivation cannot be checked. Quiver is an Agentic Service Provider (ASP) that exposes ten priced computations over the x402 payment protocol <sup class="cite">[39]</sup> and the ERC-8004 trustless-agent registry <sup class="cite">[38]</sup>, spanning options analytics, transaction-safety analysis, market microstructure, prediction-market execution, and protocol risk. This document specifies each service and the methods behind it. The options service fits an arbitrage-free SVI volatility surface <sup class="cite">[5],[6]</sup> per expiry and recovers the risk-neutral density by the Breeden–Litzenberger identity <sup class="cite">[4]</sup>; on live Deribit chains it produces a full terminal-price distribution whose mean reproduces the forward to within 0.001% (the martingale condition), and a probability ladder that corrects the standard <span class="mono">N(d2)</span> figure by up to five percentage points on a skewed smile. The transaction-safety service simulates an unsigned transaction and also decodes EIP-712 permit signatures <sup class="cite">[32],[33]</sup>, closing the signature-drainer gap that transaction simulators structurally cannot see. The tape service computes Kyle's lambda <sup class="cite">[15]</sup>, Amihud illiquidity <sup class="cite">[16]</sup>, and VPIN <sup class="cite">[17]</sup> on the live DEX tape. Every quantitative claim is locked by an automated test suite of 39 model-free invariants and was validated against live data. The guiding principle is stated plainly and enforced throughout: where a signal cannot be grounded in observable data, the service refuses to emit it rather than fabricate precision.</p>
+<p class="abstract">Autonomous trading and wallet agents now move real value on a loop — on the order of 69,000 agents and 169M+ x402 transactions in 2026 — yet they cannot perform the deterministic financial mathematics that keeps them solvent: top financial language models collapse from 95.6% accuracy on simple lookups to near zero on multivariate calculation, and an autonomous agent lost 62% of its capital trading perpetuals with no human oversight. The agent risk layer now shipping from exchanges and startups enforces user-set <em>limits</em> but does not <em>compute</em> the numbers those limits are checked against, and most agent-facing services return figures whose derivation cannot be verified. Quiver is an Agentic Service Provider (ASP) that supplies the missing layer: twenty-two deterministic, priced quantitative computations over the x402 payment protocol <sup class="cite">[39]</sup> and the ERC-8004 trustless-agent registry <sup class="cite">[38]</sup>, spanning options analytics, liquidity-provision and market microstructure, transaction-safety analysis, prediction-market execution, and a <strong>Risk Brain</strong> — perpetual-futures liquidation and funding risk, fractional-Kelly position sizing with risk-of-ruin, and execution-quality (fair-fill) verification. Its defining property is <strong>verifiability</strong>: because every computation is deterministic, each answer ships a <em>proof envelope</em> — the echoed inputs, the exact code identity, a content hash, and a self-check that tests the output against a ground-truth invariant (the liquidation condition, the Kelly optimality FOC, the constant-product <span class="mono">k</span>, the martingale <span class="mono">E[S<sub>T</sub>]=F</span>, the arbitrage-free density). The caller re-runs the open engine and reproduces the number rather than trusting the provider — a guarantee LLM-based tools cannot cheaply make. The options service fits an arbitrage-free SVI volatility surface <sup class="cite">[5],[6]</sup> per expiry and recovers the risk-neutral density by the Breeden–Litzenberger identity <sup class="cite">[4]</sup>; on live Deribit chains it produces a full terminal-price distribution whose mean reproduces the forward to within 0.001% (the martingale condition), and a probability ladder that corrects the standard <span class="mono">N(d2)</span> figure by up to five percentage points on a skewed smile. The transaction-safety service simulates an unsigned transaction and also decodes EIP-712 permit signatures <sup class="cite">[32],[33]</sup>, closing the signature-drainer gap that transaction simulators structurally cannot see. The tape service computes Kyle's lambda <sup class="cite">[15]</sup>, Amihud illiquidity <sup class="cite">[16]</sup>, and VPIN <sup class="cite">[17]</sup> on the live DEX tape. Every quantitative claim is locked by an automated suite of one hundred and thirty-five tests — several of which provably fail on the pre-fix code — and was validated against live data. The guiding principle is stated plainly and enforced throughout: where a signal cannot be grounded in observable data, or verified against an invariant, the service refuses to emit it rather than fabricate precision.</p>
 </div>
 
 <!-- ============================== TOC ============================== -->
@@ -144,7 +146,20 @@
       <li><span class="n">5.3</span> Risk-neutral density and the full distribution</li>
       <li><span class="n">5.4</span> Variance risk premium</li>
       <li><span class="n">5.5</span> Tape microstructure estimators</li>
-      <li><span class="n">5.6</span> Transaction and signature safety</li>
+      <li><span class="n">5.6</span> Dealer gamma exposure and barrier probabilities</li>
+      <li><span class="n">5.7</span> Transaction and signature safety</li>
+      <li><span class="n">5.8</span> Model-free calendar bounds by martingale optimal transport</li>
+      <li><span class="n">5.9</span> Concentrated-liquidity value and divergence loss</li>
+      <li><span class="n">5.10</span> Perpetual liquidation and funding</li>
+      <li><span class="n">5.11</span> Position sizing and the probability of ruin</li>
+      <li><span class="n">5.12</span> Execution quality and adverse fills</li>
+      <li><span class="n">5.13</span> Options-book greeks and scenario margin</li>
+      <li><span class="n">5.14</span> Liquidity-provision divergence and its LVR rate</li>
+      <li><span class="n">5.15</span> Stablecoin-treasury concentration and depeg</li>
+      <li><span class="n">5.16</span> Event-implied expected move</li>
+      <li><span class="n">5.17</span> Batched attestation</li>
+      <li><span class="n">5.18</span> Cross-venue portfolio exposure and correlated-crash stress</li>
+      <li><span class="n">5.19</span> The proof envelope: correctness you re-derive</li>
     </ol>
   </li>
   <li><span class="n">6</span><a href="#s6">Verification and Testing</a></li>
@@ -175,7 +190,7 @@
 
 <p>Two failures are common in the services that do exist. The first is reachability. The quantitative tooling that desks rely on, from volatility-surface fitters to market-impact models, lives in notebooks and internal libraries that expose no priced, machine-callable interface. An agent cannot invoke it. The second failure is trust. Many agent-facing endpoints return a number, a grade, or a score with no way to check how it was produced. A "health score of 73" or a "buy signal" is worthless to a counterparty that cannot audit the derivation, and worse than worthless if the number was fitted to look good. For financial and security computations, where a wrong answer moves real money, an unverifiable output is a liability.</p>
 
-<p>Quiver is built for that gap. It is an Agentic Service Provider: a single host that publishes ten independently priced computations, each callable by any agent that speaks x402, each registered on-chain under ERC-8004 <sup class="cite">[38]</sup> so it can be discovered and its reputation accrued. The services are not thin wrappers over a data feed. They implement the methods a quantitative desk or a security team would actually run, and they are written to a standard this document makes explicit: correctness is proven by test, claims are grounded in observable data, and when the data does not support a claim the service says so.</p>
+<p>Quiver is built for that gap. It is an Agentic Service Provider: a single host that publishes twenty-two independently priced computations, each callable by any agent that speaks x402, each registered on-chain under ERC-8004 <sup class="cite">[38]</sup> so it can be discovered and its reputation accrued. The services are not thin wrappers over a data feed. They implement the methods a quantitative desk or a security team would actually run, and they are written to a standard this document makes explicit: correctness is proven by test, claims are grounded in observable data, and when the data does not support a claim the service says so.</p>
 
 <h3>Design stance and contributions</h3>
 
@@ -183,14 +198,17 @@
 
 <p>The contributions are the following.</p>
 <ol class="body">
-  <li>A production ASP of ten priced services on x402 and ERC-8004, live and paid end-to-end, covering options, transaction safety, microstructure, prediction markets, and protocol risk.</li>
-  <li>An arbitrage-free options analytics stack: raw SVI fitted per expiry with the Gatheral–Jacquier no-arbitrage conditions enforced inside the objective <sup class="cite">[6]</sup>, the Breeden–Litzenberger density <sup class="cite">[4]</sup>, and a full risk-neutral distribution with an internal martingale correctness check.</li>
+  <li>A production ASP of twenty-two priced services on x402 and ERC-8004, live and paid end-to-end, covering options, transaction and token safety, microstructure, prediction markets, concentrated-liquidity economics, protocol risk, and a verifiable risk brain — perpetual-futures liquidation and funding, cross-venue portfolio risk (net exposure, nearest-liquidation, and a correlated-crash stress), fractional-Kelly sizing with risk-of-ruin, and execution-quality (fair-fill) verification.</li>
+  <li>A <strong>proof envelope</strong> on every risk computation: because the engines are deterministic, each answer carries its inputs, code identity, a content hash, and a self-check against a ground-truth invariant, so a caller re-runs and reproduces the number instead of trusting the provider.</li>
+  <li>An arbitrage-free options analytics stack: raw SVI fitted per expiry with the Gatheral–Jacquier butterfly and Roger-Lee wing conditions enforced inside the objective <sup class="cite">[6],[8]</sup>, the calendar condition enforced across expiries on the <em>shipped</em> surface rather than on a full-precision object the caller never receives, and the Breeden–Litzenberger density <sup class="cite">[4]</sup> policed by a coverage-honest butterfly check that reports the strike range it actually verified and withholds its verdict where the smile could not be evaluated.</li>
+  <li>Model-free no-arbitrage price bounds on calendar and forward-starting option payoffs via martingale optimal transport (Beiglböck, Henry-Labordère and Penkner): given two fitted expiry marginals, a linear program returns the tightest lower and upper prices consistent with <em>every</em> arbitrage-free model, and its feasibility is exactly the Strassen convex-order condition certifying that the two smiles are jointly free of calendar arbitrage — a bound nobody assumes a dynamics to produce.</li>
+  <li>A concentrated-liquidity reality-check that reconstructs a Uniswap-V3 position's realised fees against its divergence loss from the pool's live on-chain swap history, read over a keyless public archive node, so the fee-versus-loss verdict is measured on real flow rather than assumed.</li>
   <li>A transaction-safety service that combines on-chain simulation with EIP-712 permit-signature analysis <sup class="cite">[32]</sup>, addressing the dominant modern drainer vector that pure simulators cannot observe.</li>
   <li>Real market-microstructure estimators on the DEX tape: Kyle's lambda, Amihud illiquidity, and VPIN, with quality gates that return null rather than a false number on thin data.</li>
-  <li>A verification methodology: 39 automated tests of model-free invariants, plus a ground-truthing protocol against live venues, with every reported figure reproducible by a documented request.</li>
+  <li>A verification methodology: 152 automated tests of model-free invariants that run on every build, a further five live-archive integration tests behind an RPC flag, and a ground-truthing protocol against live venues, with every reported figure reproducible by a documented request.</li>
 </ol>
 
-<p>The remainder of the document is organised as follows. Section 2 describes the payment, identity, and hosting architecture. Section 3 states the design principles that constrain every service. Section 4 catalogues the ten services. Section 5 gives the mathematics. Section 6 describes verification. Section 7 walks through live calls end to end. Section 8 is a candid account of what the services do not do. Section 9 positions the work, Section 10 recounts how it was built and how an agent uses it, and Section 11 concludes.</p>
+<p>The remainder of the document is organised as follows. Section 2 describes the payment, identity, and hosting architecture. Section 3 states the design principles that constrain every service. Section 4 catalogues the twenty-two services. Section 5 gives the mathematics. Section 6 describes verification. Section 7 walks through live calls end to end. Section 8 is a candid account of what the services do not do. Section 9 positions the work, Section 10 recounts how it was built and how an agent uses it, and Section 11 concludes.</p>
 
 <!-- ============================== 2. ARCHITECTURE ============================== -->
 <h2 id="s2">System Architecture</h2>
@@ -199,7 +217,7 @@
 
 <h3>The x402 payment loop</h3>
 
-<p>Payment uses x402, the protocol that revives the dormant HTTP 402 status code as a settlement channel <sup class="cite">[39]</sup>. The flow has three messages. An agent requests a paid route; the server answers <span class="mono">402 Payment Required</span> with a challenge that names the asset, amount, recipient, and network. The agent constructs a payment authorization and resends the request carrying it. The server verifies the authorization through a facilitator and, once settled, executes the service and returns the result. Quiver implements the v2 <em>exact</em> scheme, in which the client authorizes a transfer of a fixed amount to a fixed recipient. That scheme is built on EIP-3009 <span class="mono">transferWithAuthorization</span> <sup class="cite">[36]</sup>, so the transfer is gasless and signed off-chain; the token is USD₮0 on X Layer (chain <span class="mono">eip155:196</span>). Prices are per call and range from 0.005 to 0.02 USDT, low enough that an agent can poll a service inside a decision loop without material cost.</p>
+<p>Payment uses x402, the protocol that revives the dormant HTTP 402 status code as a settlement channel <sup class="cite">[39]</sup>. The flow has three messages. An agent requests a paid route; the server answers <span class="mono">402 Payment Required</span> with a challenge that names the asset, amount, recipient, and network. The agent constructs a payment authorization and resends the request carrying it. The server verifies the authorization through a facilitator and, once settled, executes the service and returns the result. Quiver implements the v2 <em>exact</em> scheme, in which the client authorizes a transfer of a fixed amount to a fixed recipient. That scheme is built on EIP-3009 <span class="mono">transferWithAuthorization</span> <sup class="cite">[36]</sup>, so the transfer is gasless and signed off-chain; the token is USD₮0 on X Layer (chain <span class="mono">eip155:196</span>) via the OKX facilitator, with a second settlement rail in USDC on Base (chain <span class="mono">eip155:8453</span>) through the Coinbase CDP facilitator, offered on the same 402 challenge. Prices are per call and range from 0.005 to 0.05 USDT, low enough that an agent can poll a service inside a decision loop without material cost.</p>
 
 <p>The payment gate is enforced before any business logic. A route that is called without a valid authorization, whether by an honest probe or by the reviewer's conformance tool, receives the mandatory 402 challenge rather than a partial result or an error. This property is checked directly: at the time of writing, every paid route returns 402 to an unauthenticated request.</p>
 
@@ -222,7 +240,7 @@
 
 <h3>Identity and discovery under ERC-8004</h3>
 
-<p>An agent economy needs a way for one agent to find another and to judge whether it is worth transacting with. ERC-8004, the Trustless Agents standard <sup class="cite">[38]</sup>, provides this with three on-chain registries: Identity, Reputation, and Validation. Identity is a portable ERC-721 token whose metadata points to a registration file describing the agent and its services. Reputation collects client feedback; Validation records independent checks of delivered work. Quiver is registered as ASP <span class="mono">#5152</span> on X Layer under this standard, which makes its ten services discoverable to any agent browsing the registry and lets a track record accrue against a stable identity rather than a URL that can change. ERC-8004 is deliberately silent on payment and execution <sup class="cite">[38]</sup>, which is what allows it to compose with x402 for settlement and with the A2MCP calling convention for invocation.</p>
+<p>An agent economy needs a way for one agent to find another and to judge whether it is worth transacting with. ERC-8004, the Trustless Agents standard <sup class="cite">[38]</sup>, provides this with three on-chain registries: Identity, Reputation, and Validation. Identity is a portable ERC-721 token whose metadata points to a registration file describing the agent and its services. Reputation collects client feedback; Validation records independent checks of delivered work. Quiver is registered as ASP <span class="mono">#5152</span> on X Layer under this standard, which makes its twenty-two services discoverable to any agent browsing the registry and lets a track record accrue against a stable identity rather than a URL that can change. ERC-8004 is deliberately silent on payment and execution <sup class="cite">[38]</sup>, which is what allows it to compose with x402 for settlement and with the A2MCP calling convention for invocation. The nine deterministic risk-brain engines are additionally exposed over a remote Model Context Protocol (MCP) endpoint that any MCP-speaking agent can list and call directly.</p>
 
 <h3>Multi-service host and data plane</h3>
 
@@ -233,7 +251,7 @@
 <p>Latency is bounded by the venue round trip rather than by the computation. Measured end to end, the transaction decode and simulation returns in roughly 125 to 160 milliseconds, the fast-tier chart in 220 to 300, and the full options desk, which fetches and normalises an entire Deribit chain and fits a surface across expiries, in 550 to 700. These are within the budget an agent can absorb inside a decision loop, which is the point of pricing calls low enough to poll. Every response carries an <span class="mono">elapsedMs</span> field so a caller can hold the service to its own timing.</p>
 
 <table>
-  <caption>Table 1 — the ten registered services, their data source, and per-call price.</caption>
+  <caption>Table 1 — the twenty-two registered services, their data source, and per-call price.</caption>
   <tr><th>Service</th><th>Function</th><th>Primary data source</th><th>Price (USDT)</th></tr>
   <tr><td><span class="mono">options-desk</span></td><td>Options analytics: surface, greeks, RND, GEX, VRP, cross-market</td><td>Deribit v2, OKX</td><td>0.01</td></tr>
   <tr><td><span class="mono">calldata-x</span></td><td>Transaction simulation and EIP-712 signature safety</td><td>EVM JSON-RPC</td><td>0.005</td></tr>
@@ -243,8 +261,20 @@
   <tr><td><span class="mono">poly-desk</span></td><td>Polymarket wallet book and unrealised PnL</td><td>Polymarket</td><td>0.01</td></tr>
   <tr><td><span class="mono">updown-pulse</span></td><td>Short-window up/down market read (no fabricated edge)</td><td>Polymarket, OKX</td><td>0.01</td></tr>
   <tr><td><span class="mono">protocol-pulse</span></td><td>DeFi protocol risk flags from TVL and hack history</td><td>DefiLlama</td><td>0.01</td></tr>
-  <tr><td><span class="mono">macro-sentry</span></td><td>High-impact US macro events in a lookahead window</td><td>Curated calendar</td><td>0.005</td></tr>
+  <tr><td><span class="mono">macro-sentry</span></td><td>High-impact US macro events ahead + the options-implied expected move to the next one</td><td>Curated calendar + ATM IV</td><td>0.005</td></tr>
+  <tr><td><span class="mono">event-vol</span></td><td>Options-implied expected move around an event (1&sigma; + straddle E|&Delta;S| + prob-beyond) &amp; event-isolation from the vol term structure, self-checked</td><td>Black-76 (deterministic)</td><td>0.01</td></tr>
   <tr><td><span class="mono">loop-digest</span></td><td>Cursor-based wallet diff for agent loops</td><td>OKX DEX</td><td>0.01</td></tr>
+  <tr><td><span class="mono">lp-desk</span></td><td>Concentrated-liquidity fees vs divergence loss, replayed on real swaps</td><td>Uniswap-V3 (keyless RPC)</td><td>0.01</td></tr>
+  <tr><td><span class="mono">token-scan</span></td><td>Wash-trading share of DEX volume, with wallet/tx evidence</td><td>OKX DEX trades</td><td>0.05</td></tr>
+  <tr><td><span class="mono">wallet-audit</span></td><td>Authenticity grade of a wallet's PnL and win rate</td><td>OKX portfolio</td><td>0.05</td></tr>
+  <tr><td><span class="mono">perp-gate</span></td><td>Perp liquidation price, distance-to-liq &amp; funding drag, with a liquidation-invariant self-check</td><td>Hyperliquid / dYdX (live) + inputs</td><td>0.01</td></tr>
+  <tr><td><span class="mono">portfolio-gate</span></td><td>Cross-venue net exposure per underlying, the leg that liquidates first, concentration (HHI), and a correlated-crash stress</td><td>Hyperliquid, dYdX (live)</td><td>0.05</td></tr>
+  <tr><td><span class="mono">size-gate</span></td><td>Fractional-Kelly size + risk-of-ruin, with a Kelly-optimality self-check</td><td>Edge inputs (deterministic)</td><td>0.01</td></tr>
+  <tr><td><span class="mono">exec-verify</span></td><td>Fair-fill / sandwich check — bps lost to adverse execution, with a constant-product self-check</td><td>Swap + pool state (deterministic)</td><td>0.01</td></tr>
+  <tr><td><span class="mono">options-risk</span></td><td>Portfolio greeks + SPAN-style scenario margin for an options book, self-checked against finite differences</td><td>Black-76 (deterministic)</td><td>0.02</td></tr>
+  <tr><td><span class="mono">lp-risk</span></td><td>Forward-looking LP impermanent loss / divergence (LVR) + fee breakeven, self-checked at the token level</td><td>Closed-form (deterministic)</td><td>0.01</td></tr>
+  <tr><td><span class="mono">treasury-risk</span></td><td>Stablecoin-treasury concentration (HHI), depeg and correlated-depeg stress, and risk-adjusted yield, self-checked</td><td>Deterministic</td><td>0.02</td></tr>
+  <tr><td><span class="mono">risk-attest</span></td><td>Merkle-batch of proof hashes &rarr; one root + inclusion proofs + an EIP-712 (EAS-ready) attestation for a single on-chain anchor</td><td>Deterministic</td><td>0.01</td></tr>
 </table>
 
 <!-- ============================== 3. DESIGN PRINCIPLES ============================== -->
@@ -259,18 +289,18 @@
 <p>When a quantity cannot be estimated from observable data, the service returns null with a reason rather than a plausible-looking number. The tape microstructure estimators return null on a tape too thin to support them. The options surface excludes near-expiry slices where a diffusive model does not apply, rather than force-fitting them. The short-window up/down service outputs no directional edge at all, because short-horizon direction is empirically indistinguishable from a coin flip and a fabricated fair value would contradict the product's own thesis.</p>
 
 <h3>Arbitrage-free by construction</h3>
-<p>The volatility surface is fitted with the no-arbitrage inequalities enforced inside the optimisation objective, so an accepted fit satisfies them by construction rather than by hope <sup class="cite">[6]</sup>. A fit that fails its quality gate is rejected, and the caller is told the fallback was used. A negative risk-neutral density, the signature of butterfly arbitrage, is detected and disclosed rather than silently served.</p>
+<p>The volatility surface is fitted with the no-arbitrage inequalities enforced inside the optimisation objective, so an accepted fit satisfies them by construction rather than by hope <sup class="cite">[6]</sup>. Three conditions are enforced, not one: the butterfly condition per slice, the Roger-Lee wing bound, and — the one most easily overlooked — the calendar condition <em>between</em> slices, checked on the rounded parameters the caller actually receives rather than on the full-precision fit, because rounding a slice can reintroduce a crossing the fit had eliminated. A fit that fails its quality gate is rejected, and the caller is told the fallback was used. A negative risk-neutral density, the signature of butterfly arbitrage, is detected and disclosed rather than silently served; the check reports the strike range over which it was able to evaluate the density and withholds a clean verdict where the smile could not be evaluated, so &ldquo;no arbitrage detected&rdquo; can never mean &ldquo;detected none over the sliver I could see.&rdquo;</p>
 
 <h3>Descriptive, not prescriptive</h3>
 <p>Services report what the market prices and what the data shows. They do not tell a caller what to do. A composite "grade" that implies a validated predictive model is avoided where no labelled dataset exists to validate it; the protocol-risk service was rebuilt from a fitted 0–100 score into a set of individually defensible risk flags for exactly this reason. Every output that touches a trading decision carries a not-advice disclosure.</p>
 
 <h3>Proven by test</h3>
-<p>The financial mathematics is locked by an automated suite of model-free invariants: put-call parity, the delta relationship, non-negativity of the risk-neutral density, the martingale property of the distribution, and the absence of look-ahead in every time-series indicator. A change that breaks an identity breaks the build. Section 6 describes the suite; it currently holds 39 tests and all pass.</p>
+<p>The financial mathematics is locked by an automated suite of model-free invariants: put-call parity, the delta relationship, non-negativity of the risk-neutral density, the martingale property of the distribution, and the absence of look-ahead in every time-series indicator. A change that breaks an identity breaks the build. Section 6 describes the suite; it currently holds 152 tests that run on every build, with a further five live-archive integration tests behind an RPC flag, and all pass.</p>
 
 <!-- ============================== 4. SERVICE CATALOGUE ============================== -->
 <h2 id="s4">Service Catalogue</h2>
 
-<p>The ten services fall into five groups: options intelligence, transaction safety, charting, tape microstructure, and prediction-market and protocol tooling. Two are treated as the flagship of the set and specified in full; the rest are described at the level of what they compute, from where, and with what guarantees. Section 5 gives the mathematics that several of them share.</p>
+<p>The twenty-two services fall into seven groups: options intelligence, transaction and token safety, charting, tape microstructure, prediction-market and protocol tooling, concentrated-liquidity economics, and a verifiable risk brain (perpetual liquidation, cross-venue portfolio risk, position sizing, execution-quality verification, and options-portfolio greeks &amp; SPAN-style margin). Two are treated as the flagship of the set and specified in full; the rest are described at the level of what they compute, from where, and with what guarantees. Section 5 gives the mathematics that several of them share.</p>
 
 <div class="svc-head"><h3 style="border:none;margin-top:6px;">options-desk</h3><span class="price">/api/options-desk · 0.01 USDT</span></div>
 
@@ -285,6 +315,8 @@
 <p><strong>Variance risk premium and its significance.</strong> The service estimates the premium of implied over realised variance from overlapping windows <sup class="cite">[22],[23]</sup> and, critically, tests whether it is statistically distinguishable from zero at the effective independent sample size rather than the inflated count of overlapping pairs. On live BTC the ratio of realised to implied volatility is 0.881 with a p-value of 0.254; the service reports that this is not significant and refuses to present the real-world-calibrated probabilities as anything but indicative. This is the single clearest example of the product holding itself to a real quant standard: it computes the premium, then declines to claim an edge the data does not support.</p>
 
 <p><strong>Cross-market divergence.</strong> The options market and Polymarket price the same events by different mechanisms. For each live Polymarket threshold market on the coin, the service computes the options-implied probability of the identical question and reports the divergence. Because the market's resolution date is rarely a listed option expiry, the arbitrage-free smile is interpolated to the exact tenor in total variance, linearly in time between the two bracketing expiries, which preserves the calendar no-arbitrage condition; each row discloses whether the smile was interpolated or extrapolated and across which expiries. The raw divergence is then decomposed into the part explained by the variance risk premium, which is structural and not an edge, and the residual dislocation.</p>
+
+<p><strong>Model-free calendar bounds.</strong> A single smile prices vanilla options; it does not price a payoff that depends on two dates at once, such as a forward-starting straddle or a calendar spread. Rather than assume a stochastic-volatility dynamics to fill the gap, the service computes the tightest price interval consistent with <em>every</em> model that reprices both quoted expiries, by martingale optimal transport (Beiglböck, Henry-Labordère and Penkner): the two fitted marginals, mapped to the martingale coordinate <span class="mono">X = S/F</span>, become the constraints of a linear program whose optimum is a hard lower and upper no-arbitrage bound. The program is feasible if and only if the two marginals sit in convex order, which by Strassen's theorem is exactly the statement that the pair is free of calendar arbitrage — so the bound doubles as a certificate. Two exact identities gate the output: a payoff in the later date alone must integrate to one under the later marginal, and the expected increment <span class="mono">E[X<sub>2</sub> − X<sub>1</sub>]</span> must be zero. When either fails the bounds are withheld rather than shipped. Section 5.8 gives the construction. No other agent in the registry prices a two-date payoff without assuming a model.</p>
 
 <p>Supporting layers include the implied-volatility term structure and rank against the DVOL history, coverage-honest skew, max pain, put/call open interest, and an implied-rate curve backed out per expiry. The service fetches and normalises the full Deribit chain on each call, fits the surface once, and reuses it across the layers so every number is consistent with a single arbitrage-free surface.</p>
 
@@ -321,6 +353,22 @@
 <p><strong>macro-sentry</strong> returns the high-impact US macro events, FOMC decisions and CPI, PCE, and payrolls releases, that fall inside a caller's lookahead window, so a trading agent can de-risk before a print. The calendar is curated from published institutional schedules, which are fixed and durable, and the service is deterministic and dependency-free.</p>
 
 <p><strong>loop-digest</strong> is built for the top of an agent's loop. Given a cursor from the caller's previous call, it returns a compact diff of a wallet's world since then, new fills and per-token PnL drift, so the agent reads one small object instead of re-fetching and re-paying for the entire state on every iteration.</p>
+
+<div class="svc-head"><h3 style="border:none;margin-top:16px;">token-scan, wallet-audit</h3><span class="price">authenticity · 0.05 USDT each</span></div>
+
+<p><strong>token-scan</strong> answers a question that a price chart cannot: what share of a token's recent DEX volume is organic rather than manufactured. It aggregates the recent tape per wallet and scores the fingerprints of wash trading — round-trip churn, machine-regular timing cadence, buy/sell ping-pong alternation, and volume concentration in a handful of addresses — cross-referenced against OKX holder-cluster funding priors. Every verdict ships its evidence: the specific wallets and transaction hashes behind the score, and a confidence that is lowered rather than hidden when the tape is thin. The number an agent acts on can be audited back to the trades that produced it.</p>
+
+<p><strong>wallet-audit</strong> asks the same authenticity question of a track record. Native OKX endpoints report a wallet's PnL and win rate; this service grades whether those numbers reflect skill or are statistically hollow. A win rate over a handful of trades is not evidence, so the audit reports the Wilson score interval on the win rate at the real sample size, flags a record too short to support the claimed edge, and reuses token-scan on the wallet's own traded tokens to catch a PnL inflated by self-manufactured volume. It returns a grade with its working shown, or an explicit insufficient-data verdict, never a flattering point estimate on its own.</p>
+
+<div class="svc-head"><h3 style="border:none;margin-top:16px;">lp-desk</h3><span class="price">/api/lp-desk · 0.01 USDT</span></div>
+
+<p>lp-desk is a concentrated-liquidity reality-check, and it is built to <em>refuse</em> a product the rest of the market sells. Every &ldquo;range optimiser&rdquo; promises an optimal width for a Uniswap-V3 position. The service reconstructs what a chosen range would actually have earned by replaying the pool's real on-chain swap history — fetched over a keyless public archive node, with pool metadata read from the chain rather than assumed — and nets the realised fees against the divergence loss (loss-versus-rebalancing) the position bleeds as price moves through it. The finding, measured on hundreds of thousands of real swaps across two eighteen-month-separated windows, is that no capturable optimal width exists: narrow ranges are destroyed by rebalance bleed rather than gas, the widely shipped hardcoded ±5% band was net-negative in both windows, and a volatility-fitted width — the entire premise of an optimiser — failed to beat a constant reliably out of sample. So lp-desk sells the measurement, not a false optimum, and says plainly when the honest answer is &ldquo;don't provide this liquidity.&rdquo; Its own biases are disclosed and both happen to favour narrow ranges, which still lose, so the conclusion is robust; the limitation that swap logs carry only aggregate active liquidity, making the tool exact for relative strategy ranking at small size but not absolute PnL at scale, is stated in the output rather than buried. Section 5.9 gives the position mathematics.</p>
+
+<div class="svc-head"><h3 style="border:none;margin-top:16px;">Risk Brain — perp-gate, size-gate, exec-verify, options-risk, portfolio-gate</h3><span class="price">/api/perp-gate · /api/size-gate · /api/exec-verify · /api/options-risk · /api/portfolio-gate · 0.01–0.05 USDT</span></div>
+
+<p>The Risk Brain is the layer beneath the risk gate. An autonomous agent moving money on a loop does not fail for want of alpha; it fails on the arithmetic — an agent lost 62% of its capital trading perpetuals with no oversight, and top financial language models drop from 95.6% accuracy on lookups to near zero on multivariate calculation. The agent risk products now shipping from exchanges and startups enforce user-set <em>limits</em> (max size, leverage caps, drawdown stops) but assume the correct risk numbers as input; they do not compute them. These three services compute them, deterministically, and prove each answer.</p>
+
+<p><strong>perp-gate</strong> returns a perpetual-futures position's exact liquidation price, the adverse move to liquidation, effective leverage, and — given a funding rate — the funding drag. The liquidation price is not copied from a venue formula; it is <em>derived</em> from Hyperliquid's stated liquidation condition (account value below maintenance margin) and then <em>verified</em> numerically against that condition on every call, so a wrong derivation fails loudly rather than shipping a confident wrong number. Section 5.10 gives the derivation. <strong>size-gate</strong> converts an edge — discrete odds or a return/volatility pair — into a fractional-Kelly position and the probability of ever drawing down to 50/75/90% of capital; it defaults to quarter-Kelly because full Kelly rides thin, over-estimated edges to ruin, and it self-checks the returned fraction against the first-order condition that <em>defines</em> Kelly optimality. <strong>exec-verify</strong> takes a completed swap and the pre-trade pool state and reports how many basis points the fill lost to <em>adverse</em> execution — sandwiching, MEV, or a stale quote — beyond the unavoidable fee and own price impact, proving the uncomfortable fact that a fill &ldquo;within slippage tolerance&rdquo; can still have been robbed; its benchmark is the constant-product invariant, asserted on every call. A fourth, <strong>options-risk</strong>, aggregates a whole options book: net greeks (delta, gamma, vega, theta, and the second-order vanna and volga) and a SPAN-style scenario margin — the worst repriced P&amp;L over a price&times;vol grid — because an options book's true risk is not the sum of per-leg notionals. Its self-check is the strongest in the catalogue: all six analytic portfolio greeks are verified against finite-difference derivatives of the actually-repriced book, a discrepancy that surfaced (and forced the upgrade to a machine-precision normal CDF, since the greeks must be consistent with the prices to the last figure). A fifth, <strong>portfolio-gate</strong>, is the whole-book view the others lack: it aggregates perpetual legs <em>across venues</em> — Hyperliquid and dYdX — into the true net exposure per underlying (signed notionals summed, so a long on one venue and a short of the same asset on another net out instead of double-counting), the leg that liquidates <em>first</em> across the book, a concentration index that exposes when a nominally diversified book is secretly one directional bet, and a correlated-crash stress that moves every leg together as correlations go to one — the regime in which roughly &#36;19&thinsp;billion liquidated in a single day in October 2025. Section&nbsp;5.18 derives the aggregation and the four identities it self-checks. Each of these five ships the proof envelope of Section 3: echoed inputs, code identity, a content hash, and the self-check result, so the caller reproduces the number rather than trusting it.</p>
 
 <!-- ============================== 5. METHODOLOGY ============================== -->
 <h2 id="s5">Methodology</h2>
@@ -423,6 +471,497 @@
 
 <p>The signature path parses an EIP-712 typed-data payload <sup class="cite">[32]</sup>. EIP-712 binds a signature to a domain and a typed struct through a hash of the form <span class="mono">keccak256("\\x19\\x01" ‖ domainSeparator ‖ hashStruct(message))</span>; a signature that a wallet displays as harmless can authorise a transfer through a Permit or Permit2 grant. The service recognises the Permit2 <sup class="cite">[37]</sup> and EIP-2612 <sup class="cite">[33]</sup> permit shapes, extracts the spender, amount, and expiry, checks the domain against the canonical Permit2 deployment, and flags an unlimited allowance, a non-expiring permit, a batch that touches many tokens, or a spender that resolves to an externally owned or EIP-7702-delegated wallet <sup class="cite">[35]</sup> rather than an audited contract. Because these grants are signatures and never transactions, no amount of transaction simulation can see them; a service that stops at simulation leaves the dominant drainer vector uncovered.</p>
 
+<h3>Model-free calendar bounds by martingale optimal transport</h3>
+
+<p>A single expiry's smile pins down the risk-neutral law of the terminal price at that one date; it says nothing about the joint law across two dates, which is exactly what a forward-starting or calendar payoff needs. The classical response is to assume a dynamics — Heston, local volatility, a jump model — and inherit its misspecification. Martingale optimal transport instead asks for the entire range of prices consistent with the two marginals and no arbitrage, and returns a hard interval rather than a point (Beiglböck, Henry-Labordère and Penkner). Work in the martingale coordinate <span class="mono">X = S/F(T)</span>, in which each fitted marginal has mean one. Let <span class="mono">μ</span> be the earlier date's law and <span class="mono">ν</span> the later's, both recovered from the fitted smiles by Breeden–Litzenberger and discretised to grids <span class="mono">{x<sub>i</sub>}</span> and <span class="mono">{y<sub>j</sub>}</span> with probabilities <span class="mono">{μ<sub>i</sub>}</span>, <span class="mono">{ν<sub>j</sub>}</span>. A joint law is a coupling <span class="mono">π<sub>ij</sub> ≥ 0</span>, and the no-arbitrage price of a payoff <span class="mono">c</span> is bounded by the linear program</p>
+
+<div class="eq">[ lower, upper ] = min / max<sub>π</sub> Σ<sub>ij</sub> π<sub>ij</sub> c(x<sub>i</sub>, y<sub>j</sub>) &nbsp; s.t. &nbsp; Σ<sub>j</sub> π<sub>ij</sub> = μ<sub>i</sub>, &nbsp; Σ<sub>i</sub> π<sub>ij</sub> = ν<sub>j</sub>, &nbsp; Σ<sub>j</sub> π<sub>ij</sub>(y<sub>j</sub> − x<sub>i</sub>) = 0. <span class="num">(15)</span></div>
+
+<p>The first two constraints reproduce the quoted marginals; the third is the martingale condition <span class="mono">E[Y | X = x<sub>i</sub>] = x<sub>i</sub></span> that no-arbitrage imposes between the two dates. The program is feasible if and only if <span class="mono">μ</span> and <span class="mono">ν</span> lie in convex order, written <span class="mono">μ ⪯ ν</span>, which by Strassen's theorem is precisely the existence of a martingale coupling — equivalently, that the two smiles carry no calendar arbitrage. The same linear program that prices the payoff therefore certifies the surface: infeasibility <em>is</em> a calendar-arbitrage detector, agreeing with the total-variance monotonicity check of Section 5.2 by a completely independent route. Two identities gate the result before it ships. The later marginal must itself have unit mean, <span class="mono">∫ y dν = 1</span>, and the transport must preserve it, so <span class="mono">E<sub>π</sub>[Y − X] = 0</span> to numerical tolerance. When either fails — the signature of a mis-discretised or crossed marginal — the bounds are withheld rather than served, in keeping with the refuse-to-fabricate principle.</p>
+
+<h3>Concentrated-liquidity value and divergence loss</h3>
+
+<p>A Uniswap-V3 position supplies liquidity <span class="mono">L</span> across a price range <span class="mono">[P<sub>a</sub>, P<sub>b</sub>]</span> and earns fees only while the pool price sits inside it. At a price <span class="mono">P</span> within the range the position holds</p>
+
+<div class="eq">amount0 = L ( 1/√P − 1/√P<sub>b</sub> ), &nbsp;&nbsp; amount1 = L ( √P − √P<sub>a</sub> ), <span class="num">(16)</span></div>
+
+<p>token0 vanishing at the top of the range and token1 at the bottom. lp-desk fixes <span class="mono">L</span> from the caller's capital at entry, then replays the pool's real swap sequence read from chain: at each in-range swap it credits the position's pro-rata fee share <span class="mono">L / (L<sub>active</sub> + L)</span> of the tier applied to that swap's volume, and re-marks the holdings by (16) at the new price. The profit-and-loss against simply holding the entry bundle decomposes as</p>
+
+<div class="eq">( LP − HODL ) = fees earned − divergence loss, <span class="num">(17)</span></div>
+
+<p>where the divergence loss is the concentrated-liquidity form of loss-versus-rebalancing — the value the position sheds to arbitrageurs as price crosses it, growing as the range narrows. The replay is exact for <em>ranking</em> strategies at small size, where the pro-rata share is faithful; it is a relative measure, not absolute PnL at scale, because public swap logs expose only aggregate active liquidity and not the per-tick order book, and the service discloses this limit in its own output. The empirical result across the replayed windows is that fees never overtake divergence loss for the narrow ranges an optimiser would recommend, which is why lp-desk reports the measurement and declines to name an optimum it cannot honestly defend.</p>
+
+<h3>Perpetual liquidation and funding</h3>
+
+<p>The <span class="mono">perp-gate</span> liquidation price is not copied from a venue's formula — it is <em>derived</em> from the stated liquidation condition and then verified against it on every call. A venue liquidates an isolated position when its account value falls to the maintenance margin. With posted margin <span class="mono">M</span>, size <span class="mono">q</span> in base units, entry <span class="mono">P<sub>0</sub></span>, side <span class="mono">s&isin;{+1,&minus;1}</span>, and a maintenance rate <span class="mono">mmr</span> (half the initial rate at maximum leverage, so <span class="mono">mmr = 0.5 / maxLeverage</span>), the account value at price <span class="mono">P</span> is <span class="mono">M + s&middot;q&middot;(P&minus;P<sub>0</sub>)</span> and the maintenance requirement is <span class="mono">q&middot;P&middot;mmr</span>. Equating the two and solving gives</p>
+
+<div class="eq">P<sub>liq</sub> = ( s&middot;q&middot;P<sub>0</sub> &minus; M ) / ( q ( s &minus; mmr ) ), <span class="num">(18)</span></div>
+
+<p>which for a long is <span class="mono">(P<sub>0</sub> &minus; M/q)/(1 &minus; mmr)</span>. On every call the engine substitutes <span class="mono">P<sub>liq</sub></span> back and confirms that account value equals the maintenance requirement there — the same condition it solved — so a wrong derivation fails loudly (residual &sim;10<sup>&minus;11</sup>) rather than shipping a confident wrong number. This is the discipline in action: deriving from the primary source, rather than a widely-repeated secondary formula that dropped the maintenance term and reported roughly double the true buffer. Funding is projected separately on the notional at the venue's cadence (hourly on Hyperliquid). The maintenance rate is not a single constant: on Hyperliquid it steps up with position notional through the venue's margin tiers, so a large position is measured against the tighter rate its size actually incurs rather than the headline one, and the identical derivation is driven by a second venue's live parameters when a leg sits on dYdX, whose maintenance-margin fraction is published directly. Figure&nbsp;1 shows how the liquidation buffer collapses with leverage.</p>
+
+<figure style="margin:22px auto;max-width:660px;text-align:center;"><svg width="640" height="360" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 640 360">
+<rect width="640" height="360" x="0" y="0" fill="none"></rect>
+<path d="M62 308.5L616 308.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 259.5L616 259.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 210.5L616 210.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 161.5L616 161.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 113.5L616 113.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 64.5L616 64.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62.5 64L62.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M178.5 64L178.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M324.5 64L324.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M470.5 64L470.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M616.5 64L616.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="-6" transform="matrix(0,-1,1,0,28,186)" fill="#1a2332">adverse move to liquidation (%)</text>
+<path d="M62.5 308L62.5 64" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="6" transform="translate(339 342)" fill="#1a2332">effective leverage (×)</text>
+<path d="M62 308.5L616 308.5" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr2-cls-8"></path>
+<path d="M62 308.5L57 308.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 259.5L57 259.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 210.5L57 210.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 161.5L57 161.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 113.5L57 113.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 64.5L57 64.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62.5 308L62.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M178.5 308L178.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M324.5 308L324.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M470.5 308L470.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M616.5 308L616.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 308)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 259.2)" fill="#8a97a8">10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 210.4)" fill="#8a97a8">20</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 161.6)" fill="#8a97a8">30</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 112.8)" fill="#8a97a8">40</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 64)" fill="#8a97a8">50</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(62 316)" fill="#8a97a8">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(178.6316 316)" fill="#8a97a8">10</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(324.4211 316)" fill="#8a97a8">20</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(470.2105 316)" fill="#8a97a8">30</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(616 316)" fill="#8a97a8">40</text>
+<polygon points="397.3 308 616 308 616 64 397.3 64" fill="rgb(192,57,43)" fill-opacity="0.07" stroke="#2b6cb0" stroke-width="0" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" ecmeta_silent="true" class="zr2-cls-8"></polygon>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10px;font-family:Georgia, serif;" xml:space="preserve" y="5" transform="translate(611 69)" fill="#c0392b">danger: thin buffer</text>
+<g clip-path="url(#zr2-c0)">
+<path d="M62 67.1L76.6 149.5L91.2 190.6L105.7 215.3L120.3 231.8L134.9 243.6L149.5 252.4L164.1 259.3L178.6 264.8L193.2 269.3L207.8 273L222.4 276.2L236.9 278.9L251.5 281.2L266.1 283.3L280.7 285.1L295.3 286.7L309.8 288.2L324.4 289.5L339 290.6L353.6 291.7L368.2 292.7L382.7 293.6L397.3 294.4L411.9 295.2L426.5 295.9L441.1 296.5L455.6 297.1L470.2 297.7L484.8 298.2L499.4 298.7L513.9 299.2L528.5 299.6L543.1 300.1L557.7 300.5L572.3 300.8L586.8 301.2L601.4 301.5L616 301.8L616 308L601.4 308L586.8 308L572.3 308L557.7 308L543.1 308L528.5 308L513.9 308L499.4 308L484.8 308L470.2 308L455.6 308L441.1 308L426.5 308L411.9 308L397.3 308L382.7 308L368.2 308L353.6 308L339 308L324.4 308L309.8 308L295.3 308L280.7 308L266.1 308L251.5 308L236.9 308L222.4 308L207.8 308L193.2 308L178.6 308L164.1 308L149.5 308L134.9 308L120.3 308L105.7 308L91.2 308L76.6 308L62 308Z" fill="rgb(43,108,176)" fill-opacity="0.041999999999999996" class="zr2-cls-10"></path>
+<path d="M62 67.1L76.6 149.5L91.2 190.6L105.7 215.3L120.3 231.8L134.9 243.6L149.5 252.4L164.1 259.3L178.6 264.8L193.2 269.3L207.8 273L222.4 276.2L236.9 278.9L251.5 281.2L266.1 283.3L280.7 285.1L295.3 286.7L309.8 288.2L324.4 289.5L339 290.6L353.6 291.7L368.2 292.7L382.7 293.6L397.3 294.4L411.9 295.2L426.5 295.9L441.1 296.5L455.6 297.1L470.2 297.7L484.8 298.2L499.4 298.7L513.9 299.2L528.5 299.6L543.1 300.1L557.7 300.5L572.3 300.8L586.8 301.2L601.4 301.5L616 301.8" fill="none" pointer-events="visible" stroke="#2b6cb0" stroke-width="2" stroke-linejoin="bevel" class="zr2-cls-11"></path>
+</g>
+<path d="M-176.7 -5l353.4 0l0 46l-353.4 0Z" transform="translate(320 20)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#3c3c41" stroke-width="0" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:15px;font-family:Georgia, serif;font-weight:600;" xml:space="preserve" y="7.5" transform="translate(320 20)" fill="#1a2332">The liquidation buffer collapses with leverage</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" y="30.5" transform="translate(320 20)" fill="#8a97a8">move-to-liquidation for a BTC long (maint. margin 1.25%) — perp-gate</text>
+<defs >
+<clipPath id="zr2-c0">
+<path d="M61 63l556 0l0 246l-556 0Z" fill="#000" class="zr2-cls-9"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr2-cls-8:hover {
+pointer-events:none;
+}
+.zr2-cls-9:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr2-cls-10:hover {
+cursor:pointer;
+fill:rgba(47,118,193,0.06);
+}
+.zr2-cls-11:hover {
+cursor:pointer;
+}
+
+]]>
+
+</style>
+</svg><figcaption style="font-size:12px;color:#5b6b80;margin-top:4px;font-style:italic;">Figure 1 &mdash; move-to-liquidation for a BTC long at maintenance margin 1.25%, computed by perp-gate across leverage.</figcaption></figure>
+
+<h3>Position sizing and the probability of ruin</h3>
+
+<p>Over-betting, not a bad thesis, is what ruins a leveraged agent, so <span class="mono">size-gate</span> converts an edge into a fraction of capital and reports the probability that fraction ever ruins it. Full Kelly maximises expected log-growth: for a discrete edge (win probability <span class="mono">p</span>, net odds <span class="mono">b</span>) it is <span class="mono">f* = (p(b+1)&minus;1)/b</span>, the argmax of <span class="mono">g(f)=p&middot;ln(1+fb)+(1&minus;p)ln(1&minus;f)</span>; for a continuous edge, <span class="mono">f* = &mu;/&sigma;<sup>2</sup></span>. Full Kelly is growth-optimal but its drawdowns are violent, so the engine bets a fraction <span class="mono">&lambda;</span> of full Kelly (default a quarter). The probability of <em>ever</em> drawing down to a fraction <span class="mono">&alpha;</span> of capital is derived, not recalled: under fractional-Kelly&nbsp;<span class="mono">&lambda;</span> log-wealth is a Brownian motion with drift <span class="mono">g=(&mu;<sup>2</sup>/&sigma;<sup>2</sup>)&lambda;(1&minus;&lambda;/2)</span> and variance rate <span class="mono">s<sup>2</sup>=&lambda;<sup>2</sup>&mu;<sup>2</sup>/&sigma;<sup>2</sup></span>; the probability that a drifting Brownian motion ever reaches a level <span class="mono">&minus;L</span> is <span class="mono">exp(&minus;2gL/s<sup>2</sup>)</span>, and with <span class="mono">L=ln(1/&alpha;)</span> this collapses to</p>
+
+<div class="eq">RoR( &alpha;, &lambda; ) = &alpha;<sup>(2&minus;&lambda;)/&lambda;</sup>, <span class="num">(19)</span></div>
+
+<p>which at full Kelly (<span class="mono">&lambda;=1</span>) reduces to the classic result <span class="mono">RoR=&alpha;</span>. The engine self-checks the returned fraction against the first-order condition <span class="mono">g&prime;(f*)=0</span> that <em>defines</em> Kelly, the half-Kelly identity (growth&nbsp;&times;0.75, volatility&nbsp;&times;0.5), and the ruin anchor, and it flags when the recommended bet exceeds the bankroll (Kelly implying leverage, where the ruin figure understates the true risk of a forced liquidation). Figure&nbsp;2 shows why professionals under-bet: ruin risk falls super-linearly as the Kelly fraction shrinks.</p>
+
+<figure style="margin:22px auto;max-width:680px;text-align:center;"><svg width="640" height="380" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 640 380">
+<rect width="640" height="380" x="0" y="0" fill="none"></rect>
+<path d="M64 329.5L616 329.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M64 281.5L616 281.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M64 232.5L616 232.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M64 184.5L616 184.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M64 136.5L616 136.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M64 88.5L616 88.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M64.5 88L64.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M180.5 88L180.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M296.5 88L296.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M412.5 88L412.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M529.5 88L529.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<path d="M616.5 88L616.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="-6" transform="matrix(0,-1,1,0,27.46,208.5)" fill="#1a2332">probability of ever reaching it (%)</text>
+<path d="M64.5 329L64.5 88" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="6" transform="translate(340 363)" fill="#1a2332">drawdown from peak (%)</text>
+<path d="M64 329.5L616 329.5" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr0-cls-0"></path>
+<path d="M64 329.5L59 329.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M64 281.5L59 281.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M64 232.5L59 232.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M64 184.5L59 184.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M64 136.5L59 136.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M64 88.5L59 88.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M64.5 329L64.5 334" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M180.5 329L180.5 334" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M296.5 329L296.5 334" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M412.5 329L412.5 334" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M529.5 329L529.5 334" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<path d="M616.5 329L616.5 334" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(56 329)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(56 280.8)" fill="#8a97a8">20</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(56 232.6)" fill="#8a97a8">40</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(56 184.4)" fill="#8a97a8">60</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(56 136.2)" fill="#8a97a8">80</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(56 88)" fill="#8a97a8">100</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(64 337)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(180.2105 337)" fill="#8a97a8">20</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(296.4211 337)" fill="#8a97a8">40</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(412.6316 337)" fill="#8a97a8">60</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(528.8421 337)" fill="#8a97a8">80</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(616 337)" fill="#8a97a8">95</text>
+<g clip-path="url(#zr0-c0)">
+<path d="M93.1 100.1L107.6 106.1L122.1 112.1L136.6 118.1L151.2 124.2L165.7 130.2L180.2 136.2L194.7 142.2L209.3 148.3L223.8 154.3L238.3 160.3L252.8 166.3L267.4 172.4L281.9 178.4L296.4 184.4L310.9 190.4L325.5 196.4L340 202.5L354.5 208.5L369.1 214.5L383.6 220.6L398.1 226.6L412.6 232.6L427.2 238.6L441.7 244.6L456.2 250.7L470.7 256.7L485.3 262.7L499.8 268.8L514.3 274.8L528.8 280.8L543.4 286.8L557.9 292.9L572.4 298.9L586.9 304.9L601.5 310.9" fill="none" pointer-events="visible" stroke="#c0392b" stroke-width="2.4" stroke-linejoin="bevel" class="zr0-cls-2"></path>
+</g>
+<g clip-path="url(#zr0-c1)">
+<path d="M93.1 122.4L107.6 138.3L122.1 153.3L136.6 167.6L151.2 181L165.7 193.7L180.2 205.6L194.7 216.8L209.3 227.3L223.8 237.2L238.3 246.3L252.8 254.9L267.4 262.8L281.9 270.2L296.4 276.9L310.9 283.2L325.5 288.9L340 294.1L354.5 298.9L369.1 303.2L383.6 307L398.1 310.5L412.6 313.6L427.2 316.3L441.7 318.7L456.2 320.7L470.7 322.5L485.3 324L499.8 325.2L514.3 326.3L528.8 327.1L543.4 327.7L557.9 328.2L572.4 328.5L586.9 328.8L601.5 328.9" fill="none" pointer-events="visible" stroke="#b7791f" stroke-width="2.2" stroke-linejoin="bevel" class="zr0-cls-2"></path>
+</g>
+<g clip-path="url(#zr0-c2)">
+<path d="M93.1 160.7L107.6 189.4L122.1 213.7L136.6 234.4L151.2 251.7L165.7 266.3L180.2 278.5L194.7 288.5L209.3 296.8L223.8 303.6L238.3 309.1L252.8 313.6L267.4 317.2L281.9 320L296.4 322.3L310.9 324L325.5 325.3L340 326.3L354.5 327.1L369.1 327.7L383.6 328.1L398.1 328.4L412.6 328.6L427.2 328.8L441.7 328.9L456.2 328.9L470.7 329L485.3 329L499.8 329L514.3 329L528.8 329L543.4 329L557.9 329L572.4 329L586.9 329L601.5 329" fill="none" pointer-events="visible" stroke="#2b6cb0" stroke-width="3.2" stroke-linejoin="bevel" class="zr0-cls-2"></path>
+</g>
+<path d="M-5 -5l504.6 0l0 23.2l-504.5 0Z" transform="translate(72.725 57)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#b7b9be" stroke-width="0" class="zr0-cls-0"></path>
+<path d="M0 7L25 7" transform="translate(73.725 56.6)" fill="#000" stroke="#c0392b" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(73.725 56.6)" fill="#fff" stroke="#c0392b" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" x="30" y="7" transform="translate(73.725 56.6)" fill="#1a2332">Full Kelly (λ=1) — ruinous</text>
+<path d="M-1 0.4l162.9 0l0 13.2l-162.9 0Z" transform="translate(73.725 56.6)" fill="none" pointer-events="visible" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr0-cls-3"></path>
+<path d="M0 7L25 7" transform="translate(244.615 56.6)" fill="#000" stroke="#b7791f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(244.615 56.6)" fill="#fff" stroke="#b7791f" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" x="30" y="7" transform="translate(244.615 56.6)" fill="#1a2332">Half Kelly (λ=0.5)</text>
+<path d="M-1 0.4l120.7 0l0 13.2l-120.6 0Z" transform="translate(244.615 56.6)" fill="none" pointer-events="visible" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr0-cls-3"></path>
+<path d="M0 7L25 7" transform="translate(373.265 56.6)" fill="#000" stroke="#2b6cb0" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(373.265 56.6)" fill="#fff" stroke="#2b6cb0" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" x="30" y="7" transform="translate(373.265 56.6)" fill="#1a2332">Quarter Kelly (λ=0.25) — default</text>
+<path d="M-1 0.4l195 0l0 13.2l-195 0Z" transform="translate(373.265 56.6)" fill="none" pointer-events="visible" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr0-cls-3"></path>
+<path d="M-182.1 -5l364.2 0l0 46l-364.1 0Z" transform="translate(320 20)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#3c3c41" stroke-width="0" class="zr0-cls-0"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:15px;font-family:Georgia, serif;font-weight:600;" xml:space="preserve" y="7.5" transform="translate(320 20)" fill="#1a2332">Risk of ruin shrinks super-linearly with fractional Kelly</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" y="30.5" transform="translate(320 20)" fill="#8a97a8">P(ever drawing down to a loss) — size-gate, RoR = α^((2−λ)/λ)</text>
+<defs >
+<clipPath id="zr0-c0">
+<path d="M62 86.8l556 0l0 243.4l-556 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+<clipPath id="zr0-c1">
+<path d="M62 86.9l556 0l0 243.2l-556 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+<clipPath id="zr0-c2">
+<path d="M62 86.4l557 0l0 244.2l-557 0Z" fill="#000" class="zr0-cls-1"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr0-cls-0:hover {
+pointer-events:none;
+}
+.zr0-cls-1:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr0-cls-2:hover {
+cursor:pointer;
+}
+.zr0-cls-3:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg><figcaption style="font-size:12px;color:#5b6b80;margin-top:4px;font-style:italic;">Figure 2 &mdash; probability of ever reaching a given drawdown at full, half and quarter Kelly, from size-gate. Full Kelly is linear in the drawdown; quarter Kelly is <span class="mono">&alpha;<sup>7</sup></span>.</figcaption></figure>
+
+<h3>Execution quality and adverse fills</h3>
+
+<p>&ldquo;Filled within slippage tolerance&rdquo; is not protection — a sandwich completes the trade inside the tolerance while extracting value the caller never sees. For a constant-product pool with pre-trade reserves <span class="mono">(x,y)</span> and fee <span class="mono">f</span>, the honest output for input <span class="mono">&Delta;x</span> is</p>
+
+<div class="eq">out = y&middot;&Delta;x(1&minus;f) / ( x + &Delta;x(1&minus;f) ), <span class="num">(20)</span></div>
+
+<p>which exactly preserves the fee-adjusted product, <span class="mono">(x+&Delta;x(1&minus;f))(y&minus;out)=xy</span> — the invariant <span class="mono">exec-verify</span> asserts on every call. The realised fill's shortfall against this honest figure is reported as adverse-execution basis points, separated from the unavoidable fee and the caller's own price impact; a favourable fill is labelled as such rather than mislabelled adverse. The engine discloses that its benchmark is only as good as the reserve snapshot's timing (block-start versus immediately-pre-transaction), because that choice determines whether a front-run is inside or outside the measured baseline.</p>
+
+<h3>Options-book greeks and scenario margin</h3>
+
+<p>An options book's risk is not the sum of its legs' notionals. <span class="mono">options-risk</span> aggregates the position-weighted greeks (<span class="mono">&Sigma; q<sub>i</sub>&middot;greek<sub>i</sub></span>) on Black-76 and computes a SPAN-style scenario margin — the worst repriced profit-and-loss over a grid of price and volatility shocks, which is the loss the book must be held against. Its self-check is the most exacting in the catalogue: the analytic portfolio greeks are verified against finite-difference derivatives of the <em>actually repriced</em> book, so <span class="mono">dV/d(shock)</span> must equal <span class="mono">&Sigma; q<sub>i</sub>&middot;&delta;<sub>i</sub>&middot;F<sub>i</sub></span> and the second difference <span class="mono">&Sigma; q<sub>i</sub>&middot;&gamma;<sub>i</sub>&middot;F<sub>i</sub><sup>2</sup></span>. Enforcing that to a tight tolerance surfaced a latent flaw: the pricing used an Abramowitz&ndash;Stegun normal CDF whose numerical derivative disagreed with the exact-density greeks at &sim;5&times;10<sup>&minus;4</sup>, flooring any greek self-check. Rather than widen the tolerance to make the red turn green, we replaced the CDF with a machine-precision (Hart) algorithm, restoring price&ndash;greek consistency to &sim;4&times;10<sup>&minus;8</sup> and improving every options service that shares the pricer. Figure&nbsp;3 shows the scenario surface of a short straddle.</p>
+
+<figure style="margin:22px auto;max-width:680px;text-align:center;"><svg width="640" height="380" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 640 380">
+<rect width="640" height="380" x="0" y="0" fill="none"></rect>
+<path d="M68.8 329.5L616 329.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 294.5L616 294.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 260.5L616 260.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 225.5L616 225.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 191.5L616 191.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 157.5L616 157.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 122.5L616 122.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M68.8 88.5L616 88.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M69.5 88L69.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M160.5 88L160.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M251.5 88L251.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M342.5 88L342.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M433.5 88L433.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M525.5 88L525.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<path d="M616.5 88L616.5 329" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="-6" transform="matrix(0,-1,1,0,20,208.5)" fill="#1a2332">portfolio P&amp;L ($)</text>
+<path d="M342.5 329L342.5 88" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="6" transform="translate(342.4125 363)" fill="#1a2332">underlying move (%)</text>
+<path d="M68.8 157.5L616 157.5" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr3-cls-12"></path>
+<path d="M342.4 329.5L337.4 329.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 294.5L337.4 294.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 260.5L337.4 260.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 225.5L337.4 225.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 191.5L337.4 191.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 157.5L337.4 157.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 122.5L337.4 122.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.4 88.5L337.4 88.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M69.5 156.9L69.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M160.5 156.9L160.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M251.5 156.9L251.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M342.5 156.9L342.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M433.5 156.9L433.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M525.5 156.9L525.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<path d="M616.5 156.9L616.5 161.9" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 329)" fill="#8a97a8">-5,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 294.5714)" fill="#8a97a8">-4,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 260.1429)" fill="#8a97a8">-3,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 225.7143)" fill="#8a97a8">-2,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 191.2857)" fill="#8a97a8">-1,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 156.8571)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 122.4286)" fill="#8a97a8">1,000</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(60.825 88)" fill="#8a97a8">2,000</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(68.825 337)" fill="#8a97a8">-15</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(160.0208 337)" fill="#8a97a8">-10</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(251.2167 337)" fill="#8a97a8">-5</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(342.4125 337)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(433.6083 337)" fill="#8a97a8">5</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(524.8042 337)" fill="#8a97a8">10</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(616 337)" fill="#8a97a8">15</text>
+<g clip-path="url(#zr3-c0)">
+<path d="M68.8 249.8L160 193.8L251.2 162.3L342.4 156.9L433.6 176.7L524.8 219.3L616 280.7" fill="none" pointer-events="visible" stroke="#2b6cb0" stroke-width="2" stroke-linejoin="bevel" class="zr3-cls-14"></path>
+</g>
+<g clip-path="url(#zr3-c1)">
+<path d="M68.8 281.4L160 234.3L251.2 209.4L342.4 207L433.6 226.4L524.8 265.4L616 321.3" fill="none" pointer-events="visible" stroke="#7aa0cf" stroke-width="2" stroke-linejoin="bevel" class="zr3-cls-14"></path>
+</g>
+<g clip-path="url(#zr3-c2)">
+<path d="M68.8 222.6L160 155.7L251.2 115.8L342.4 106.6L433.6 127.7L524.8 175.4L616 244.4" fill="none" pointer-events="visible" stroke="#4d80bd" stroke-width="2" stroke-linejoin="bevel" class="zr3-cls-14"></path>
+</g>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,68.825,249.7905)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,160.0208,193.7701)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,251.2167,162.2672)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,342.4125,156.8571)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,433.6083,176.7455)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,524.8041,219.2724)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,616,280.7022)" fill="#2b6cb0" ecmeta_series_index="0" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr3-cls-15"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,68.825,281.3677)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,160.0208,234.3118)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,251.2167,209.3518)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,342.4125,207.0409)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,433.6083,226.4259)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,524.8041,265.4197)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,616,321.2694)" fill="#7aa0cf" ecmeta_series_index="1" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr3-cls-16"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,68.825,222.6329)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="0" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,160.0208,155.7003)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="1" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,251.2167,115.8372)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,342.4125,106.6114)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="3" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,433.6083,127.6848)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="4" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,524.8041,175.4317)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="5" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M1 0A1 1 0 1 1 1 -0.1A1 1 0 0 1 1 0" transform="matrix(2.5,0,0,2.5,616,244.4111)" fill="#4d80bd" ecmeta_series_index="2" ecmeta_data_index="6" ecmeta_ssr_type="chart" class="zr3-cls-17"></path>
+<path d="M-5 -5l292 0l0 21.2l-292 0Z" transform="translate(178.985 57)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#b7b9be" stroke-width="0" class="zr3-cls-12"></path>
+<path d="M0 7L25 7" transform="translate(179.985 55.6)" fill="#000" stroke="#2b6cb0" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-12"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(179.985 55.6)" fill="#2b6cb0" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" x="30" y="7" transform="translate(179.985 55.6)" fill="#1a2332">IV unchanged</text>
+<path d="M-1 1.4l99.3 0l0 11.2l-99.3 0Z" transform="translate(179.985 55.6)" fill="none" pointer-events="visible" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="legend" class="zr3-cls-18"></path>
+<path d="M0 7L25 7" transform="translate(287.295 55.6)" fill="#000" stroke="#7aa0cf" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-12"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(287.295 55.6)" fill="#7aa0cf" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" x="30" y="7" transform="translate(287.295 55.6)" fill="#1a2332">IV +10 pts</text>
+<path d="M-1 1.4l81.1 0l0 11.2l-81 0Z" transform="translate(287.295 55.6)" fill="none" pointer-events="visible" ecmeta_series_index="1" ecmeta_data_index="1" ecmeta_ssr_type="legend" class="zr3-cls-18"></path>
+<path d="M0 7L25 7" transform="translate(376.345 55.6)" fill="#000" stroke="#4d80bd" stroke-width="2" stroke-linecap="butt" stroke-miterlimit="10" class="zr3-cls-12"></path>
+<path d="M18.1 7A5.6 5.6 0 1 1 18.1 6.4A5.6 5.6 0 0 1 18.1 7" transform="translate(376.345 55.6)" fill="#4d80bd" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" x="30" y="7" transform="translate(376.345 55.6)" fill="#1a2332">IV −10 pts</text>
+<path d="M-1 1.4l85.7 0l0 11.2l-85.7 0Z" transform="translate(376.345 55.6)" fill="none" pointer-events="visible" ecmeta_series_index="2" ecmeta_data_index="2" ecmeta_ssr_type="legend" class="zr3-cls-18"></path>
+<path d="M68.8 321.5L616 321.5" fill="none" pointer-events="visible" stroke="#c0392b" stroke-dasharray="4,2" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" ecmeta_silent="true" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10px;font-family:Georgia, serif;" xml:space="preserve" y="-5" transform="translate(611 316.2694)" fill="#c0392b">worst case = SPAN margin −$4775.46</text>
+<path d="M-216.8 -5l433.6 0l0 46l-433.6 0Z" transform="translate(320 20)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#3c3c41" stroke-width="0" class="zr3-cls-12"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:15px;font-family:Georgia, serif;font-weight:600;" xml:space="preserve" y="7.5" transform="translate(320 20)" fill="#1a2332">SPAN scenario P&amp;L: a short straddle bleeds on any large move</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" y="30.5" transform="translate(320 20)" fill="#8a97a8">worst-case = margin ($4775.46) — options-risk price×vol grid</text>
+<defs >
+<clipPath id="zr3-c0">
+<path d="M67 87l551 0l0 243l-551 0Z" fill="#000" class="zr3-cls-13"></path>
+</clipPath>
+<clipPath id="zr3-c1">
+<path d="M67 87l551 0l0 243l-551 0Z" fill="#000" class="zr3-cls-13"></path>
+</clipPath>
+<clipPath id="zr3-c2">
+<path d="M67 87l551 0l0 243l-551 0Z" fill="#000" class="zr3-cls-13"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr3-cls-12:hover {
+pointer-events:none;
+}
+.zr3-cls-13:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr3-cls-14:hover {
+cursor:pointer;
+}
+.zr3-cls-15:hover {
+cursor:pointer;
+fill:rgba(47,118,193,1);
+}
+.zr3-cls-16:hover {
+cursor:pointer;
+fill:rgba(134,176,227,1);
+}
+.zr3-cls-17:hover {
+cursor:pointer;
+fill:rgba(84,140,207,1);
+}
+.zr3-cls-18:hover {
+cursor:pointer;
+fill:rgba(0,0,0,0);
+}
+
+]]>
+
+</style>
+</svg><figcaption style="font-size:12px;color:#5b6b80;margin-top:4px;font-style:italic;">Figure 3 &mdash; SPAN-style scenario P&amp;L of a short BTC straddle across the price&times;volatility grid, from options-risk; the worst cell is the scenario margin.</figcaption></figure>
+
+<h3>Liquidity-provision divergence and its LVR rate</h3>
+
+<p>Where lp-desk replays history, <span class="mono">lp-risk</span> forecasts. For a full-range position the impermanent loss at a realised price ratio <span class="mono">r</span> is</p>
+
+<div class="eq">IL( r ) = 2&radic;r / (1+r) &minus; 1, <span class="num">(21)</span></div>
+
+<p>verified at the token level against explicit constant-product amounts (the position holds <span class="mono">2&radic;(kP<sub>1</sub>)</span> in value against the held bundle). Expanding to leading order, <span class="mono">IL &asymp; &minus;(ln&nbsp;r)<sup>2</sup>/8</span>, so the expected divergence over a horizon under a lognormal underlying is <span class="mono">E[IL] &asymp; &minus;&sigma;<sup>2</sup>T/8</span> — which is exactly the loss-versus-rebalancing rate of a constant-product pool. Given a fee yield the engine returns the net forecast and the break-even volatility above which fees no longer cover the bleed. Figure&nbsp;4 shows the loss is symmetric in log-price and always non-positive.</p>
+
+<figure style="margin:22px auto;max-width:660px;text-align:center;"><svg width="640" height="360" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 640 360">
+<rect width="640" height="360" x="0" y="0" fill="none"></rect>
+<path d="M62 308.5L616 308.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 247.5L616 247.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 186.5L616 186.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 125.5L616 125.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 64.5L616 64.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62.5 64L62.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M173.5 64L173.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M320.5 64L320.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M468.5 64L468.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M616.5 64L616.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="-6" transform="matrix(0,-1,1,0,27.875,186)" fill="#1a2332">impermanent loss (%)</text>
+<path d="M62.5 308L62.5 64" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="6" transform="translate(339 342)" fill="#1a2332">price ratio r = P₁ / P₀</text>
+<path d="M62 64.5L616 64.5" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr1-cls-4"></path>
+<path d="M62 308.5L57 308.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 247.5L57 247.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 186.5L57 186.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 125.5L57 125.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 64.5L57 64.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62.5 64L62.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M173.5 64L173.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M320.5 64L320.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M468.5 64L468.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M616.5 64L616.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 308)" fill="#8a97a8">-20</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 247)" fill="#8a97a8">-15</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 186)" fill="#8a97a8">-10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 125)" fill="#8a97a8">-5</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 64)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(62 316)" fill="#8a97a8">0.25</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(172.8 316)" fill="#8a97a8">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(320.5333 316)" fill="#8a97a8">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(468.2667 316)" fill="#8a97a8">3</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(616 316)" fill="#8a97a8">4</text>
+<g clip-path="url(#zr1-c0)">
+<path d="M62 308L69.4 256L76.8 214.7L84.2 181.7L91.5 155.2L98.9 133.8L106.3 116.5L113.7 102.7L121.1 91.8L128.5 83.1L135.9 76.5L143.3 71.6L150.6 68L158 65.7L165.4 64.4L172.8 64L180.2 64.4L187.6 65.4L195 67L202.3 69.1L209.7 71.6L217.1 74.4L224.5 77.6L231.9 81.1L239.3 84.8L246.7 88.6L254.1 92.7L261.4 96.9L268.8 101.3L276.2 105.7L283.6 110.2L291 114.9L298.4 119.5L305.8 124.2L313.1 129L320.5 133.8L327.9 138.6L335.3 143.4L342.7 148.2L350.1 153L357.5 157.8L364.9 162.7L372.2 167.4L379.6 172.2L387 177L394.4 181.7L401.8 186.4L409.2 191.1L416.6 195.8L423.9 200.4L431.3 205L438.7 209.6L446.1 214.1L453.5 218.6L460.9 223L468.3 227.4L475.7 231.8L483 236.2L490.4 240.5L497.8 244.8L505.2 249L512.6 253.2L520 257.3L527.4 261.5L534.7 265.6L542.1 269.6L549.5 273.6L556.9 277.6L564.3 281.5L571.7 285.4L579.1 289.3L586.5 293.1L593.8 296.9L601.2 300.6L608.6 304.3L616 308L616 64L608.6 64L601.2 64L593.8 64L586.5 64L579.1 64L571.7 64L564.3 64L556.9 64L549.5 64L542.1 64L534.7 64L527.4 64L520 64L512.6 64L505.2 64L497.8 64L490.4 64L483 64L475.7 64L468.3 64L460.9 64L453.5 64L446.1 64L438.7 64L431.3 64L423.9 64L416.6 64L409.2 64L401.8 64L394.4 64L387 64L379.6 64L372.2 64L364.9 64L357.5 64L350.1 64L342.7 64L335.3 64L327.9 64L320.5 64L313.1 64L305.8 64L298.4 64L291 64L283.6 64L276.2 64L268.8 64L261.4 64L254.1 64L246.7 64L239.3 64L231.9 64L224.5 64L217.1 64L209.7 64L202.3 64L195 64L187.6 64L180.2 64L172.8 64L165.4 64L158 64L150.6 64L143.3 64L135.9 64L128.5 64L121.1 64L113.7 64L106.3 64L98.9 64L91.5 64L84.2 64L76.8 64L69.4 64L62 64Z" fill="rgb(192,57,43)" fill-opacity="0.06999999999999999" class="zr1-cls-6"></path>
+<path d="M62 308L69.4 256L76.8 214.7L84.2 181.7L91.5 155.2L98.9 133.8L106.3 116.5L113.7 102.7L121.1 91.8L128.5 83.1L135.9 76.5L143.3 71.6L150.6 68L158 65.7L165.4 64.4L172.8 64L180.2 64.4L187.6 65.4L195 67L202.3 69.1L209.7 71.6L217.1 74.4L224.5 77.6L231.9 81.1L239.3 84.8L246.7 88.6L254.1 92.7L261.4 96.9L268.8 101.3L276.2 105.7L283.6 110.2L291 114.9L298.4 119.5L305.8 124.2L313.1 129L320.5 133.8L327.9 138.6L335.3 143.4L342.7 148.2L350.1 153L357.5 157.8L364.9 162.7L372.2 167.4L379.6 172.2L387 177L394.4 181.7L401.8 186.4L409.2 191.1L416.6 195.8L423.9 200.4L431.3 205L438.7 209.6L446.1 214.1L453.5 218.6L460.9 223L468.3 227.4L475.7 231.8L483 236.2L490.4 240.5L497.8 244.8L505.2 249L512.6 253.2L520 257.3L527.4 261.5L534.7 265.6L542.1 269.6L549.5 273.6L556.9 277.6L564.3 281.5L571.7 285.4L579.1 289.3L586.5 293.1L593.8 296.9L601.2 300.6L608.6 304.3L616 308" fill="none" pointer-events="visible" stroke="#2b6cb0" stroke-width="2" stroke-linejoin="bevel" class="zr1-cls-7"></path>
+</g>
+<path d="M173.5 308L173.5 64" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-dasharray="4,2" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" ecmeta_silent="true" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Georgia, serif;" xml:space="preserve" y="-5" transform="translate(177.8 303)" fill="#8a97a8">no move</text>
+<path d="M-203 -5l406 0l0 46l-406 0Z" transform="translate(320 20)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#3c3c41" stroke-width="0" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:15px;font-family:Georgia, serif;font-weight:600;" xml:space="preserve" y="7.5" transform="translate(320 20)" fill="#1a2332">Impermanent loss is symmetric in log-price and always ≤ 0</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" y="30.5" transform="translate(320 20)" fill="#8a97a8">IL(r) = 2√r/(1+r) − 1 — lp-risk, verified at the token level</text>
+<defs >
+<clipPath id="zr1-c0">
+<path d="M61 63l556 0l0 246l-556 0Z" fill="#000" class="zr1-cls-5"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr1-cls-4:hover {
+pointer-events:none;
+}
+.zr1-cls-5:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr1-cls-6:hover {
+cursor:pointer;
+fill:rgba(211,62,47,0.1);
+}
+.zr1-cls-7:hover {
+cursor:pointer;
+}
+
+]]>
+
+</style>
+</svg><figcaption style="font-size:12px;color:#5b6b80;margin-top:4px;font-style:italic;">Figure 4 &mdash; impermanent loss versus price ratio, from lp-risk; zero at no move, symmetric under <span class="mono">r&rarr;1/r</span>.</figcaption></figure>
+
+<h3>Stablecoin-treasury concentration and depeg</h3>
+
+<p>A treasury's real risk is concentration and depeg, not its headline yield. <span class="mono">treasury-risk</span> measures concentration as the Herfindahl index over USD shares, <span class="mono">HHI = &Sigma; w<sub>i</sub><sup>2</sup></span>, whose reciprocal is the effective number of independent exposures; any single share above a limit is flagged as a breach. Depeg loss for an asset marked at price <span class="mono">p</span> against peg <span class="mono">q</span> is <span class="mono">&Sigma; amount<sub>i</sub>(q&minus;p)/q</span>, exact and independently re-checked on the worst-single-depeg scenario, and the risk-adjusted yield subtracts the annualised expected depeg loss wherever probabilities are supplied. Because depegs are not independent — the March 2023 weekend pulled USDC and the DAI it backs down together — the service also stresses a <em>correlated</em> depeg in which every stable falls to a common floor at once, the systemic loss a worst-single scenario hides, and reports a correlation-adjusted effective-exposure count <span class="mono">1/(w<sup>T</sup>&rho;w)</span> that drops below the independent Herfindahl figure once a correlation matrix is supplied — identity by default, so no <span class="mono">&rho;</span> is ever fabricated. The same Herfindahl lens deepens <span class="mono">poly-desk</span>, turning a flat list of prediction-market positions into a book with a concentration grade and a directional skew.</p>
+
+<h3>Event-implied expected move</h3>
+
+<p>A macro calendar gives a date and a &ldquo;high impact&rdquo; label; it does not give the market's priced-in magnitude. <span class="mono">event-vol</span> supplies it. For spot <span class="mono">S</span>, at-the-money implied vol <span class="mono">&sigma;</span> and horizon <span class="mono">T</span>, the one-standard-deviation move is <span class="mono">S&sigma;&radic;T</span>, and — since for a driftless forward the ATM straddle price is the risk-neutral expected <em>absolute</em> move — the straddle equals <span class="mono">E|S<sub>T</sub>&minus;S<sub>0</sub>| = 2S(2&Phi;(&sigma;&radic;T/2)&minus;1)</span>, which the engine verifies against a numerical integral of <span class="mono">|S<sub>T</sub>&minus;S<sub>0</sub>|</span> over the martingale lognormal. Given the volatility term structure across the event — an expiry just before and just after — the event's own contribution is isolated as</p>
+
+<div class="eq">event&nbsp;1&sigma; = S&middot;&radic;( &sigma;<sub>after</sub><sup>2</sup>&middot;T<sub>after</sub> &minus; &sigma;<sub>before</sub><sup>2</sup>&middot;T<sub>before</sub> ), <span class="num">(22)</span></div>
+
+<p>the event-day options technique: the post-event expiry carries the baseline diffusion plus the event, the pre-event expiry carries the baseline alone, and the difference in total variance is the jump the market is pricing. A non-positive event variance means the term structure does not isolate the event, and is disclosed rather than reported as a fabricated move. This is <span class="mono">macro-sentry</span>'s new depth: with a coin's spot and ATM vol it reports not just that an FOMC is ahead but that the market is pricing, say, a ten-percent one-sigma move into it.</p>
+
+<h3>Batched attestation</h3>
+
+<p>To make many computations cheaply and permanently attestable, <span class="mono">risk-attest</span> combines their content hashes into a single Merkle root (sha256, sorted pairs, OpenZeppelin-compatible). One on-chain anchor of that root — broadcast from the caller's own wallet, never Quiver's — attests every member of the batch at once, and any single computation is later provable with a small inclusion proof. The engine self-checks both directions of a Merkle proof: completeness (every leaf verifies against the root) and soundness (a fabricated non-member does not), so a defect in the tree or proof code fails its own test rather than issuing an attestation that cannot be honoured.</p>
+
+<h3>Cross-venue portfolio exposure and correlated-crash stress</h3>
+
+<p>The services above price one position at a time; an agent's real risk lives in the whole book, and the book is often spread across venues. <span class="mono">portfolio-gate</span> aggregates a set of perpetual legs — on Hyperliquid, dYdX, or both — into four book-level numbers, reusing the <span class="mono">perp-gate</span> derivation of Section&nbsp;5.10 for each leg so the aggregate inherits per-leg correctness. Write leg <span class="mono">i</span> with side <span class="mono">s<sub>i</sub>&thinsp;&isin;&thinsp;{+1,&minus;1}</span>, size <span class="mono">q<sub>i</sub></span>, and mark <span class="mono">P<sub>i</sub></span>, so its signed notional is <span class="mono">s<sub>i</sub>q<sub>i</sub>P<sub>i</sub></span> and its gross notional <span class="mono">q<sub>i</sub>P<sub>i</sub></span>. The <em>net</em> exposure to an underlying <span class="mono">a</span> sums the signed notionals of that underlying's legs,</p>
+
+<div class="eq">E<sub>a</sub> = &Sigma;<sub>i&thinsp;&isin;&thinsp;a</sub> s<sub>i</sub> q<sub>i</sub> P<sub>i</sub>, <span class="num">(23)</span></div>
+
+<p>so a long on one venue and a short of the same size on another net to zero real exposure rather than counting as two positions — a distinction a per-instrument tool cannot draw. Concentration is the Herfindahl index over gross notional by underlying, <span class="mono">H = &Sigma;<sub>a</sub>(G<sub>a</sub>/G)&sup2;</span> with <span class="mono">G<sub>a</sub></span> the gross in underlying <span class="mono">a</span> and <span class="mono">G</span> the book total; its reciprocal <span class="mono">1/H</span> is the effective number of independent bets, which collapses toward one when a nominally diversified book is really a single directional wager. The binding constraint is the <em>nearest</em> liquidation — the smallest adverse move to liquidation over all legs, each move computed by the Section&nbsp;5.10 condition,</p>
+
+<div class="eq">m&#42; = min<sub>i</sub> |P<sub>liq,i</sub> &minus; P<sub>i</sub>| / P<sub>i</sub>, <span class="num">(24)</span></div>
+
+<p>which is the whole book's true distance to first blood. The catastrophic mode, though, is not one leg but many at once: in a crash, correlations go to one and independently-sized bets liquidate together — October&nbsp;10,&nbsp;2025 saw roughly &#36;19&thinsp;billion liquidated in a day as exactly this unfolded. The correlated-crash stress moves the entire market by a uniform <span class="mono">&plusmn;x%</span> and counts the legs crossing maintenance <em>simultaneously</em>: a down move with <span class="mono">x&thinsp;&ge;&thinsp;m<sub>i</sub></span> liquidates long leg <span class="mono">i</span>, an up move the shorts, and the fraction of the book breaching at each shock is the honest measure of how concentrated the tail truly is. The stress assumes co-movement, so a leg on a genuinely uncorrelated asset would not breach in reality; that assumption is disclosed with the result rather than buried.</p>
+
+<p>Four exact identities guard the aggregation on every call: the per-asset net exposures sum to the reported book net, so a mis-bucketed leg fails loudly; every per-leg liquidation still satisfies its own maintenance invariant from Section&nbsp;5.10; the reported nearest liquidation is genuinely the minimum distance across the book; and the count of legs breaching under the correlated down-crash is monotone non-decreasing in the shock size. Isolated per-leg margin is assumed by default — a true cross-margin account shares equity across legs, and that is modelled by passing account context, never silently presumed.</p>
+
+<h3>The proof envelope: correctness you re-derive</h3>
+
+<p>Every risk computation ships a <em>proof envelope</em>, and because the engines are deterministic the envelope is a reconstruction, not a promise. It carries the exact inputs, the code identity, a content hash <span class="mono">H(engine, code, inputs, result)</span>, and the self-check results, so a caller re-runs the open-source engine on the echoed inputs and reproduces the number bit-for-bit — correctness re-derived, not trusted. When a signing key is configured the content hash is additionally signed with secp256k1 over its EIP-191 digest, so a proof recovers to a known address — Quiver's published attestation signer <span class="mono">0x946324E0E5d7D77206731E35Ef4044a383e2a8C2</span> — and a tampered result no longer does. Signing, though, is only table stakes — a policy gate can sign its policy. The deeper guarantee is the one underneath: each engine tests its own output against a ground-truth invariant (the liquidation condition, the Kelly first-order condition, the constant-product <span class="mono">k</span>, the martingale <span class="mono">E[S<sub>T</sub>]=F</span>, the arbitrage-free density), so a wrong number fails its own check <em>before</em> it is ever signed. That is the sense in which Quiver proves it is right rather than merely proving it spoke.</p>
+
+<div class="box"><div class="cap">Verifying a Quiver attestation — recover the signer of any T1 proof</div>
+<pre>// Every T1 proof signs its content hash with secp256k1 over the EIP-191 digest,
+// so anyone can recover the signer from a paid response and check it is Quiver's.
+import { verifyMessage } from "ethers";
+
+const QUIVER_SIGNER = "0x946324E0E5d7D77206731E35Ef4044a383e2a8C2";
+const { contentHash, signature } = response.proof;   // signature = { signer, signature, ... }
+const recovered = verifyMessage(contentHash, signature.signature);
+
+recovered === QUIVER_SIGNER;   // true => the number came from Quiver, untampered
+// The deeper check needs no key at all: re-run the open-source engine on
+// proof.inputs and confirm sha256(canonical{engine, codeHash, inputs, result})
+// reproduces contentHash — correctness re-derived, not trusted.</pre></div>
+
 <!-- ============================== 6. VERIFICATION ============================== -->
 <h2 id="s6">Verification and Testing</h2>
 
@@ -430,10 +969,10 @@
 
 <h3>The invariant test suite</h3>
 
-<p>The financial mathematics is locked by 39 automated tests that run under the built-in Node test runner <sup class="cite">[54]</sup>, with no external dependency. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number. The load-bearing tests are the following.</p>
+<p>The financial mathematics is locked by 152 automated tests that run under the built-in Node test runner <sup class="cite">[54]</sup> with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number. The load-bearing tests are the following.</p>
 
 <table>
-  <caption>Table 2 — representative invariants from the 39-test suite. All currently pass.</caption>
+  <caption>Table 2 — representative invariants from the 152-test suite. All currently pass.</caption>
   <tr><th>Property asserted</th><th>Why it must hold</th></tr>
   <tr><td>Put-call parity, <span class="mono">C − P = e<sup>−rT</sup>(F − K)</span></td><td>Model-free; a violation means the pricer is wrong.</td></tr>
   <tr><td>Delta parity, <span class="mono">Δ<sub>c</sub> − Δ<sub>p</sub> = e<sup>−rT</sup></span></td><td>Follows from parity; guards the greeks.</td></tr>
@@ -571,9 +1110,9 @@
 
 <p>The project began with one observation. Agents had just gained the ability to pay for a service in-band over HTTP, and almost nothing worth paying for existed on the other side of that payment. We looked at what an autonomous trading or wallet agent needs at the moment it acts, and the list was concrete: the real probability that a price level is reached, the true cost of a size against real depth, a verdict on a signature before it is signed. None of it was available in a form an agent could call and trust. That gap set the direction. The decision that followed was to build computations a desk would recognise rather than another data relay, since a relay adds nothing an agent could not fetch for itself.</p>
 
-<h3>Choosing the ten</h3>
+<h3>Choosing the set</h3>
 
-<p>Not every candidate survived. We held ideas to a floor: a real recurring need, an identifiable caller, and durability past the moment of a demo. Anything that depended on a fad, or that dressed a single API call as a product, was dropped. What remained clustered into the ten services of Section 4. Options analytics was chosen as the widest moat, because the mathematics is unforgiving and the registry held no options service; a wrong volatility surface is worse than none, so getting it right is itself a barrier. Transaction safety was chosen for the opposite reason, that it is the highest-frequency and highest-stakes decision an agent makes, and the signature-drainer vector was covered by nobody. The rest fill out the surfaces an agent touches inside a loop: the tape, the book, the protocol, and the calendar.</p>
+<p>Not every candidate survived. We held ideas to a floor: a real recurring need, an identifiable caller, and durability past the moment of a demo. Anything that depended on a fad, or that dressed a single API call as a product, was dropped. What remained clustered into the twenty-two services of Section 4. Options analytics was chosen as the widest moat, because the mathematics is unforgiving and the registry held no options service; a wrong volatility surface is worse than none, so getting it right is itself a barrier. Transaction safety was chosen for the opposite reason, that it is the highest-frequency and highest-stakes decision an agent makes, and the signature-drainer vector was covered by nobody. The rest fill out the surfaces an agent touches inside a loop: the tape, the book, the protocol, and the calendar. The most recent additions came from taking that floor seriously rather than from adding surface — the concentrated-liquidity desk earns its place by <em>refusing</em> to sell the optimiser the floor cannot justify, and reports the measurement instead; the authenticity scans exist because a number an agent trades on should be auditable back to the wallets and trades that produced it.</p>
 
 <h3>Holding a standard, and what it caught</h3>
 
@@ -598,7 +1137,7 @@
 <!-- ============================== 11. CONCLUSION ============================== -->
 <h2 id="s10">Conclusion</h2>
 
-<p>Quiver is a live, paid Agentic Service Provider that gives autonomous agents ten financial and security computations they can call over x402 and discover under ERC-8004. The services implement methods a desk would recognise, and they are held to a standard that this document has tried to make legible rather than merely assert: correctness proven by 39 model-free tests, claims grounded against live venues, and a stated refusal to emit a number the data does not support. That refusal is not a limitation of the product; it is the product. In a market where an agent must trust a computation it cannot supervise, a service that corrects its own <span class="mono">N(d₂)</span>, that catches its own Amihud explosion, and that reports a variance premium as insignificant when it is, is worth more than one that returns a confident number and hopes. The mathematics here is public and old. The discipline of applying it honestly, at the point where an agent is about to move money, is the part that was missing.</p>
+<p>Quiver is a live, paid Agentic Service Provider that gives autonomous agents twenty-two financial and security computations they can call over x402 and discover under ERC-8004. The services implement methods a desk would recognise, and they are held to a standard that this document has tried to make legible rather than merely assert: correctness proven by 152 model-free tests, claims grounded against live venues, and a stated refusal to emit a number the data does not support. That refusal is not a limitation of the product; it is the product. In a market where an agent must trust a computation it cannot supervise, a service that corrects its own <span class="mono">N(d₂)</span>, that catches its own Amihud explosion, and that reports a variance premium as insignificant when it is, is worth more than one that returns a confident number and hopes. The mathematics here is public and old. The discipline of applying it honestly, at the point where an agent is about to move money, is the part that was missing.</p>
 
 <!-- ============================== APPENDIX A ============================== -->
 <h2 id="sa" class="nonum" style="counter-increment:none;">Appendix A &nbsp;·&nbsp; API Reference</h2>
@@ -633,7 +1172,7 @@
   <li><strong>Market impact (Section 7).</strong> Call <span class="mono">poly-fill</span> on a live market; <span class="mono">marketImpact.fitR2</span> is the measured quality of the square-root fit, and <span class="mono">bookDepth.imbalance</span> is computed from the same book that the walk consumes.</li>
 </ul>
 
-<p class="small">The invariant test suite is self-contained and deterministic; it runs with the project's standard test command and requires no network access, so the 39 model-free properties of Section 6 can be verified offline.</p>
+<p class="small">The invariant test suite is self-contained and deterministic; it runs with the project's standard test command and requires no network access, so the 152 model-free properties of Section 6 can be verified offline.</p>
 
 <!-- ============================== REFERENCES ============================== -->
 <h2 id="refs" class="nonum" style="counter-increment:none;">References</h2>

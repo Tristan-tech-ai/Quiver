@@ -2,6 +2,8 @@
 // lookahead window, so a trading agent can de-risk before a print. Deterministic curated calendar
 // (these dates are published on fixed institutional schedules) — durable and dependency-free.
 import { config } from '../config.js';
+import { eventVol } from './eventVol.js';
+import { round } from './stats.js';
 
 // Curated 2026 high-impact US macro calendar (times in UTC). FOMC = scheduled meetings (decision
 // day 19:00 UTC); CPI/PPI ~08:30 ET (12:30 UTC) mid-month; NFP first Friday 12:30 UTC; PCE end-month.
@@ -47,12 +49,30 @@ export function eventsBetween(startMs, endMs) {
   return EVENTS_2026.filter((e) => e.ts >= startMs && e.ts <= endMs);
 }
 
-export function macroSentry({ hours = 72, nowMs = null }) {
+export function macroSentry({ hours = 72, nowMs = null, spot = null, atmIvPct = null }) {
   const now = nowMs || Date.now();
   const horizon = now + Math.max(1, Math.min(24 * 30, hours)) * 3600 * 1000;
   const upcoming = EVENTS_2026.filter((e) => e.ts >= now && e.ts <= horizon)
     .map((e) => ({ ...e, hoursUntil: Math.round(((e.ts - now) / 3600000) * 10) / 10 }));
   const next = EVENTS_2026.find((e) => e.ts >= now);
+
+  // DEPTH (was just a calendar): the options-implied EXPECTED MOVE to the next event — the market's own
+  // priced-in magnitude — when the caller supplies the coin's spot + ATM IV. Real macro calendars stop at
+  // the date + an "impact: high" label; this returns the number a desk actually sizes against. See eventVol.
+  let nextEventRisk = null;
+  const checks = [];
+  if (next && Number(spot) > 0 && Number(atmIvPct) > 0) {
+    const daysToEvent = (next.ts - now) / 86400000;
+    const ev = eventVol({ spot: Number(spot), atmIvPct: Number(atmIvPct), daysToEvent });
+    if (ev.ok) {
+      nextEventRisk = {
+        event: next.kind, label: next.label, atUtc: next.iso, daysUntil: round(daysToEvent, 2),
+        spot: Number(spot), atmIvPct: Number(atmIvPct),
+        expectedMove: ev.expectedMove, probabilityMoveBeyond: ev.probabilityMoveBeyond,
+      };
+      checks.push(...ev.checks);
+    }
+  }
 
   return {
     service: 'macro-sentry',
@@ -60,12 +80,14 @@ export function macroSentry({ hours = 72, nowMs = null }) {
     windowHours: hours,
     verdict: upcoming.length ? 'EVENTS_AHEAD' : 'CLEAR',
     guidance: upcoming.length
-      ? `${upcoming.length} high-impact US macro event(s) in the next ${hours}h — expect elevated volatility around ${upcoming.map((e) => e.kind).join(', ')}.`
+      ? `${upcoming.length} high-impact US macro event(s) in the next ${hours}h — expect elevated volatility around ${upcoming.map((e) => e.kind).join(', ')}.${nextEventRisk ? ` The market is pricing ~${nextEventRisk.expectedMove.oneSigmaPct}% (1σ) into ${nextEventRisk.event}.` : ''}`
       : `No high-impact US macro events in the next ${hours}h. Next is ${next ? `${next.kind} in ${Math.round((next.ts - now) / 3600000)}h` : 'beyond the calendar'}.`,
     events: upcoming.map((e) => ({ kind: e.kind, label: e.label, atUtc: e.iso, hoursUntil: e.hoursUntil, impact: e.impact })),
     nextEvent: next ? { kind: next.kind, label: next.label, atUtc: next.iso, hoursUntil: Math.round((next.ts - now) / 3600000) } : null,
-    method: 'Curated calendar of scheduled high-impact US macro releases (FOMC, CPI, NFP) filtered to the requested lookahead window; times in UTC.',
-    limitations: 'US high-impact events only; scheduled release times (actual data drops at the scheduled minute). Not investment advice.',
+    nextEventRisk, // options-implied expected move (only when spot + atmIvPct are supplied)
+    method: 'Curated calendar of scheduled high-impact US macro releases (FOMC, CPI, NFP) filtered to the requested lookahead window; times in UTC. When spot + ATM IV are supplied, the options-implied expected move to the next event is computed (eventVol) — the market\'s priced-in magnitude, self-checked against a numerical integral.',
+    limitations: 'US high-impact events only; scheduled release times (actual data drops at the scheduled minute). Expected move uses the ATM vol; a full smile (options-desk) refines the tails. Not investment advice.',
+    checks: checks.length ? checks : undefined,
     elapsedMs: 0,
   };
 }

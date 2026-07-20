@@ -1,14 +1,33 @@
 // Black-76 (options on a forward/future) — analytic greeks + IV, pure JS.
 // Deribit crypto options are quoted on the forward, so Black-76 is the correct model.
 // Validated against Deribit's own ticker greeks (see options-desk validation).
+import { round } from './stats.js';
 
-// Standard normal PDF and CDF (Abramowitz-Stegun 7.1.26 erf approximation).
+// Standard normal PDF and CDF. The CDF is the HART (1968) rational algorithm, accurate to ~1e-15 — chosen
+// over the older Abramowitz-Stegun 7.1.26 (~7.5e-8) because A-S is mutually INCONSISTENT with the exact pdf
+// used in the greeks: the second derivative of an A-S-based price disagrees with the pdf-based gamma at
+// ~5e-4, which would floor any analytic-greek-vs-finite-difference self-check. Hart makes price and greeks
+// consistent to ~machine precision, so those self-checks can be tight and meaningful.
 const npdf = (x) => Math.exp(-0.5 * x * x) / Math.sqrt(2 * Math.PI);
 function ncdf(x) {
-  const t = 1 / (1 + 0.2316419 * Math.abs(x));
-  const d = 0.319381530 * t - 0.356563782 * t * t + 1.781477937 * t ** 3 - 1.821255978 * t ** 4 + 1.330274429 * t ** 5;
-  const p = 1 - npdf(x) * d;
-  return x >= 0 ? p : 1 - p;
+  const z = Math.abs(x);
+  let c = 0;
+  if (z <= 37) {
+    const e = Math.exp(-z * z / 2);
+    if (z < 7.07106781186547) {
+      let b = 3.52624965998911e-2 * z + 0.700383064443688;
+      b = b * z + 6.37396220353165; b = b * z + 33.912866078383; b = b * z + 112.079291497871;
+      b = b * z + 221.213596169931; b = b * z + 220.206867912376;
+      let d = 8.83883476483184e-2 * z + 1.75566716318264;
+      d = d * z + 16.064177579207; d = d * z + 86.7807322029461; d = d * z + 296.564248779674;
+      d = d * z + 637.333633378831; d = d * z + 793.826512519948; d = d * z + 440.413735824752;
+      c = e * b / d;
+    } else {
+      let f = z + 0.65; f = z + 4 / f; f = z + 3 / f; f = z + 2 / f; f = z + 1 / f;
+      c = e / (2.506628274631 * f);
+    }
+  }
+  return x <= 0 ? c : 1 - c;
 }
 
 // F=forward, K=strike, T=years, sigma=vol (decimal, e.g. 0.65), type='call'|'put'.
@@ -73,6 +92,58 @@ export function rndDensity(F, K, T, ivFn, r = 0) {
   const c0 = px(K), cu = px(K + h), cd = px(K - h);
   if (c0 == null || cu == null || cd == null) return null;
   return Math.exp(r * T) * (cu - 2 * c0 + cd) / (h * h);
+}
+
+// Butterfly-arbitrage police, extracted so it is REACHABLE BY A TEST. It previously lived inline in the
+// service and therefore had none — and an untested guard is indistinguishable from no guard.
+//
+// The defect it was hiding: rndDensity returns null wherever the smile has no vol — which is precisely the
+// WINGS, precisely where butterfly arbitrage lives. The old loop did `if (d == null) continue`, so those
+// points were silently dropped from the denominator and the verdict still read "non-negative across the
+// traded strike range". A smile that could not be evaluated in the wings produced a CLEAN verdict from an
+// ATM-only scan. Absence read as success — the same shape as the "0x"-is-truthy trap.
+//
+// So: count what we could not evaluate, publish the domain we actually scanned, and REFUSE to certify when
+// coverage is too thin to support the sentence. `certified` answers "is this slice arbitrage-free?" only
+// when we are entitled to answer; `null` means we do not know, which is a different claim from "yes".
+export function butterflyPolice(F, T, ivFn, kMin, kMax, r = 0, gridN = 120, minCoverage = 0.8) {
+  if (!(kMax > kMin) || !(F > 0) || !(T > 0)) return null;
+  const step = (kMax - kMin) / gridN;
+  let negs = 0, evaluated = 0, skipped = 0, minDensity = Infinity, worstK = null;
+  let loK = null, hiK = null;
+  for (let K = kMin + step; K < kMax - step; K += step) {
+    const d = rndDensity(F, K, T, ivFn, r);
+    if (d == null) { skipped += 1; continue; }         // counted now, not swallowed
+    evaluated += 1;
+    if (loK == null) loK = K; hiK = K;                 // the domain we ACTUALLY covered, not the one we asked for
+    if (d < 0) negs += 1;
+    if (d < minDensity) { minDensity = d; worstK = K; }
+  }
+  const attempted = evaluated + skipped;
+  if (!attempted || !evaluated) return null;
+  const coverage = evaluated / attempted;
+  const covered = coverage >= minCoverage;
+  const clean = negs === 0;
+  const pct = (K) => round(((K - F) / F) * 100, 1);
+  return {
+    // The verdict. null = insufficient coverage to make ANY claim — never silently "true".
+    certified: covered ? clean : null,
+    densityNonNegative: clean,
+    violationGridPoints: negs,
+    gridPoints: evaluated,
+    skippedGridPoints: skipped,
+    coveragePct: round(coverage * 100, 1),
+    // The DOMAIN of the claim. A guard that will not say where it looked cannot be checked by the caller.
+    scannedStrikeRange: loK != null ? [round(loK, 0), round(hiK, 0)] : null,
+    scannedMoneynessPct: loK != null ? [pct(loK), pct(hiK)] : null,
+    minDensity: Number.isFinite(minDensity) ? Number(minDensity.toExponential(2)) : null,
+    minDensityAtStrike: worstK != null ? round(worstK, 0) : null,
+    note: !covered
+      ? `Coverage too thin to certify: the smile could not be evaluated at ${skipped}/${attempted} grid points (${round(coverage * 100, 1)}% covered). No butterfly-arbitrage verdict is issued for this slice — an unevaluable smile is not an arbitrage-free one.`
+      : clean
+        ? `Risk-neutral density is non-negative at all ${evaluated} scanned points spanning K ${round(loK, 0)}–${round(hiK, 0)} (${pct(loK)}% to ${pct(hiK)}% moneyness) — no butterfly arbitrage detected over that range. Outside it, unchecked.`
+        : `Density goes NEGATIVE at ${negs}/${evaluated} scanned points (worst ${Number(minDensity.toExponential(2))} at K=${round(worstK, 0)}, ${pct(worstK)}% moneyness) — this slice is not arbitrage-free under interpolation, so probabilities near those strikes are unsound. Disclosed rather than hidden; an arbitrage-free (SSVI) fit is the correct remedy.`,
+  };
 }
 
 // FULL risk-neutral distribution from the smile: integrate the Breeden–Litzenberger density over a strike

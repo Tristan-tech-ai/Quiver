@@ -2,7 +2,36 @@
 // unrealized PnL, cash-out value, and biggest movers — for copy/portfolio agents tracking a trader.
 import * as pm from '../adapters/polymarket.js';
 import { config } from '../config.js';
-import { round } from './stats.js';
+import { round, hhi } from './stats.js';
+
+// Portfolio RISK on a prediction-market book (the depth a flat position read lacks): concentration by
+// market (Herfindahl → effective number of independent bets), the largest single-market share, and the
+// YES/NO directional skew. Pure + deterministic given the positions, so it is unit-tested offline.
+export function polyPortfolioRisk(norm) {
+  const byMarket = {};
+  for (const p of norm) { const k = p.market || 'unknown'; byMarket[k] = (byMarket[k] || 0) + Math.abs(p.valueUsd || 0); }
+  const vals = Object.values(byMarket);
+  const total = vals.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return null;
+  const H = hhi(vals);
+  const shares = Object.entries(byMarket).map(([market, v]) => ({ market, sharePct: round((100 * v) / total, 1) })).sort((a, b) => b.sharePct - a.sharePct);
+  let yes = 0, no = 0;
+  for (const p of norm) { const o = String(p.outcome || '').toLowerCase(); const v = Math.abs(p.valueUsd || 0); if (o.includes('yes')) yes += v; else if (o.includes('no')) no += v; }
+  const top = shares[0]?.sharePct ?? 0;
+  return {
+    marketsHeld: vals.length,
+    concentrationHhi: round(H, 4),
+    effectiveBets: round(1 / H, 2),
+    largestPositionPct: top,
+    topMarkets: shares.slice(0, 5),
+    outcomeSkew: (yes + no) > 0 ? { yesPct: round((100 * yes) / (yes + no), 1), noPct: round((100 * no) / (yes + no), 1) } : null,
+    verdict: top > 50
+      ? `Over-concentrated: ${top}% of the book is in a single market (${shares[0].market}). One resolution dominates the P&L.`
+      : H > 0.5
+        ? `Concentrated: ~${round(1 / H, 1)} effective independent bets — a few markets drive the book.`
+        : `Diversified across ~${round(1 / H, 1)} effective bets.`,
+  };
+}
 
 export async function polyDesk(wallet) {
   const t0 = Date.now();
@@ -52,6 +81,7 @@ export async function polyDesk(wallet) {
       unrealizedPnlPct: totalValue - totalPnl > 0 ? round((totalPnl / (totalValue - totalPnl)) * 100, 1) : null,
     },
     positions: norm.slice(0, 20),
+    portfolioRisk: polyPortfolioRisk(norm),
     biggestMovers: movers,
     recentActivity: recent,
     method: 'Live Polymarket positions (data-api) marked to current CLOB prices for unrealized PnL and cash-out value; recent activity from the public activity feed.',

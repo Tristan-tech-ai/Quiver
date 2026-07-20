@@ -97,8 +97,19 @@ const unpack5 = (p) => ({ a: p[0], b: Math.exp(p[1]), rho: Math.tanh(p[2]), m: p
  * 5 params against 20–45 strikes per slice — flexible enough for short-dated crypto smiles, where the
  * 2-param SSVI slice was measured to be too rigid (RMSE 5.8 vol pts on the front expiries).
  */
-export function fitSVI(slices, { maxRmseVolPts = 1.5, kBand = 0.35, minPtsPerSlice = 6, minTdays = 1.5 } = {}) {
-  const perSlice = (slices || []).filter((s) => s.T > 0 && Array.isArray(s.pts)).map((s) => {
+export function fitSVI(slices, { maxRmseVolPts = 1.5, kBand = 0.35, minPtsPerSlice = 6, minTdays = 1.5, gMargin = 1e-3, cMargin = 3e-5 } = {}) {
+  // Penalty grid is DELIBERATELY finer than the fit needs, and the reported minima are measured on a
+  // DENSE grid that the optimiser never sees. Scoring a constraint on the same nodes it was trained on
+  // makes the check unfalsifiable: the optimiser satisfies g(k)≥0 at the nodes and dips negative between
+  // them. Measured on the shipped 12-node grid: reported minG=+9.9e-8 while the true minimum was -1.7e-3
+  // (butterfly arbitrage across 4.2% of the band). Penalty grid and audit grid must never coincide.
+  const pgrid = []; for (let x = -kBand; x <= kBand + 1e-9; x += kBand / 150) pgrid.push(x);
+  const dense = []; for (let x = -kBand; x <= kBand + 1e-9; x += kBand / 1500) dense.push(x);
+  // Slices must be fitted in ascending T: each accepted slice becomes the CALENDAR FLOOR for the next.
+  const inOrder = (slices || []).filter((s) => s.T > 0 && Array.isArray(s.pts)).slice().sort((a, b) => a.T - b.T);
+  let floorP = null;
+  const perSlice = inOrder.map((s) => {
+    const floor = floorP;
     // SCOPE THE MODEL TO WHERE IT IS VALID. Near-expiry smiles are JUMP-dominated, not diffusive; SVI is a
     // diffusive parameterisation and cannot describe them (measured: RMSE 5.1–7.4 vol pts at ~15 min and
     // ~1 day to expiry, versus 0.1–1.2 at ≥2 days — the signature of jump dominance decaying with T).
@@ -106,18 +117,24 @@ export function fitSVI(slices, { maxRmseVolPts = 1.5, kBand = 0.35, minPtsPerSli
     if (s.T * 365 < minTdays) return { T: round(s.T, 5), ok: false, n: (s.pts || []).length, excluded: true, reason: `near-expiry (${round(s.T * 365, 2)}d): jump-dominated regime — a diffusive SVI smile is not applicable, so this slice is excluded by design rather than force-fitted` };
     const pts = s.pts.filter((q) => Number.isFinite(q.k) && Math.abs(q.k) <= kBand && q.sigma > 0);
     if (pts.length < minPtsPerSlice) return { T: round(s.T, 5), ok: false, n: pts.length, reason: `only ${pts.length} liquid strikes within |k|<=${kBand}` };
-    const grid = []; for (let x = -kBand; x <= kBand + 1e-9; x += kBand / 12) grid.push(x);
-
     const objective = (p) => {
       const P = unpack5(p);
       if (!(P.b > 0) || !(P.sig > 0) || !Number.isFinite(P.a)) return 1e12;
       let pen = 0;
-      if (!sviWingOk(P)) pen += 1e4 * (P.b * (1 + Math.abs(P.rho)) - 1.99) ** 2;
-      for (const k of grid) {
+      if (!sviWingOk(P)) pen += 1e6 * Math.max(0, P.b * (1 + Math.abs(P.rho)) - 1.99);
+      for (const k of pgrid) {
         const w = sviW(k, P);
-        if (!(w > 0)) { pen += 1e4; continue; }
+        if (!(w > 0)) { pen += 1e6; continue; }
         const g = sviG(k, P);
-        if (g < 0) pen += 1e4 * g * g;             // butterfly violation -> heavily penalised
+        // LINEAR, not quadratic. A quadratic penalty on a one-sided constraint makes small violations
+        // nearly free: at g=-7e-5 the old 1e4*g² cost 4.9e-5 — less than a single quote's fit error — so
+        // the optimiser settled ON and just under the boundary. Linear keeps the gradient steep at zero,
+        // and gMargin buys strict interior feasibility rather than boundary-hugging.
+        if (g < gMargin) pen += 1e6 * (gMargin - g);
+        // CALENDAR: w(k,T) must be non-decreasing in T at fixed k (Gatheral). Fitting slices independently
+        // leaves this unconstrained, and sviIvFnAtT's linear-in-T interpolation is only calendar-arb-free
+        // if its bracketing anchors are themselves ordered — a precondition nothing previously enforced.
+        if (floor) { const d = w - (sviW(k, floor) + cMargin); if (d < 0) pen += 1e6 * (-d); }
       }
       let sse = 0;
       for (const q of pts) {
@@ -142,14 +159,26 @@ export function fitSVI(slices, { maxRmseVolPts = 1.5, kBand = 0.35, minPtsPerSli
 
     let sse = 0; for (const q of pts) { const w = sviW(q.k, P); if (!(w > 0)) continue; sse += (Math.sqrt(w / s.T) - q.sigma) ** 2; }
     const rmseVolPts = round(Math.sqrt(sse / pts.length) * 100, 2);
-    let minG = Infinity; for (const k of grid) { const g = sviG(k, P); if (g < minG) minG = g; }
-    const noArb = minG >= 0 && sviWingOk(P);
+    // AUDIT THE ARTIFACT THAT SHIPS. The guarantee must hold for the params the caller actually receives,
+    // not for the full-precision optimum we happen to hold in memory. Rounding b to 4dp perturbs w by
+    // ~1.5e-5 — enough to flip a marginal butterfly/calendar constraint — so a fit verified on P and served
+    // as round(P) is verified on an object nobody ever sees. Round FIRST, then audit, then floor on the
+    // rounded slice, so every check and every downstream consumer sees one and the same surface.
+    const shipped = { a: round(P.a, 8), b: round(P.b, 8), rho: round(P.rho, 8), m: round(P.m, 8), sig: round(P.sig, 8) };
+    // Audited on the DENSE grid, never the penalty grid.
+    let minG = Infinity; for (const k of dense) { const g = sviG(k, shipped); if (g < minG) minG = g; }
+    let calMinDw = null;
+    if (floor) { calMinDw = Infinity; for (const k of dense) { const d = sviW(k, shipped) - sviW(k, floor); if (d < calMinDw) calMinDw = d; } }
+    const calendarOk = calMinDw === null || calMinDw >= 0;
+    const noArb = minG >= 0 && sviWingOk(shipped) && calendarOk;
     const ok = rmseVolPts <= maxRmseVolPts && noArb;
+    if (ok) floorP = shipped;   // floor the next expiry on the SHIPPED slice, not the in-memory optimum
     return {
       T: round(s.T, 5), n: pts.length, ok, rmseVolPts,
-      params: { a: round(P.a, 6), b: round(P.b, 4), rho: round(P.rho, 4), m: round(P.m, 4), sigma: round(P.sig, 4) },
+      params: { a: shipped.a, b: shipped.b, rho: shipped.rho, m: shipped.m, sigma: shipped.sig },
       butterflyMinG: Number(minG.toExponential(2)), wingBoundOk: sviWingOk(P),
-      reason: ok ? undefined : (!noArb ? `no-arbitrage violated (min g(k)=${minG.toExponential(2)}, wing bound ${sviWingOk(P) ? 'ok' : 'breached'})` : `RMSE ${rmseVolPts} vol pts exceeds the ${maxRmseVolPts} gate`),
+      calendarMinDw: calMinDw === null ? null : Number(calMinDw.toExponential(2)), calendarOk,
+      reason: ok ? undefined : (!noArb ? `no-arbitrage violated (min g(k)=${minG.toExponential(2)}, wing bound ${sviWingOk(P) ? 'ok' : 'breached'}, calendar ${calendarOk ? 'ok' : `breached: min Δw=${calMinDw.toExponential(2)}`})` : `RMSE ${rmseVolPts} vol pts exceeds the ${maxRmseVolPts} gate`),
     };
   });
   const fitted = perSlice.filter((s) => s.ok);
@@ -205,8 +234,9 @@ export function sviIvFnAtT(fit, F, T) {
 }
 
 /**
- * Fit SSVI SLICE-BY-SLICE (the calibration the literature actually recommends — see the eSSVI algorithm,
- * arXiv:2304.02106: "forward slice-by-slice calibration of SSVI slices"). Each expiry gets its own
+ * Fit SSVI SLICE-BY-SLICE (the robust arbitrage-free calibration the literature recommends — Corbetta,
+ * Cohort, Laachir & Martini, "Robust calibration and arbitrage-free interpolation of SSVI slices",
+ * arXiv:1804.04924; global no-arb parametrization in Mingone, arXiv:2204.00312). Each expiry gets its own
  * (ρ, φ) with θ OBSERVED — 2 free parameters against 10–40 strikes, so no overfitting — instead of
  * forcing ONE global (ρ, η, γ) to span every maturity at once (measured: that is over-constrained,
  * RMSE 4.6–8.8 vol pts on live chains, and correctly rejected by the gate).
@@ -262,7 +292,7 @@ export function fitSSVI(slices, { maxRmseVolPts = 1.5, kBand = 0.35, minPtsPerSl
     ok: fitted.length > 0,
     slicesFitted: fitted.length, slicesTotal: out.length,
     meanRmseVolPts: rmseAll, calendarOk, kBand, perSlice: out,
-    method: 'SSVI (Gatheral–Jacquier arXiv:1204.0646) calibrated SLICE-BY-SLICE per the eSSVI algorithm (arXiv:2304.02106). Per expiry: θ is the OBSERVED ATM total variance (SSVI has w(0,θ)=θ, so it is not fitted) and only (ρ, φ) are free — 2 parameters against 10–40 strikes. Butterfly conditions θφ(1+|ρ|)<4 and θφ²(1+|ρ|)≤4 are penalised inside the objective, so any accepted slice is arbitrage-free by construction. Nelder–Mead, multi-start. Deep wings trimmed to |log-moneyness| ≤ kBand (far-OTM marks are stale/wide). A slice failing the RMSE gate is REJECTED and falls back to disclosed interpolation — a silently mis-fitted smile is worse than an honest imperfect one.',
+    method: 'SSVI (Gatheral–Jacquier arXiv:1204.0646) calibrated SLICE-BY-SLICE, arbitrage-free per Corbetta et al. (arXiv:1804.04924). Per expiry: θ is the OBSERVED ATM total variance (SSVI has w(0,θ)=θ, so it is not fitted) and only (ρ, φ) are free — 2 parameters against 10–40 strikes. Butterfly conditions θφ(1+|ρ|)<4 and θφ²(1+|ρ|)≤4 are penalised inside the objective, so any accepted slice is arbitrage-free by construction. Nelder–Mead, multi-start. Deep wings trimmed to |log-moneyness| ≤ kBand (far-OTM marks are stale/wide). A slice failing the RMSE gate is REJECTED and falls back to disclosed interpolation — a silently mis-fitted smile is worse than an honest imperfect one.',
     reason: fitted.length ? undefined : 'no slice passed the fit-quality gate — all fall back to disclosed interpolation',
   };
 }

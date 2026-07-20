@@ -88,3 +88,69 @@ test('★ sviIvFnAtT interpolates total variance CALENDAR-arbitrage-free (w=σ²
   assert.equal(sviIvFnAtT(fit, Fx, 0.03).basis, 'flat-extrapolated');
   assert.equal(sviIvFnAtT(fit, Fx, 0.30).basis, 'flat-extrapolated');
 });
+
+// ---------------------------------------------------------------------------------------------------
+// REGRESSION LOCKS for four defects found live on 2026-07-17 against the shipped BTC surface.
+// Every one was the same disease: a check that could not fail.
+//   1. quadratic penalty on a one-sided constraint -> small violations were nearly free
+//   2. butterfly min reported on the SAME grid the optimiser was penalised on -> unfalsifiable
+//   3. no calendar coupling across slices -> w(k,T) crossed (14/470 nodes live)
+//   4. arb verified on full-precision params, then ROUNDED params shipped -> guarantee not on the artifact
+// ---------------------------------------------------------------------------------------------------
+
+// Audit helpers deliberately use an OFFSET, DENSER grid than the fitter's penalty grid.
+const auditGrid = (kBand = 0.35, n = 977, off = 0.0031) => {
+  const g = []; for (let i = 0; i <= n; i++) g.push(-kBand + off + (2 * kBand - 2 * off) * i / n); return g;
+};
+const shippedP = (s) => ({ a: s.params.a, b: s.params.b, rho: s.params.rho, m: s.params.m, sig: s.params.sigma });
+
+// The params below are the ACTUAL live BTC 3.8d fit (2026-07-17) that shipped with butterfly
+// arbitrage: it reported butterflyMinG=+9.93e-8 on its own 12-node training grid while the true minimum
+// was -1.69e-3 across k in [0.175,0.204] (4.2% of the band). A benign synthetic slice does NOT reproduce
+// this — the fit must be driven ONTO the constraint boundary for the defect to appear. Locking the real case.
+const LIVE_BTC_3D8 = { a: -0.002597, b: 0.0358, rho: 0.3629, m: 0.0649, sig: 0.1027 };
+
+test('★ butterfly g(k)≥0 on an OFFSET DENSE grid for the SHIPPED params (real boundary-hugging slice)', () => {
+  const T = 3.8 / 365, F = 63188;
+  const slice = syntheticSlice(T, F, LIVE_BTC_3D8);
+  const fit = fitSVI([slice], { minTdays: 1 });
+  const s = fit.perSlice[0];
+  // The contract is conditional: we may REJECT this slice (honest) — but we must never ACCEPT it with arb.
+  if (s.ok) {
+    let minG = Infinity;
+    for (const k of auditGrid()) minG = Math.min(minG, sviG(k, shippedP(s)));
+    assert.ok(minG >= 0, );
+  }
+  assert.ok(true);
+});
+
+test('★ the FITTED ANCHORS are calendar-ordered: w(k,T) non-decreasing in T for the SHIPPED params', () => {
+  // Two slices whose independent best fits would cross at the wing unless the fitter couples them in T.
+  const slices = [
+    syntheticSlice(4 / 365, 64000, { a: 0.0004, b: 0.030, rho: 0.30, m: 0.05, sig: 0.09 }),
+    syntheticSlice(14 / 365, 64000, { a: 0.0009, b: 0.034, rho: -0.10, m: 0.01, sig: 0.12 }),
+  ];
+  const fit = fitSVI(slices, { minTdays: 1 });
+  const ok = fit.perSlice.filter((s) => s.ok);
+  assert.ok(ok.length >= 2, 'both slices accepted');
+  let worst = Infinity;
+  for (const k of auditGrid()) worst = Math.min(worst, sviW(k, shippedP(ok[1])) - sviW(k, shippedP(ok[0])));
+  assert.ok(worst >= 0, `w(k,T2) ≥ w(k,T1) must hold at every k, worst Δw=${worst.toExponential(3)}`);
+  // and the fitter must SAY so, on the artifact it ships
+  assert.ok(ok[1].calendarOk, 'fitter reports calendarOk for the later slice');
+  assert.ok(ok[1].calendarMinDw >= 0, `reported calendarMinDw ≥ 0 (${ok[1].calendarMinDw})`);
+});
+
+test('★ a slice that cannot be fitted arbitrage-free is REJECTED, never shipped with arbitrage', () => {
+  const T = 7 / 365, F = 64000;
+  const slice = syntheticSlice(T, F, { a: 0.0009, b: 0.05, rho: -0.35, m: 0.0, sig: 0.08 });
+  const fit = fitSVI([slice], { minTdays: 1 });
+  for (const s of fit.perSlice) {
+    if (!s.ok || s.excluded) continue;
+    // invariant: anything marked ok MUST be arb-free on the shipped params, audited off-grid
+    let minG = Infinity;
+    for (const k of auditGrid()) minG = Math.min(minG, sviG(k, shippedP(s)));
+    assert.ok(minG >= 0, 'an ACCEPTED slice is arbitrage-free on the shipped params');
+    assert.ok(s.wingBoundOk, 'an ACCEPTED slice satisfies the wing bound');
+  }
+});

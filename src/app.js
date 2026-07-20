@@ -7,6 +7,9 @@ import { paid } from './x402.js';
 import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
 import { SERVICES, byName } from './services.js';
+import { handleRpc } from './mcp.js';
+import { recurrenceSummary } from './recurrence.js';
+import { _internal } from './engine/proof.js';
 
 // Technical documentation, served as a plain HTML page so it is readable by both humans and automated
 // (LLM) reviewers — a Drive PDF link is not fetchable by an AI screener; this URL is.
@@ -29,9 +32,45 @@ app.get('/', (_req, res) => res.json({
   tagline: 'A quiver of agent tools — one call.',
   services: Object.fromEntries(SERVICES.filter((s) => s.register !== false).map((s) => [`POST ${s.path}`, `${s.blurb} — ${s.price} USDT/call`])),
   payment: { protocol: 'x402 v2', scheme: 'exact', network: config.network, asset: 'USDT (X Layer)' },
+  mcp: 'POST /mcp — Streamable HTTP MCP endpoint; add this URL to any MCP client (Claude/Cursor/LangChain) to call the verifiable risk brain',
   version: config.version,
 }));
-app.get('/healthz', (_req, res) => res.json({ ok: true, version: config.version, services: SERVICES.length }));
+app.get('/healthz', (_req, res) => res.json({ ok: true, version: config.version, services: SERVICES.filter((s) => s.register !== false).length }));
+
+// Build provenance — makes "re-run bit-for-bit" CHECKABLE, not a promise. `codeHash` is the sha256 of the
+// open-source engine sources and equals `proof.codeHash` on every answer; rebuild from the published repo to
+// get the identical codeHash, then re-run any engine on `proof.inputs` on the SAME Node/V8 (shown here) to
+// reproduce the result bit-for-bit. (Basic IEEE-754 ops are deterministic across platforms; transcendentals
+// are stable within a V8 version — pin to this runtime for an exact re-run.)
+app.get('/build', (_req, res) => res.json({
+  codeHash: _internal.buildId(),
+  node: process.version,
+  version: config.version,
+  repo: 'https://github.com/Tristan-tech-ai/Quiver',
+  reproduce: 'Rebuild from source → identical codeHash. Then re-run the open engine on proof.inputs (on this Node version) → identical result & contentHash. Correctness is re-derived, not trusted.',
+}));
+
+// ── Remote MCP endpoint (Streamable HTTP transport) ─────────────────────────────────────────────────────
+// The Phase-1 distribution unlock: any MCP-compatible agent (Claude, Cursor, LangChain/CrewAI/OpenAI via an
+// MCP client) adds Quiver by URL — `<this-host>/mcp` — and calls the verifiable risk brain directly. Stateless
+// request/response (no sessions, no SSE): POST a JSON-RPC message → get the JSON-RPC response. Free T0 (every
+// answer still carries its re-runnable, self-checked proof); paid live-data + T1 attestation stay on the x402
+// routes. CORS-open: a public read-only compute API with no local resources to protect.
+const MCP_CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'POST, OPTIONS', 'Access-Control-Allow-Headers': 'content-type, accept, mcp-protocol-version, mcp-session-id, authorization', 'Access-Control-Max-Age': '86400' };
+app.options('/mcp', (_req, res) => res.set(MCP_CORS).status(204).end());
+app.get('/mcp', (_req, res) => res.set(MCP_CORS).set('Allow', 'POST').status(405).json({ error: 'Stateless MCP endpoint — POST a JSON-RPC message. No SSE stream is offered here.' }));
+app.post('/mcp', async (req, res) => {
+  res.set(MCP_CORS);
+  const msg = req.body;
+  if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return res.status(400).json({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'expected a single JSON-RPC message object' } });
+  if (msg.id === undefined) { try { await handleRpc(msg); } catch { /* notifications never error back */ } return res.status(202).end(); }
+  try {
+    const resp = await handleRpc(msg);
+    return res.set('Content-Type', 'application/json').json(resp ?? { jsonrpc: '2.0', id: msg.id, result: {} });
+  } catch (e) {
+    return res.status(500).json({ jsonrpc: '2.0', id: msg.id, error: { code: -32603, message: String(e.message || e) } });
+  }
+});
 
 // Public technical documentation (HTML — LLM- and human-readable). Also aliased at /whitepaper and /docs.
 app.get(['/paper', '/whitepaper', '/docs'], (_req, res) => {
@@ -59,6 +98,9 @@ app.get('/diag', async (_req, res) => {
   res.json({ region: process.env.RAILWAY_REGION || 'unknown', adapter: config.adapter, results: await Promise.all([config.okxApiBase, 'https://web3.okx.com'].map(probe)) });
 });
 
+// Phase-1 recurrence readout (gated) — distinct paying callers + how many came back (≥2). The real success signal.
+app.get('/diag/recurrence', (req, res) => { if (!gated(req, res)) return; res.json(recurrenceSummary()); });
+
 // Run any service unpaid for verification: /diag/scan?svc=tape-pulse&chain=solana&address=...
 app.get('/diag/scan', async (req, res) => {
   if (!gated(req, res)) return;
@@ -84,6 +126,31 @@ app.post('/diag/scanpost', async (req, res) => {
   if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: v.error });
   try { res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` })); }
   catch (e) { res.status(500).json({ svc: svc.name, error: 'engine_error', detail: String(e.message || e).slice(0, 400) }); }
+});
+
+// CDP facilitator auth probe (gated, read-only) — certifies the CDP keys + JWT auth + URL + network naming
+// WITHOUT a payer: mint a real per-request JWT from the configured CDP creds and GET the facilitator's
+// /supported endpoint. 200 => auth accepted; 401 => bad/absent keys; 403 => insufficient scope.
+app.get('/diag/cdp', async (req, res) => {
+  if (!gated(req, res)) return;
+  try {
+    if (req.query.verify) {
+      // Probe CDP /verify with a synthetic (invalid) eip155:8453 payload against the LIVE Base requirements.
+      const dummy = { x402Version: 2, scheme: 'exact', network: 'eip155:8453', payload: { signature: '0x' + '00'.repeat(65), authorization: { from: '0x0000000000000000000000000000000000000001', to: '0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b', value: '10000', validAfter: '0', validBefore: '9999999999', nonce: '0x' + '00'.repeat(32) } } };
+      const { _probeCdpVerify } = await import('./x402.js');
+      return res.json(await _probeCdpVerify(dummy));
+    }
+    const { facilitator } = await import('@coinbase/x402');
+    const all = await facilitator.createAuthHeaders();
+    const hdr = all.supported || {};
+    const t = Date.now();
+    const r = await fetch(facilitator.url + '/supported', { headers: hdr, signal: AbortSignal.timeout(15000) });
+    const text = await r.text();
+    let body; try { body = JSON.parse(text); } catch { body = text.slice(0, 300); }
+    res.json({ url: facilitator.url + '/supported', status: r.status, ms: Date.now() - t, authPresent: !!hdr.Authorization, body });
+  } catch (e) {
+    res.status(500).json({ error: 'cdp_probe_failed', detail: String(e.message || e).slice(0, 300) });
+  }
 });
 
 app.get('/diag/fetch', async (req, res) => {

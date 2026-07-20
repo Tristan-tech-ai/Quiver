@@ -1,0 +1,73 @@
+<svg width="640" height="360" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 640 360">
+<rect width="640" height="360" x="0" y="0" fill="none"></rect>
+<path d="M62 308.5L616 308.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 259.5L616 259.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 210.5L616 210.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 161.5L616 161.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 113.5L616 113.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62 64.5L616 64.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M62.5 64L62.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M178.5 64L178.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M324.5 64L324.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M470.5 64L470.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<path d="M616.5 64L616.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="-6" transform="matrix(0,-1,1,0,28,186)" fill="#1a2332">adverse move to liquidation (%)</text>
+<path d="M62.5 308L62.5 64" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="6" transform="translate(339 342)" fill="#1a2332">effective leverage (×)</text>
+<path d="M62 308.5L616 308.5" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr2-cls-8"></path>
+<path d="M62 308.5L57 308.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 259.5L57 259.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 210.5L57 210.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 161.5L57 161.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 113.5L57 113.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62 64.5L57 64.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M62.5 308L62.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M178.5 308L178.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M324.5 308L324.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M470.5 308L470.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<path d="M616.5 308L616.5 313" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 308)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 259.2)" fill="#8a97a8">10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 210.4)" fill="#8a97a8">20</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 161.6)" fill="#8a97a8">30</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 112.8)" fill="#8a97a8">40</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 64)" fill="#8a97a8">50</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(62 316)" fill="#8a97a8">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(178.6316 316)" fill="#8a97a8">10</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(324.4211 316)" fill="#8a97a8">20</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(470.2105 316)" fill="#8a97a8">30</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(616 316)" fill="#8a97a8">40</text>
+<polygon points="397.3 308 616 308 616 64 397.3 64" fill="rgb(192,57,43)" fill-opacity="0.07" stroke="#2b6cb0" stroke-width="0" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" ecmeta_silent="true" class="zr2-cls-8"></polygon>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10px;font-family:Georgia, serif;" xml:space="preserve" y="5" transform="translate(611 69)" fill="#c0392b">danger: thin buffer</text>
+<g clip-path="url(#zr2-c0)">
+<path d="M62 67.1L76.6 149.5L91.2 190.6L105.7 215.3L120.3 231.8L134.9 243.6L149.5 252.4L164.1 259.3L178.6 264.8L193.2 269.3L207.8 273L222.4 276.2L236.9 278.9L251.5 281.2L266.1 283.3L280.7 285.1L295.3 286.7L309.8 288.2L324.4 289.5L339 290.6L353.6 291.7L368.2 292.7L382.7 293.6L397.3 294.4L411.9 295.2L426.5 295.9L441.1 296.5L455.6 297.1L470.2 297.7L484.8 298.2L499.4 298.7L513.9 299.2L528.5 299.6L543.1 300.1L557.7 300.5L572.3 300.8L586.8 301.2L601.4 301.5L616 301.8L616 308L601.4 308L586.8 308L572.3 308L557.7 308L543.1 308L528.5 308L513.9 308L499.4 308L484.8 308L470.2 308L455.6 308L441.1 308L426.5 308L411.9 308L397.3 308L382.7 308L368.2 308L353.6 308L339 308L324.4 308L309.8 308L295.3 308L280.7 308L266.1 308L251.5 308L236.9 308L222.4 308L207.8 308L193.2 308L178.6 308L164.1 308L149.5 308L134.9 308L120.3 308L105.7 308L91.2 308L76.6 308L62 308Z" fill="rgb(43,108,176)" fill-opacity="0.041999999999999996" class="zr2-cls-10"></path>
+<path d="M62 67.1L76.6 149.5L91.2 190.6L105.7 215.3L120.3 231.8L134.9 243.6L149.5 252.4L164.1 259.3L178.6 264.8L193.2 269.3L207.8 273L222.4 276.2L236.9 278.9L251.5 281.2L266.1 283.3L280.7 285.1L295.3 286.7L309.8 288.2L324.4 289.5L339 290.6L353.6 291.7L368.2 292.7L382.7 293.6L397.3 294.4L411.9 295.2L426.5 295.9L441.1 296.5L455.6 297.1L470.2 297.7L484.8 298.2L499.4 298.7L513.9 299.2L528.5 299.6L543.1 300.1L557.7 300.5L572.3 300.8L586.8 301.2L601.4 301.5L616 301.8" fill="none" pointer-events="visible" stroke="#2b6cb0" stroke-width="2" stroke-linejoin="bevel" class="zr2-cls-11"></path>
+</g>
+<path d="M-176.7 -5l353.4 0l0 46l-353.4 0Z" transform="translate(320 20)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#3c3c41" stroke-width="0" class="zr2-cls-8"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:15px;font-family:Georgia, serif;font-weight:600;" xml:space="preserve" y="7.5" transform="translate(320 20)" fill="#1a2332">The liquidation buffer collapses with leverage</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" y="30.5" transform="translate(320 20)" fill="#8a97a8">move-to-liquidation for a BTC long (maint. margin 1.25%) — perp-gate</text>
+<defs >
+<clipPath id="zr2-c0">
+<path d="M61 63l556 0l0 246l-556 0Z" fill="#000" class="zr2-cls-9"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr2-cls-8:hover {
+pointer-events:none;
+}
+.zr2-cls-9:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr2-cls-10:hover {
+cursor:pointer;
+fill:rgba(47,118,193,0.06);
+}
+.zr2-cls-11:hover {
+cursor:pointer;
+}
+
+]]>
+
+</style>
+</svg>

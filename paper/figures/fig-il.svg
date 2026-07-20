@@ -1,0 +1,70 @@
+<svg width="640" height="360" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" baseProfile="full" viewBox="0 0 640 360">
+<rect width="640" height="360" x="0" y="0" fill="none"></rect>
+<path d="M62 308.5L616 308.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 247.5L616 247.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 186.5L616 186.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 125.5L616 125.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62 64.5L616 64.5" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M62.5 64L62.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M173.5 64L173.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M320.5 64L320.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M468.5 64L468.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<path d="M616.5 64L616.5 308" fill="none" pointer-events="visible" stroke="#e4e9f0" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="-6" transform="matrix(0,-1,1,0,27.875,186)" fill="#1a2332">impermanent loss (%)</text>
+<path d="M62.5 308L62.5 64" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:12px;font-family:Georgia, serif;" xml:space="preserve" y="6" transform="translate(339 342)" fill="#1a2332">price ratio r = P₁ / P₀</text>
+<path d="M62 64.5L616 64.5" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-linecap="round" class="zr1-cls-4"></path>
+<path d="M62 308.5L57 308.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 247.5L57 247.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 186.5L57 186.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 125.5L57 125.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62 64.5L57 64.5" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M62.5 64L62.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M173.5 64L173.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M320.5 64L320.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M468.5 64L468.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<path d="M616.5 64L616.5 69" fill="none" pointer-events="visible" stroke="#8a97a8" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 308)" fill="#8a97a8">-20</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 247)" fill="#8a97a8">-15</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 186)" fill="#8a97a8">-10</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 125)" fill="#8a97a8">-5</text>
+<text dominant-baseline="central" text-anchor="end" style="font-size:10.5px;font-family:Georgia, serif;" transform="translate(54 64)" fill="#8a97a8">0</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(62 316)" fill="#8a97a8">0.25</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(172.8 316)" fill="#8a97a8">1</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(320.5333 316)" fill="#8a97a8">2</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(468.2667 316)" fill="#8a97a8">3</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:10.5px;font-family:Georgia, serif;" y="5.25" transform="translate(616 316)" fill="#8a97a8">4</text>
+<g clip-path="url(#zr1-c0)">
+<path d="M62 308L69.4 256L76.8 214.7L84.2 181.7L91.5 155.2L98.9 133.8L106.3 116.5L113.7 102.7L121.1 91.8L128.5 83.1L135.9 76.5L143.3 71.6L150.6 68L158 65.7L165.4 64.4L172.8 64L180.2 64.4L187.6 65.4L195 67L202.3 69.1L209.7 71.6L217.1 74.4L224.5 77.6L231.9 81.1L239.3 84.8L246.7 88.6L254.1 92.7L261.4 96.9L268.8 101.3L276.2 105.7L283.6 110.2L291 114.9L298.4 119.5L305.8 124.2L313.1 129L320.5 133.8L327.9 138.6L335.3 143.4L342.7 148.2L350.1 153L357.5 157.8L364.9 162.7L372.2 167.4L379.6 172.2L387 177L394.4 181.7L401.8 186.4L409.2 191.1L416.6 195.8L423.9 200.4L431.3 205L438.7 209.6L446.1 214.1L453.5 218.6L460.9 223L468.3 227.4L475.7 231.8L483 236.2L490.4 240.5L497.8 244.8L505.2 249L512.6 253.2L520 257.3L527.4 261.5L534.7 265.6L542.1 269.6L549.5 273.6L556.9 277.6L564.3 281.5L571.7 285.4L579.1 289.3L586.5 293.1L593.8 296.9L601.2 300.6L608.6 304.3L616 308L616 64L608.6 64L601.2 64L593.8 64L586.5 64L579.1 64L571.7 64L564.3 64L556.9 64L549.5 64L542.1 64L534.7 64L527.4 64L520 64L512.6 64L505.2 64L497.8 64L490.4 64L483 64L475.7 64L468.3 64L460.9 64L453.5 64L446.1 64L438.7 64L431.3 64L423.9 64L416.6 64L409.2 64L401.8 64L394.4 64L387 64L379.6 64L372.2 64L364.9 64L357.5 64L350.1 64L342.7 64L335.3 64L327.9 64L320.5 64L313.1 64L305.8 64L298.4 64L291 64L283.6 64L276.2 64L268.8 64L261.4 64L254.1 64L246.7 64L239.3 64L231.9 64L224.5 64L217.1 64L209.7 64L202.3 64L195 64L187.6 64L180.2 64L172.8 64L165.4 64L158 64L150.6 64L143.3 64L135.9 64L128.5 64L121.1 64L113.7 64L106.3 64L98.9 64L91.5 64L84.2 64L76.8 64L69.4 64L62 64Z" fill="rgb(192,57,43)" fill-opacity="0.06999999999999999" class="zr1-cls-6"></path>
+<path d="M62 308L69.4 256L76.8 214.7L84.2 181.7L91.5 155.2L98.9 133.8L106.3 116.5L113.7 102.7L121.1 91.8L128.5 83.1L135.9 76.5L143.3 71.6L150.6 68L158 65.7L165.4 64.4L172.8 64L180.2 64.4L187.6 65.4L195 67L202.3 69.1L209.7 71.6L217.1 74.4L224.5 77.6L231.9 81.1L239.3 84.8L246.7 88.6L254.1 92.7L261.4 96.9L268.8 101.3L276.2 105.7L283.6 110.2L291 114.9L298.4 119.5L305.8 124.2L313.1 129L320.5 133.8L327.9 138.6L335.3 143.4L342.7 148.2L350.1 153L357.5 157.8L364.9 162.7L372.2 167.4L379.6 172.2L387 177L394.4 181.7L401.8 186.4L409.2 191.1L416.6 195.8L423.9 200.4L431.3 205L438.7 209.6L446.1 214.1L453.5 218.6L460.9 223L468.3 227.4L475.7 231.8L483 236.2L490.4 240.5L497.8 244.8L505.2 249L512.6 253.2L520 257.3L527.4 261.5L534.7 265.6L542.1 269.6L549.5 273.6L556.9 277.6L564.3 281.5L571.7 285.4L579.1 289.3L586.5 293.1L593.8 296.9L601.2 300.6L608.6 304.3L616 308" fill="none" pointer-events="visible" stroke="#2b6cb0" stroke-width="2" stroke-linejoin="bevel" class="zr1-cls-7"></path>
+</g>
+<path d="M173.5 308L173.5 64" fill="none" pointer-events="visible" stroke="#8a97a8" stroke-dasharray="4,2" ecmeta_series_index="0" ecmeta_data_index="0" ecmeta_ssr_type="chart" ecmeta_silent="true" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="start" style="font-size:10px;font-family:Georgia, serif;" xml:space="preserve" y="-5" transform="translate(177.8 303)" fill="#8a97a8">no move</text>
+<path d="M-203 -5l406 0l0 46l-406 0Z" transform="translate(320 20)" fill="rgb(0,0,0)" fill-opacity="0" stroke="#3c3c41" stroke-width="0" class="zr1-cls-4"></path>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:15px;font-family:Georgia, serif;font-weight:600;" xml:space="preserve" y="7.5" transform="translate(320 20)" fill="#1a2332">Impermanent loss is symmetric in log-price and always ≤ 0</text>
+<text dominant-baseline="central" text-anchor="middle" style="font-size:11px;font-family:Georgia, serif;" xml:space="preserve" y="30.5" transform="translate(320 20)" fill="#8a97a8">IL(r) = 2√r/(1+r) − 1 — lp-risk, verified at the token level</text>
+<defs >
+<clipPath id="zr1-c0">
+<path d="M61 63l556 0l0 246l-556 0Z" fill="#000" class="zr1-cls-5"></path>
+</clipPath>
+</defs>
+<style ><![CDATA[
+.zr1-cls-4:hover {
+pointer-events:none;
+}
+.zr1-cls-5:hover {
+cursor:pointer;
+fill:rgba(0,0,0,1);
+}
+.zr1-cls-6:hover {
+cursor:pointer;
+fill:rgba(211,62,47,0.1);
+}
+.zr1-cls-7:hover {
+cursor:pointer;
+}
+
+]]>
+
+</style>
+</svg>

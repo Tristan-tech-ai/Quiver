@@ -1,24 +1,27 @@
 {
-  "name": "quiver",
+  "name": "veritape",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Quiver — pay-per-call quant and security services for AI agents, over x402 on X Layer (ERC-8004 ASP #5152).",
+  "description": "Veritape — on-chain authenticity forensics: wash-volume and track-record verification, pay-per-call via x402.",
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "start": "node src/server.js",
+    "mcp": "node src/mcp.js",
     "dev": "set DEV_MODE=1&& node src/server.js",
     "test:local": "node test/run-local.mjs",
     "postinstall": "node tools/fetch-cli.mjs",
     "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
+    "@coinbase/x402": "^2.1.0",
     "@resvg/resvg-js": "^2.6.2",
     "echarts": "^6.1.0",
     "ethers": "^6.17.0",
     "express": "^4.21.2",
+    "javascript-lp-solver": "^1.0.3",
     "klinecharts": "^9.8.12",
     "playwright": "^1.61.1",
     "playwright-core": "^1.61.1",

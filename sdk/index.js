@@ -64,27 +64,43 @@ export function createRiskBrain({ mode = 'local', baseUrl = 'https://quiver-prod
     };
   }
 
-  // verify(): recompute the content hash from the echoed inputs + the (proof-stripped) result, and re-check
-  // that every self-check passed. Cheap; needs no re-run. A tampered result changes the hash and fails here.
+  // verify(): recompute the content hash from the echoed fields + the (envelope-stripped) result, and
+  // re-check that every self-check passed. Cheap; needs no re-run. A tampered result changes the hash and
+  // fails here. Handles BOTH envelope kinds: `proof` (deterministic services — also reproduce()-able) and
+  // `observation` (live-market services — committed snapshot, timestamped, NOT re-runnable by design).
+  // The result is hashed in its WIRE form (one JSON round-trip): res.json drops undefined-valued keys and
+  // stringifies Dates, and the server commits to exactly that form — so verify() matches both a response
+  // received over HTTP (round-trip is a no-op) and a locally-computed envelope still holding such values.
   function verify(envelope) {
-    const p = envelope?.proof;
-    if (!p) return { valid: false, reason: 'no proof envelope' };
-    const { proof, ...result } = envelope;
-    const recomputed = _internal.sha256(_internal.canonical({ engine: p.engine, codeHash: p.codeHash, inputs: p.inputs, result }));
-    const contentHashOk = recomputed === p.contentHash;
-    const selfChecksOk = (p.selfChecks || []).every((c) => c.pass !== false);
-    return { valid: contentHashOk && selfChecksOk, contentHashOk, selfChecksOk };
+    const p = envelope?.proof, o = envelope?.observation;
+    if (!p && !o) return { valid: false, reason: 'no proof or observation envelope' };
+    const clean = _internal.jsonClean;
+    let recomputed, env, kind;
+    if (p) {
+      const { proof, ...result } = envelope;
+      env = p; kind = 'proof';
+      recomputed = _internal.sha256(_internal.canonical({ engine: p.engine, codeHash: p.codeHash, inputs: p.inputs, result: clean(result) }));
+    } else {
+      const { observation, ...result } = envelope;
+      env = o; kind = 'observation';
+      recomputed = _internal.sha256(_internal.canonical({ engine: o.engine, codeHash: o.codeHash, observedAtUtc: o.observedAtUtc, inputs: o.inputs, result: clean(result) }));
+    }
+    const contentHashOk = recomputed === env.contentHash;
+    const selfChecksOk = (env.selfChecks || []).every((c) => c.pass !== false);
+    return { valid: contentHashOk && selfChecksOk, contentHashOk, selfChecksOk, envelopeKind: kind };
   }
 
   // reproduce(): re-run the open engine on proof.inputs and confirm the (proof-stripped, live-stripped)
   // result is byte-identical. This is the strong guarantee — correctness you re-derive, not signature trust.
+  // Observation envelopes are refused honestly: live-market answers cannot be reproduced, only verified.
   function reproduce(envelope) {
+    if (envelope?.observation) return { reproduced: false, reason: 'observation envelope: a live-market snapshot is not re-runnable (verify() it instead)' };
     const p = envelope?.proof;
     if (!p || !ENGINES[p.engine]) return { reproduced: false, reason: 'unknown engine or no proof' };
     const fresh = ENGINES[p.engine](p.inputs);
     const { proof, live, ...expected } = envelope;   // strip proof + live (live is non-deterministic provenance)
-    const a = _internal.canonical(fresh);
-    const b = _internal.canonical(expected);
+    const a = _internal.canonical(_internal.jsonClean(fresh));
+    const b = _internal.canonical(_internal.jsonClean(expected));
     return { reproduced: a === b, engine: p.engine };
   }
 

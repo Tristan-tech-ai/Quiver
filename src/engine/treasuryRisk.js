@@ -131,7 +131,10 @@ export function treasuryRisk(input = {}) {
       { name: 'HHI(asset) == Σ wᵢ² and 1/n ≤ HHI ≤ 1', residual: Number(hhiRes.toExponential(2)), pass: hhiRes <= 1e-9 && boundsOk },
       { name: 'depeg-loss identity on worst-single (independent recompute)', residual: Number(depegRes.toExponential(2)), pass: depegRes <= 1e-6 },
       { name: 'correlated-crash loss == Σ per-asset floor losses (joint-loss identity)', residual: Number(Math.abs(crashLoss - assets.reduce((s, a) => s + depegLoss(a, floor), 0)).toExponential(2)), pass: Math.abs(crashLoss - assets.reduce((s, a) => s + depegLoss(a, floor), 0)) <= 1e-6 * Math.max(1, total) },
-      { name: 'correlation-adjusted effective exposures == 1/HHI when no ρ supplied (identity)', pass: corrIn != null || corrAdjEffExposures == null || Math.abs(corrAdjEffExposures - byAsset.effectiveExposures) <= 1e-6 * Math.max(1, byAsset.effectiveExposures) },
+      // Compare UNROUNDED to UNROUNDED: byAsset.effectiveExposures is rounded to 2dp for display, so
+      // checking the identity against it with a 1e-6 tolerance failed on any book whose 1/HHI has >2dp —
+      // the identity was true, the CHECK was broken (round-then-verify, violated by the verifier itself).
+      { name: 'correlation-adjusted effective exposures == 1/HHI when no ρ supplied (identity)', pass: corrIn != null || corrAdjEffExposures == null || Math.abs(wRw - Object.values(assetWeights).reduce((s, w) => s + w * w, 0)) <= 1e-12 },
     ],
   };
 }

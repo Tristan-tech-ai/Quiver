@@ -24,10 +24,19 @@ export async function resolveProtocol(q) {
 export const protocol = (slug) => get(`/protocol/${slug}`);
 
 let hacksCache = null;
-export async function hacks() {
+export function _resetHacksCache() { hacksCache = null; } // tests only
+export async function hacks(fetcher = get) {
   if (!hacksCache || Date.now() - hacksCache.t > 12 * 3600 * 1000) {
-    const h = await get('/hacks').catch(() => ({ hacks: [] }));
-    hacksCache = { t: Date.now(), items: Array.isArray(h) ? h : h.hacks || [] };
+    try {
+      const h = await fetcher('/hacks');
+      hacksCache = { t: Date.now(), items: Array.isArray(h) ? h : h.hacks || [] };
+    } catch (e) {
+      // NEVER cache a failure as a clean record (a swallowed catch here once poisoned 12h of
+      // "0 incidents"). With a previous real cache: serve it stale. With none: REJECT — the caller
+      // (protocol-pulse) discloses registryUnavailable instead of fabricating a clean history.
+      if (hacksCache) return hacksCache.items;
+      throw e;
+    }
   }
   return hacksCache.items;
 }

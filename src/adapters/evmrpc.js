@@ -45,7 +45,8 @@ export async function simulate(chain, { from, to, data, value = '0x0' }) {
       const call = block?.calls?.[0];
       if (!call) throw new Error('empty simulate result');
       const bn = block?.number != null ? (typeof block.number === 'string' && block.number.startsWith('0x') ? parseInt(block.number, 16) : Number(block.number)) : null;
-      return { rpc: url, blockNumber: bn, status: call.status, returnData: call.returnData, gasUsed: call.gasUsed, error: call.error, logs: call.logs || [] };
+      const bh = typeof block?.hash === 'string' && /^0x[0-9a-fA-F]{64}$/.test(block.hash) ? block.hash : null;
+      return { rpc: url, blockNumber: bn, blockHash: bh, status: call.status, returnData: call.returnData, gasUsed: call.gasUsed, error: call.error, logs: call.logs || [] };
     } catch (e) {
       if (/method .*not (found|available|supported)|does not exist|Unsupported method|not supported/i.test(String(e.message))) simCapable.set(url, false);
       lastErr = e;
@@ -82,6 +83,20 @@ export async function code(chain, address) {
 export async function gasPrice(chain) {
   const urls = RPCS[String(chain).toLowerCase()] || RPCS.ethereum;
   for (const url of urls) { try { const r = await rpc(url, 'eth_gasPrice', [], 8000); return BigInt(r); } catch { /* next */ } }
+  return null;
+}
+
+// eth_getBlockByNumber (header only) — pins the state a simulation ran against, for a reproducible
+// evidence bundle. Returns { number, hash } or null. tag = 'latest' or a hex/number block.
+export async function getBlock(chain, tag = 'latest') {
+  const urls = RPCS[String(chain).toLowerCase()] || RPCS.ethereum;
+  const t = typeof tag === 'number' ? '0x' + tag.toString(16) : tag;
+  for (const url of urls) {
+    try {
+      const b = await rpc(url, 'eth_getBlockByNumber', [t, false], 8000);
+      if (b?.hash && b?.number != null) return { number: typeof b.number === 'string' ? parseInt(b.number, 16) : Number(b.number), hash: b.hash };
+    } catch { /* next */ }
+  }
   return null;
 }
 

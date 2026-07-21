@@ -56,7 +56,39 @@ async function simulateTx(chain, { from, to, data, value }) {
       nativeSymbol: NATIVE[String(chain).toLowerCase()] || 'ETH',
     };
   }
-  return { rpc: sim.rpc, blockNumber: sim.blockNumber ?? null, reverted, revertError: sim.error || null, assetChanges, approvalChanges, gas };
+  // Evidence bundle (opening #3): pin the state the sim ran against + emit each observed effect as a
+  // re-checkable assertion, so a caller can defend a signing decision to a third party. eth_simulateV1 runs
+  // ON TOP OF 'latest'; the base state = the block just before the simulated block. Pin its hash so the
+  // whole thing is reproducible — re-run eth_simulateV1 against that base and the deltas must reproduce.
+  let baseBlock = null;
+  try {
+    if (sim.blockNumber != null) baseBlock = await evm.getBlock(chain, sim.blockNumber - 1);
+    if (!baseBlock) baseBlock = await evm.getBlock(chain, 'latest');
+  } catch { /* evidence is best-effort; absence is disclosed below */ }
+  const evidenceBundle = buildEvidenceBundle({ from, to, data, value }, { blockNumber: sim.blockNumber ?? null, assetChanges, approvalChanges }, baseBlock);
+  return { rpc: sim.rpc, blockNumber: sim.blockNumber ?? null, blockHash: sim.blockHash ?? null, reverted, revertError: sim.error || null, assetChanges, approvalChanges, gas, evidenceBundle };
+}
+
+// Assemble the auditable evidence bundle (pure — no I/O). Each observed effect becomes a re-checkable
+// assertion; the base block pins the state so a third party can re-run eth_simulateV1 and reproduce every
+// claim. Absence of a pinnable base block is DISCLOSED, never silently dropped.
+export function buildEvidenceBundle(call, sim, baseBlock) {
+  const assertions = [
+    ...(sim.assetChanges || []).map((a) => ({ kind: 'asset-delta', claim: `${a.direction === 'OUT' ? 'sends' : a.direction === 'IN' ? 'receives' : 'nets'} ${a.amount} ${a.symbol || a.token} ${a.direction}`, token: a.token, direction: a.direction, amount: a.amount })),
+    ...(sim.approvalChanges || []).map((a) => ({ kind: 'approval', claim: `grants ${a.spender} a ${a.amount} allowance on ${a.symbol || a.token}`, token: a.token, spender: a.spender, amount: a.amount })),
+  ];
+  const v = call.value;
+  return {
+    pinnedState: baseBlock ? { baseBlockNumber: baseBlock.number, baseBlockHash: baseBlock.hash } : { note: 'base-block hash unavailable this call — the sim ran but the state pin could not be fetched; deltas are still observed, just not block-pinned.' },
+    simulatedBlockNumber: sim.blockNumber ?? null,
+    method: 'eth_simulateV1',
+    call: { from: call.from, to: call.to, data: (call.data || '').slice(0, 10) + '…', valueWei: v && v !== '0' ? '0x' + BigInt(v).toString(16) : '0x0' },
+    assertions,
+    assertionCount: assertions.length,
+    reCheck: baseBlock
+      ? `Re-run eth_simulateV1 with these exact {from,to,data,value} against base block ${baseBlock.number} (hash ${baseBlock.hash}); every assertion above must reproduce. If the base block hash has since been re-orged, re-pin to the new canonical block.`
+      : 'Re-run eth_simulateV1 with the same {from,to,data,value} on current state; note the base block was not pinnable this call.',
+  };
 }
 
 const FOURBYTE = 'https://www.4byte.directory/api/v1/signatures/?hex_signature=';
@@ -359,7 +391,7 @@ export async function calldataX({ data, value = '0', to = null, from = null, cha
     plainEnglish: describe(decoded.name, args, nativeValue),
     riskFlags: flags,
     simulation: simulation ? (simulation.error ? { available: false, note: 'Simulation unavailable: ' + simulation.error }
-      : { available: true, wouldRevert: simulation.reverted, blockNumber: simulation.blockNumber, assetChanges: simulation.assetChanges, approvalsGranted: simulation.approvalChanges, gasCost: simulation.gas || null, simulatedVia: 'eth_simulateV1' })
+      : { available: true, wouldRevert: simulation.reverted, blockNumber: simulation.blockNumber, blockHash: simulation.blockHash || null, assetChanges: simulation.assetChanges, approvalsGranted: simulation.approvalChanges, gasCost: simulation.gas || null, simulatedVia: 'eth_simulateV1', evidenceBundle: simulation.evidenceBundle })
       : { available: false, note: 'Pass "to" and "from" (the unsigned tx) to simulate exact asset and approval changes.' },
     provenance,
     method: 'Decodes the 4-byte selector and arguments, and — given the full unsigned transaction — simulates it on the live chain state (eth_simulateV1) to report the exact asset transfers, approval changes, and gas cost the signer would incur. The spender is reputation-scored (known-router allowlist, EOA vs contract via eth_getCode incl. EIP-7702, code size and outbound-tx activity), and the target contract is checked for an EIP-1967 upgradeable proxy (its logic can change post-approval). A one-glance danger verdict and risk flags sit on top.',

@@ -2,7 +2,7 @@
 // Candles + MA/EMA/BOLL overlays + volume panel + RSI panel + hlines/areas/trendlines/annotations.
 import * as echarts from 'echarts';
 import { Resvg } from '@resvg/resvg-js';
-import { sma, ema, wma, boll, rsi, atr, roc, obv, vwap, cci, mfi, williamsR, trix, psar, stochastic, adx, stochRsi, keltner, OVERLAYS, PANELS } from './indicators.js';
+import { sma, ema, wma, boll, rsi, atr, roc, obv, vwap, cci, mfi, williamsR, trix, psar, stochastic, adx, stochRsi, keltner, ichimoku, OVERLAYS, PANELS, heikinAshi, buildRenko } from './indicators.js';
 
 // One overlay series spec (on the price pane) from an indicator request.
 function overlaySeries(ind, bars, closes, highs, lows, vols, col, mk) {
@@ -15,7 +15,27 @@ function overlaySeries(ind, bars, closes, highs, lows, vols, col, mk) {
   if (t === 'BOLL') { const b = boll(closes, p || 20, ind.mult || 2); return [line(b.upper, 'BOLL up', { width: 1, opacity: 0.7 }), line(b.mid, 'BOLL mid', { width: 1, type: 'dashed' }), line(b.lower, 'BOLL low', { width: 1, opacity: 0.7 })]; }
   if (t === 'KELTNER') { const k = keltner(highs, lows, closes, p || 20, ind.atrPeriod || 10, ind.mult || 2); return [line(k.upper, 'KC up', { width: 1, opacity: 0.7 }), line(k.mid, 'KC mid', { width: 1, type: 'dashed' }), line(k.lower, 'KC low', { width: 1, opacity: 0.7 })]; }
   if (t === 'PSAR') return [{ type: 'scatter', xAxisIndex: 0, yAxisIndex: 0, data: psar(highs, lows, ind.step, ind.max).map((v, i) => v == null ? null : [i, v]).filter(Boolean), symbolSize: 2.4, itemStyle: { color: '#e5c07b' } }];
+  if (t === 'ICHIMOKU') {
+    const ic = ichimoku(highs, lows, closes, { conv: ind.conv || 9, base: ind.base || 26, spanBPeriod: ind.spanB || 52, disp: ind.disp || 26 });
+    // kumo fill via a stacked band: invisible base at min(spanA,spanB) + a stacked diff with areaStyle.
+    const lo = ic.spanA.map((a, i) => (a != null && ic.spanB[i] != null ? Math.min(a, ic.spanB[i]) : null));
+    const diff = ic.spanA.map((a, i) => (a != null && ic.spanB[i] != null ? Math.abs(a - ic.spanB[i]) : null));
+    const inv = { type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'none', lineStyle: { opacity: 0 }, stack: 'kumo', data: lo, silent: true };
+    const band = { type: 'line', xAxisIndex: 0, yAxisIndex: 0, symbol: 'none', lineStyle: { opacity: 0 }, stack: 'kumo', areaStyle: { color: 'rgba(91,141,239,0.12)' }, data: diff, silent: true };
+    return [inv, band,
+      line(ic.tenkan, 'Tenkan', { color: '#5b8def', width: 1.4 }),
+      line(ic.kijun, 'Kijun', { color: '#e5c07b', width: 1.4 }),
+      line(ic.spanA, 'SpanA', { color: '#34D399', width: 1, opacity: 0.8 }),
+      line(ic.spanB, 'SpanB', { color: '#F87171', width: 1, opacity: 0.8 }),
+      line(ic.chikou, 'Chikou', { color: '#c678dd', width: 1, type: 'dashed' })];
+  }
   return [];
+}
+
+// Risk/reward long-short position box: entry↔target zone (green) + entry↔stop zone (red) + R:R label.
+export function rrOf(d) {
+  const risk = Math.abs(d.entry - d.stop), reward = Math.abs(d.target - d.entry);
+  return risk > 0 ? reward / risk : null;
 }
 
 // Series for one sub-panel oscillator on its own axis index. Returns { series[], label, bands, range }.
@@ -44,41 +64,6 @@ const THEMES = {
   light: { bg: '#ffffff', bg2: '#f4f6fa', grid: '#e6ebf2', text: '#5b6b82', title: '#0b1220', up: '#16a34a', down: '#dc2626', line: ['#b45309', '#2563eb', '#7c3aed', '#0891b2'] },
 };
 
-// Heikin-Ashi transform (D14): smooths noise; HAclose=(o+h+l+c)/4, HAopen=(prevHAopen+prevHAclose)/2.
-function heikinAshi(bars) {
-  const out = []; let po = null, pc = null;
-  for (const b of bars) {
-    const hc = (b.o + b.h + b.l + b.c) / 4;
-    const ho = po == null ? (b.o + b.c) / 2 : (po + pc) / 2;
-    out.push({ t: b.t, o: ho, h: Math.max(b.h, ho, hc), l: Math.min(b.l, ho, hc), c: hc, v: b.v });
-    po = ho; pc = hc;
-  }
-  return out;
-}
-
-// Renko bricks (D14): price-driven, time-independent. Box size = param, else ~ATR(14)-ish (0.5·median|Δclose|·k).
-// Each brick is a synthetic up/down candle; returns { bricks, brickSize }.
-function buildRenko(bars, brickSize) {
-  const closes = bars.map((b) => b.c);
-  let box = brickSize > 0 ? brickSize : null;
-  if (!box) {
-    const diffs = []; for (let i = 1; i < closes.length; i++) diffs.push(Math.abs(closes[i] - closes[i - 1]));
-    diffs.sort((a, b) => a - b);
-    box = (diffs[Math.floor(diffs.length / 2)] || closes[closes.length - 1] * 0.01) * 2; // ~2× median move
-  }
-  if (!(box > 0)) return { bricks: [], brickSize: 0 };
-  const bricks = []; let base = Math.round(closes[0] / box) * box;
-  for (let i = 1; i < closes.length; i++) {
-    let diff = closes[i] - base;
-    while (Math.abs(diff) >= box) {
-      const up = diff > 0; const nb = base + (up ? box : -box);
-      bricks.push({ t: bars[i].t, o: base, c: nb, h: Math.max(base, nb), l: Math.min(base, nb), v: 0, up });
-      base = nb; diff = closes[i] - base;
-    }
-  }
-  return { bricks, brickSize: box };
-}
-
 // Fibonacci retracement/extension levels between two price points (D13).
 const FIB_RETRACE = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const FIB_EXTEND = [0, 0.618, 1, 1.272, 1.618, 2.618];
@@ -86,7 +71,7 @@ const FIB_EXTEND = [0, 0.618, 1, 1.272, 1.618, 2.618];
 const fmtPrice = (n) => (n == null ? '' : n >= 1 ? n.toFixed(2) : n >= 0.0001 ? n.toPrecision(4) : n.toExponential(1));
 const fmtCompact = (n) => { if (n == null) return ''; const a = Math.abs(n); if (a >= 1e9) return (n / 1e9).toFixed(1) + 'B'; if (a >= 1e6) return (n / 1e6).toFixed(1) + 'M'; if (a >= 1e3) return (n / 1e3).toFixed(0) + 'K'; return String(Math.round(n)); };
 
-export function renderEChart({ bars, symbol, interval, indicators = [], drawings = [], annotations = [], theme = 'dark', width = 1200, height = 675, brand = 'quiver', chartType = 'candles', logScale = false }) {
+export function renderEChart({ bars, symbol, interval, indicators = [], drawings = [], annotations = [], theme = 'dark', width = 1200, height = 675, brand = 'quiver', chartType = 'candles', logScale = false, timezone = null, format = 'png', scale = 1 }) {
   const th = THEMES[theme] || THEMES.dark;
   const type = String(chartType || 'candles').toLowerCase();
   // Price representation (D14). Indicators are ALWAYS computed on the real time bars; only the glyph changes.
@@ -96,7 +81,18 @@ export function renderEChart({ bars, symbol, interval, indicators = [], drawings
   const priceOnly = type === 'renko';               // point/price-based view drops time-aligned sub-panels
   const isLine = type === 'line' || type === 'area';
   const closes = bars.map((b) => b.c);
-  const fmtCat = (t) => { const d = new Date(t); return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:00`; };
+  // Axis labels in the requested IANA timezone (default UTC). Invalid tz → silent UTC fallback (disclosed
+  // by the caller's facts block, which echoes the timezone actually applied).
+  let tzFmt = null;
+  if (timezone) { try { tzFmt = new Intl.DateTimeFormat('en-GB', { timeZone: timezone, month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false }); } catch { tzFmt = null; } }
+  const fmtCat = (t) => {
+    const d = new Date(t);
+    if (tzFmt) {
+      const p = Object.fromEntries(tzFmt.formatToParts(d).map((x) => [x.type, x.value]));
+      return `${p.month}-${p.day} ${p.hour}:00`;
+    }
+    return `${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')} ${String(d.getUTCHours()).padStart(2, '0')}:00`;
+  };
   const cat = priceOnly ? dbars.map((_, i) => String(i + 1)) : dbars.map((b) => fmtCat(b.t));
   const kdata = dbars.map((b) => [b.o, b.c, b.l, b.h]);
 
@@ -135,6 +131,21 @@ export function renderEChart({ bars, symbol, interval, indicators = [], drawings
     acc += h + gap;
   });
 
+  // A drawing level outside the data's price range would be silently clipped (an invisible take-profit is
+  // worse than none) — extend the price axis to cover every explicit drawing level, with a 1% pad.
+  const drawLevels = [];
+  for (const d of drawings) {
+    for (const v of [d.price, d.fromPrice, d.toPrice, d.entry, d.stop, d.target, d.p1?.price, d.p2?.price]) if (Number.isFinite(v)) drawLevels.push(v);
+    if (Number.isFinite(d.p1?.price) && Number.isFinite(d.width)) drawLevels.push(d.p1.price + d.width);
+  }
+  for (const a of annotations) if (Number.isFinite(a?.price)) drawLevels.push(a.price);
+  if (drawLevels.length) {
+    const pad = (Math.max(...drawLevels) - Math.min(...drawLevels)) * 0.01 || 1e-9;
+    const yPrice = yAxes[0];
+    yPrice.min = (v) => Math.min(v.min, Math.min(...drawLevels) - pad);
+    yPrice.max = (v) => Math.max(v.max, Math.max(...drawLevels) + pad);
+  }
+
   const series = [];
   // Price glyph (candles / heikin / renko share the candlestick series; line/area use a line). Drawings and
   // annotations (D13) attach to whichever price series is drawn.
@@ -163,6 +174,15 @@ export function renderEChart({ bars, symbol, interval, indicators = [], drawings
       markLine.data.push([{ coord: [cx(d.p1.index), d.p1.price], lineStyle: { color: col || (pct >= 0 ? th.up : th.down), width: 2 } }, { coord: [cx(d.p2.index), d.p2.price], label: { formatter: `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%`, color: th.title, fontSize: 12 } }]);
     } else if ((dt === 'text' || dt === 'arrow' || dt === 'callout') && d.price != null) {
       extraPoints.push({ coord: [cx(d.index), d.price], value: d.text || d.label || '', symbol: dt === 'arrow' ? 'arrow' : 'pin', itemStyle: { color: col || '#5b8def' } });
+    } else if ((dt === 'longshort' || dt === 'position') && d.entry != null && d.stop != null && d.target != null) {
+      const x1 = cx(d.entryIndex != null ? d.entryIndex : Math.floor(cat.length * 0.6)), x2 = cx(d.exitIndex != null ? d.exitIndex : cat.length - 1);
+      markArea.data.push([{ xAxis: x1, yAxis: d.entry, itemStyle: { color: 'rgba(52,211,153,0.16)' } }, { xAxis: x2, yAxis: d.target }]);
+      markArea.data.push([{ xAxis: x1, yAxis: d.entry, itemStyle: { color: 'rgba(248,113,113,0.16)' } }, { xAxis: x2, yAxis: d.stop }]);
+      const rr = rrOf(d);
+      markLine.data.push({ yAxis: d.entry, lineStyle: { color: '#e5c07b', type: 'solid', width: 1.2 }, label: { position: 'insideStartTop', formatter: `${(d.side || 'long').toUpperCase()} ${fmtPrice(d.entry)}  ·  R:R ${rr != null ? rr.toFixed(2) : '—'}`, color: '#0b1220', backgroundColor: '#e5c07b', padding: [3, 6], borderRadius: 3, fontSize: 12, fontWeight: 700 } });
+    } else if (dt === 'orderline' && d.price != null) {
+      const buy = String(d.side || 'buy').toLowerCase() === 'buy';
+      markLine.data.push({ yAxis: d.price, lineStyle: { color: buy ? th.up : th.down, type: 'dashed', width: 1.4 }, label: { position: 'end', distance: 2, formatter: `${buy ? 'BUY' : 'SELL'} ${d.label ? d.label + ' ' : ''}${fmtPrice(d.price)}`, color: '#0b1220', backgroundColor: buy ? th.up : th.down, padding: [3, 6], borderRadius: 3, fontSize: 12, fontWeight: 700 } });
     }
   }
   const markPoint = { symbol: 'pin', symbolSize: 44, label: { color: '#fff', fontSize: 11 }, data: [...annotations.filter((a) => a.price != null).map((a) => ({ coord: [a.index != null ? cx(a.index) : cat[cat.length - 1], a.price], value: a.text || '', itemStyle: { color: a.color || '#5b8def' } })), ...extraPoints] };
@@ -199,6 +219,8 @@ export function renderEChart({ bars, symbol, interval, indicators = [], drawings
   chart.setOption(option);
   const svg = chart.renderToSVGString();
   chart.dispose();
-  const png = new Resvg(svg, { fitTo: { mode: 'width', value: width }, font: { loadSystemFonts: true } }).render().asPng();
+  if (String(format).toLowerCase() === 'svg') return svg; // string — caller hosts as image/svg+xml
+  const s = Math.min(Math.max(Number(scale) || 1, 1), 3);
+  const png = new Resvg(svg, { fitTo: { mode: 'width', value: Math.round(width * s) }, font: { loadSystemFonts: true } }).render().asPng();
   return png;
 }

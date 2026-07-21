@@ -74,14 +74,30 @@ export function macroSentry({ hours = 72, nowMs = null, spot = null, atmIvPct = 
     }
   }
 
+  // Calendar-coverage certification: a curated list ENDS. Past its horizon, "CLEAR" is not knowledge —
+  // it is calendar exhaustion, and it must be said as such (certified true/false + a distinct verdict),
+  // or an agent still calling this in 2027 would read fabricated safety forever.
+  const lastEventTs = EVENTS_2026[EVENTS_2026.length - 1].ts;
+  const certified = horizon <= lastEventTs;
+  const calendarCoverage = {
+    calendarEndsUtc: new Date(lastEventTs).toISOString(),
+    windowEndsUtc: new Date(horizon).toISOString(),
+    certified,
+    ...(certified ? {} : { note: 'The requested window extends past the end of the curated calendar — absence of events beyond it is UNKNOWN, not CLEAR.' }),
+  };
+  const verdict = upcoming.length ? 'EVENTS_AHEAD' : certified ? 'CLEAR' : 'CALENDAR_EXHAUSTED';
+
   return {
     service: 'macro-sentry',
     version: config.version,
     windowHours: hours,
-    verdict: upcoming.length ? 'EVENTS_AHEAD' : 'CLEAR',
+    verdict,
+    calendarCoverage,
     guidance: upcoming.length
       ? `${upcoming.length} high-impact US macro event(s) in the next ${hours}h — expect elevated volatility around ${upcoming.map((e) => e.kind).join(', ')}.${nextEventRisk ? ` The market is pricing ~${nextEventRisk.expectedMove.oneSigmaPct}% (1σ) into ${nextEventRisk.event}.` : ''}`
-      : `No high-impact US macro events in the next ${hours}h. Next is ${next ? `${next.kind} in ${Math.round((next.ts - now) / 3600000)}h` : 'beyond the calendar'}.`,
+      : certified
+        ? `No high-impact US macro events in the next ${hours}h. Next is ${next ? `${next.kind} in ${Math.round((next.ts - now) / 3600000)}h` : 'beyond the calendar'}.`
+        : `The curated calendar ends ${calendarCoverage.calendarEndsUtc.slice(0, 10)} — this window extends beyond it, so "no events" CANNOT be certified. Treat as unknown, not clear.`,
     events: upcoming.map((e) => ({ kind: e.kind, label: e.label, atUtc: e.iso, hoursUntil: e.hoursUntil, impact: e.impact })),
     nextEvent: next ? { kind: next.kind, label: next.label, atUtc: next.iso, hoursUntil: Math.round((next.ts - now) / 3600000) } : null,
     nextEventRisk, // options-implied expected move (only when spot + atmIvPct are supplied)

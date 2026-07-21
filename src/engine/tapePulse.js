@@ -3,7 +3,7 @@
 // one txHashUrl (dedupe or you double-count), and isFiltered rows are OKX-flagged noise (drop).
 import * as data from '../adapters/data.js';
 import { config } from '../config.js';
-import { round } from './stats.js';
+import { round, olsSlopeCI } from './stats.js';
 
 const num = (x) => (x === undefined || x === null || x === '' ? null : Number(x));
 
@@ -53,27 +53,26 @@ export function microstructure(trades) {
 
   const out = { tape, kyleLambda: null, amihud: null, vpin: null };
 
-  // Kyle's λ — OLS of block return on block signed dollar flow; report slope, R² and sign-agreement.
+  // Kyle's λ — OLS of block return on block signed dollar flow; report slope, R², sign-agreement, and a
+  // 95% confidence interval on the slope (the CI answers the real question: is the price impact even
+  // distinguishable from zero, given this many noisy blocks?).
   if (blocks.length >= 8) {
     const m = blocks.length;
     const xs = blocks.map((b) => b.signed), ys = blocks.map((b) => b.ret);
-    const mx = xs.reduce((a, b) => a + b, 0) / m, my = ys.reduce((a, b) => a + b, 0) / m;
-    let sxy = 0, sxx = 0, syy = 0, agree = 0;
-    for (let i = 0; i < m; i++) {
-      const dx = xs[i] - mx, dy = ys[i] - my;
-      sxy += dx * dy; sxx += dx * dx; syy += dy * dy;
-      if (ys[i] !== 0 && Math.sign(ys[i]) === Math.sign(xs[i])) agree += 1;
-    }
-    if (sxx > 0 && syy > 0) {
-      const slope = sxy / sxx;                     // log-return per $ of net block flow
-      const r2 = (sxy * sxy) / (sxx * syy);         // Pearson² for a simple regression
+    let agree = 0;
+    for (let i = 0; i < m; i++) if (ys[i] !== 0 && Math.sign(ys[i]) === Math.sign(xs[i])) agree += 1;
+    const fit = olsSlopeCI(xs, ys);
+    if (fit && fit.r2 != null) {
+      const toBps = (v) => (v == null ? null : round(v * 1e8, 1));
       out.kyleLambda = {
-        priceImpactBpsPer10kUsd: round(slope * 1e8, 1), // λ·$10k·1e4 bps
-        rSquared: round(r2, 3),
+        priceImpactBpsPer10kUsd: toBps(fit.slope), // λ·$10k·1e4 bps
+        ci95BpsPer10kUsd: fit.ciLo != null ? [toBps(fit.ciLo), toBps(fit.ciHi)] : null,
+        impactDistinguishableFromZero: fit.excludesZero, // 95% CI excludes 0 → statistically-detectable impact
+        rSquared: round(fit.r2, 3),
         signAgreement: round(agree / m, 2),           // fraction of blocks where flow & price agree
         blocks: m, tradesPerBlock: BLOCK,
-        confidence: r2 >= 0.3 && m >= 20 ? 'high' : r2 >= 0.1 ? 'medium' : 'low',
-        note: 'Price impact: a net $10k of one-sided flow over a block is associated with this many bps of move. R² and sign-agreement gauge how tightly flow explains the moves; low values (common on sampled tapes) mean impact is weak or noisy here.',
+        confidence: fit.excludesZero === false ? 'indeterminate (95% CI spans 0)' : fit.r2 >= 0.3 && m >= 20 ? 'high' : fit.r2 >= 0.1 ? 'medium' : 'low',
+        note: 'Price impact: a net $10k of one-sided flow over a block is associated with this many bps of move. The 95% CI (normal approximation, df=blocks−2) shows the sampling range; if it SPANS ZERO the impact is not statistically distinguishable from noise on this tape — a common, honest outcome on thin/sampled feeds.',
       };
     }
   }

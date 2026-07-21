@@ -33,15 +33,20 @@ export function polyPortfolioRisk(norm) {
   };
 }
 
-export async function polyDesk(wallet) {
+export async function polyDesk(wallet, deps = pm) {
   const t0 = Date.now();
+  // A failed positions fetch is NOT an empty portfolio — track fetch outcomes apart from emptiness.
+  let posOk = true, actOk = true;
   const [posRaw, actRaw] = await Promise.all([
-    pm.positions(wallet).catch(() => []),
-    pm.activity(wallet, 40).catch(() => []),
+    deps.positions(wallet).catch(() => { posOk = false; return []; }),
+    deps.activity(wallet, 40).catch(() => { actOk = false; return []; }),
   ]);
   const positions = Array.isArray(posRaw) ? posRaw : posRaw?.data || [];
+  if (!posOk) {
+    return { service: 'poly-desk', version: config.version, wallet, verdict: 'DATA_UNAVAILABLE', dataCompleteness: { positionsFetched: false, activityFetched: actOk }, note: 'The Polymarket positions fetch FAILED — this wallet\'s book is UNKNOWN for this call, not empty. Retry.' };
+  }
   if (!positions.length) {
-    return { service: 'poly-desk', version: config.version, wallet, verdict: 'NO_OPEN_POSITIONS', note: 'No open Polymarket positions for this wallet.' };
+    return { service: 'poly-desk', version: config.version, wallet, verdict: 'NO_OPEN_POSITIONS', dataCompleteness: { positionsFetched: true, activityFetched: actOk }, note: 'The positions fetch succeeded and returned zero rows — genuinely no open Polymarket positions for this wallet.' };
   }
 
   const norm = positions.map((p) => {
@@ -74,6 +79,7 @@ export async function polyDesk(wallet) {
     version: config.version,
     wallet,
     verdict: totalPnl > 0 ? 'IN_PROFIT' : totalPnl < 0 ? 'IN_LOSS' : 'FLAT',
+    dataCompleteness: { positionsFetched: true, activityFetched: actOk, ...(actOk ? {} : { note: 'The activity-feed fetch FAILED — recentActivity below is missing data, not evidence of inactivity.' }) },
     summary: {
       openPositions: norm.length,
       bookValueUsd: round(totalValue, 2),

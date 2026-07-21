@@ -5,7 +5,7 @@
 Autonomous trading and wallet agents can pay for a service in-band over HTTP, but little worth paying for exists, and most agent-facing tools return numbers that cannot be verified. Quiver implements the money-math a real trading desk or security team would run — and because the risk engines are deterministic, **every answer carries a re-runnable, self-checked proof**: echoed inputs, a code hash, a content hash, and a ground-truth self-check. An agent can re-derive the number and prove it, rather than trust the provider.
 
 - **Live endpoint:** https://quiver-production-c3a8.up.railway.app
-- **Technical documentation:** [read online](https://quiver-production-c3a8.up.railway.app/paper) · [PDF (Google Drive)](https://drive.google.com/file/d/1ZU-2CZEVQplvM1LkyTeG2XjyGnkSOe8U/view?usp=sharing)
+- **Technical documentation:** [read online](https://quiver-production-c3a8.up.railway.app/paper) · [PDF (Google Drive)](https://drive.google.com/file/d/1OJP6spWNqJZlpsIi09D4NI1Yi0YMMOVe/view?usp=sharing)
 - **Remote MCP:** `https://quiver-production-c3a8.up.railway.app/mcp` — Streamable HTTP, 9 risk-brain tools, free (fair-use daily quota); callable by any MCP client (Claude, Cursor, …) — on the [official MCP registry](https://registry.modelcontextprotocol.io) as `quiver-risk-brain`
 - **Use it in 5 minutes:** [QUICKSTART.md](QUICKSTART.md) · framework snippets (ElizaOS, LangChain, CrewAI, OpenAI Agents, Vercel AI SDK, Virtuals): [INTEGRATIONS.md](INTEGRATIONS.md)
 - **On-chain identity:** ERC-8004 agent `#5152` on X Layer (`eip155:196`)

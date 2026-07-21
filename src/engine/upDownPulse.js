@@ -31,13 +31,17 @@ function windowSeconds(slug) {
 }
 
 // Find the imminent open up/down window FOR THIS COIN (soonest-resolving, strictly coin-matched).
-async function findWindow(cfg) {
+// Returns { win, lookupFailed }: both event-pool fetches failing means the market state is UNKNOWN —
+// which must never be reported as "no open window" (absence-as-success).
+async function findWindow(cfg, deps = pm) {
   const now = Date.now();
+  let fails = 0;
   // Two pools: the coin-tagged events, and a broad recent pull (the tag alone leaks other coins).
   const pools = await Promise.all([
-    pm.eventsSearch(`active=true&closed=false&limit=80&order=startDate&ascending=false&tag=${encodeURIComponent(cfg.slug)}`).catch(() => []),
-    pm.eventsSearch('active=true&closed=false&limit=100&order=startDate&ascending=false').catch(() => []),
+    deps.eventsSearch(`active=true&closed=false&limit=80&order=startDate&ascending=false&tag=${encodeURIComponent(cfg.slug)}`).catch(() => { fails += 1; return []; }),
+    deps.eventsSearch('active=true&closed=false&limit=100&order=startDate&ascending=false').catch(() => { fails += 1; return []; }),
   ]);
+  const lookupFailed = fails === 2;
   const candidates = [];
   const seen = new Set();
   for (const events of pools) {
@@ -56,7 +60,7 @@ async function findWindow(cfg) {
     }
   }
   candidates.sort((a, b) => a.end - b.end); // soonest-resolving = the imminent window
-  return candidates[0] || null;
+  return { win: candidates[0] || null, lookupFailed };
 }
 
 function impliedOdds(market) {
@@ -67,14 +71,18 @@ function impliedOdds(market) {
   return null;
 }
 
-export async function upDownPulse(coin = 'BTC') {
+export async function upDownPulse(coin = 'BTC', deps = pm) {
   const t0 = Date.now();
   const cur = String(coin).toUpperCase();
   const cfg = COIN[cur];
   if (!cfg) return { service: 'updown-pulse', version: config.version, coin: cur, verdict: 'UNSUPPORTED', note: 'Supported coins: BTC, ETH.' };
 
-  const win = await findWindow(cfg);
-  if (!win) return { service: 'updown-pulse', version: config.version, coin: cur, verdict: 'NO_OPEN_WINDOW', note: `No open Polymarket up/down window found for ${cur} right now.` };
+  const { win, lookupFailed } = await findWindow(cfg, deps);
+  if (!win) {
+    return lookupFailed
+      ? { service: 'updown-pulse', version: config.version, coin: cur, verdict: 'MARKET_LOOKUP_FAILED', note: `Both Polymarket event lookups FAILED — the market state for ${cur} is UNKNOWN this call, not absent. Retry.` }
+      : { service: 'updown-pulse', version: config.version, coin: cur, verdict: 'NO_OPEN_WINDOW', note: `The event lookups succeeded and no open up/down window matched ${cur} — genuinely no imminent market right now.` };
+  }
 
   const now = Date.now();
   const secondsLeft = Math.round((win.end - now) / 1000);

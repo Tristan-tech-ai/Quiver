@@ -7,14 +7,17 @@ import { round } from './stats.js';
 
 const DAY = 86400000;
 
-export async function protocolPulse(query) {
+export async function protocolPulse(query, deps = llama) {
   const t0 = Date.now();
-  const meta = await llama.resolveProtocol(query);
+  const meta = await deps.resolveProtocol(query);
   if (!meta) return { service: 'protocol-pulse', version: config.version, query, verdict: 'NOT_FOUND', note: `No DeFi protocol matched "${query}" on DefiLlama.` };
 
+  // A failed hack-registry fetch must NOT read as "no incidents" — absence-as-success is the exact
+  // defect class this codebase already shipped once (see VERIFIER_DISCIPLINE instance 15). Track it.
+  let registryUnavailable = false;
   const [p, allHacks] = await Promise.all([
-    llama.protocol(meta.slug),
-    llama.hacks().catch(() => []),
+    deps.protocol(meta.slug),
+    deps.hacks().catch(() => { registryUnavailable = true; return []; }),
   ]);
 
   // TVL series (aggregate).
@@ -46,6 +49,11 @@ export async function protocolPulse(query) {
   const firstT = series.length ? series[0].t : null;
   const ageDays = firstT ? round((now - firstT) / DAY, 0) : null;
 
+  // Data freshness: every TVL-derived number above is only as fresh as the last series point. Disclose it
+  // instead of letting a lagged/stale DefiLlama series silently masquerade as "now".
+  const lastPointT = series.length ? series[series.length - 1].t : null;
+  const tvlAgeHours = lastPointT != null ? round((now - lastPointT) / 3600000, 1) : null;
+
   // Incident record: match hacks by protocol name.
   const nameL = (p.name || meta.name).toLowerCase();
   const incidents = allHacks.filter((h) => String(h.name || '').toLowerCase() === nameL || String(h.name || '').toLowerCase().includes(nameL))
@@ -67,6 +75,8 @@ export async function protocolPulse(query) {
   if (ageDays !== null && ageDays < 90) flags.push({ severity: 'medium', flag: 'VERY_NEW_PROTOCOL', detail: `Only ${ageDays} days of TVL history — unproven across a full market/stress cycle.` });
   if (cur < 1e6) flags.push({ severity: 'medium', flag: 'MICRO_TVL', detail: `Under $1M TVL — thin enough to be easily manipulated and frequently abandoned.` });
   if (chainConcentration !== null && chainConcentration > 97 && Object.keys(chainTvls).length > 1) flags.push({ severity: 'low', flag: 'SINGLE_CHAIN_DEPENDENCY', detail: `${chainConcentration}% of TVL sits on ${topChain[0]} — a single-chain outage/exploit hits nearly all of it.` });
+  if (tvlAgeHours !== null && tvlAgeHours > 48) flags.push({ severity: 'low', flag: 'STALE_TVL_SERIES', detail: `The latest TVL point is ${tvlAgeHours}h old — level, trend, and drawdown above are computed on stale data.` });
+  if (registryUnavailable) flags.push({ severity: 'medium', flag: 'INCIDENT_REGISTRY_UNAVAILABLE', detail: 'The hack registry could not be fetched — the incident record is UNKNOWN for this call, not clean. riskLevel cannot read BASELINE while a load-bearing input is unknown.' });
   // riskLevel is a TRANSPARENT function of the flags (any high → ELEVATED; any medium → WATCH; none →
   // BASELINE), not a scored model. "BASELINE" means no flagged risk condition — NOT a safety endorsement.
   const riskLevel = flags.some((f) => f.severity === 'high') ? 'ELEVATED' : flags.some((f) => f.severity === 'medium') ? 'WATCH' : 'BASELINE';
@@ -77,8 +87,11 @@ export async function protocolPulse(query) {
     protocol: p.name || meta.name, slug: meta.slug, category: p.category || meta.category,
     riskLevel, riskFlags: flags,
     tvl: { currentUsd: round(cur), change7dPct: chg7, change30dPct: chg30, maxDrawdown90dPct: maxDd },
+    dataFreshness: { lastTvlPointUtc: lastPointT != null ? new Date(lastPointT).toISOString() : null, tvlAgeHours, seriesPoints: series.length, incidentRegistryFetched: !registryUnavailable },
     footprint: { chains: (p.chains || meta.chains || []).slice(0, 8), topChain: topChain ? topChain[0] : null, topChainConcentrationPct: chainConcentration, ageDays },
-    incidents: { count: incidents.length, hadHackLast12mo: !!recentHack, history: incidents.slice(0, 5) },
+    incidents: registryUnavailable
+      ? { count: null, hadHackLast12mo: null, history: [], registryUnavailable: true, note: 'Hack registry fetch FAILED this call — an unknown record, not a clean one.' }
+      : { count: incidents.length, hadHackLast12mo: !!recentHack, history: incidents.slice(0, 5) },
     method: 'DefiLlama TVL history (level, 7/30-day trend, 90-day max drawdown), chain concentration, protocol age, and the DefiLlama hack registry — reported as factual signals plus a set of individually-defensible risk FLAGS. We deliberately do NOT collapse these into a single 0-100 health score or letter grade: that would imply a calibrated predictive model, and with no labeled protocol-failure dataset to back-test weights, a hand-tuned composite would be goal-seeking. riskLevel is a transparent function of the flags present, not a scored model.',
     limitations: 'TVL and hack data are as-reported by DefiLlama; incident matching is by protocol name (a rename or subsidiary can be missed). riskLevel=BASELINE means no flagged condition was detected — it is NOT an audit, a safety endorsement, or a guarantee against exploits. Every flag threshold is disclosed above. Research signal, not investment advice.',
     elapsedMs: Date.now() - t0,

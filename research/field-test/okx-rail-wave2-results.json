@@ -1,0 +1,56 @@
+{
+ "atUtc": "2026-07-21T07:18:44.136Z",
+ "rows": [
+  {
+   "svc": "portfolio-gate",
+   "http": 200,
+   "priceUsd": 0.05,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0x58661243cf8d2c4a6108556251c2433bf89a4dc89000be0760222319ed3e4bf5",
+   "env": "observation",
+   "hashOk": true
+  },
+  {
+   "svc": "token-scan",
+   "http": 200,
+   "priceUsd": 0.05,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0xf35629c46087ffdbe16eb470d368de02d9f32233fe0d85e0c37e2dc5ed8f434c",
+   "env": "observation",
+   "hashOk": true
+  },
+  {
+   "svc": "wallet-audit",
+   "http": 200,
+   "priceUsd": 0.05,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0x9f84806c3363c3f22b5682ba88a1d54a5f44afb0dff0dc6a8023d79451a6fce9",
+   "env": "observation",
+   "hashOk": true
+  },
+  {
+   "svc": "options-risk",
+   "http": 200,
+   "priceUsd": 0.02,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0x7445f25a9b57c5a3fc066ec2c7e62e4037c47f855ab6457793a6f92a360b61db",
+   "env": "proof",
+   "hashOk": true
+  },
+  {
+   "svc": "treasury-risk",
+   "http": 200,
+   "priceUsd": 0.02,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0xe264e553a4e444eb94a0870b119508f532b4128cd06288fe0699c6535402eed6",
+   "env": "proof",
+   "hashOk": true
+  }
+ ],
+ "totalSpentUsd": 0.19
+}

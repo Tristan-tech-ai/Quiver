@@ -123,13 +123,18 @@ export async function enrichPerpInputs(input, getContext) {
  * from ONE cached fetch — fills only the fields the caller did not provide. Legs without a recognised symbol
  * pass through unchanged. `getMap` is injectable so this is testable offline. Used by portfolio-gate.
  */
-export async function enrichPortfolioLegs(positions) {
+export async function enrichPortfolioLegs(positions, getContext) {
   const legs = Array.isArray(positions) ? positions : [];
   return Promise.all(legs.map(async (l) => {
     if (!l) return l;
-    const needsLive = (l.symbol || l.asset) && l.maintMarginRate == null && l.maxLeverage == null && l.marginTiers == null && (l.markPrice == null || l.entryPrice == null);
+    // Needs live context when ANY fillable gap is open: no maintenance-rate source (mmr/maxLeverage/tiers)
+    // OR missing marks. The old condition required marks to be missing too, so an account-mode leg — which
+    // arrives WITH mark+entry from clearinghouseState but WITHOUT any mmr source — was skipped and every
+    // leg failed downstream with "need maintMarginRate…" (caught live on a real 5-leg book).
+    const noMmrSource = l.maintMarginRate == null && l.maxLeverage == null && l.marginTiers == null;
+    const needsLive = (l.symbol || l.asset) && (noMmrSource || l.markPrice == null || l.entryPrice == null);
     if (!needsLive) return l;
-    const provider = PROVIDERS[String(l.venue || 'hyperliquid').toLowerCase()]; // route each leg by its venue
+    const provider = getContext || PROVIDERS[String(l.venue || 'hyperliquid').toLowerCase()]; // route each leg by its venue
     if (!provider) return l;                                                    // unknown venue → pass through
     let ctx; try { ctx = await provider(l.symbol || l.asset); } catch { ctx = null; }
     if (!ctx) return l;
@@ -143,6 +148,60 @@ export async function enrichPortfolioLegs(positions) {
     }
     return out;
   }));
+}
+
+/**
+ * Pure parser for {type:'clearinghouseState'} — the FULL live account book, keyless. Throws on an
+ * unexpected shape: a failed/blocked fetch must surface as an error, never as an empty book
+ * (absence-as-success discipline). Notable fields per position: szi (signed size), entryPx, marginUsed,
+ * leverage {type: cross|isolated, value}, positionValue (|szi|·mark → mark), and liquidationPx — the
+ * VENUE'S OWN liquidation price, which portfolio-gate uses as an external cross-check on its computed one.
+ */
+export function parseClearinghouseState(j) {
+  const ms = j?.marginSummary;
+  const aps = j?.assetPositions;
+  if (!ms || !Array.isArray(aps)) throw new Error('hyperliquid: unexpected clearinghouseState shape');
+  const positions = [];
+  for (const ap of aps) {
+    const p = ap?.position;
+    if (!p) continue;
+    const szi = Number(p.szi);
+    if (!Number.isFinite(szi) || szi === 0) continue; // flat coins are omitted, open ones must parse
+    const size = Math.abs(szi);
+    const positionValue = Number(p.positionValue);
+    const mark = positionValue > 0 ? positionValue / size : null;
+    positions.push({
+      venue: 'hyperliquid',
+      asset: String(p.coin || '').toUpperCase(),
+      side: szi > 0 ? 'long' : 'short',
+      size,
+      entryPrice: Number(p.entryPx) > 0 ? Number(p.entryPx) : mark,
+      ...(mark > 0 ? { markPrice: round(mark, 6) } : {}),
+      ...(Number(p.marginUsed) > 0 ? { margin: Number(p.marginUsed) } : {}),
+      ...(Number(p.leverage?.value) > 0 ? { leverage: Number(p.leverage.value) } : {}),
+      ...(p.leverage?.type ? { marginMode: String(p.leverage.type) } : {}),
+      ...(Number(p.liquidationPx) > 0 ? { venueLiquidationPx: Number(p.liquidationPx) } : {}),
+    });
+  }
+  const num = (x) => (Number.isFinite(Number(x)) && Number(x) > 0 ? Number(x) : null);
+  return {
+    positions,
+    accountEquityUsd: num(ms.accountValue),
+    totalNotionalUsd: num(ms.totalNtlPos),
+    totalMarginUsedUsd: num(ms.totalMarginUsed),
+    withdrawableUsd: num(j.withdrawable),
+  };
+}
+
+/** Fetch one address's full live Hyperliquid book (positions + account equity). Keyless, public. */
+export async function fetchHlAccount(address, { timeoutMs = 12000 } = {}) {
+  const res = await fetch(INFO_URL, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ type: 'clearinghouseState', user: address }),
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!res.ok) throw new Error(`hyperliquid clearinghouseState ${res.status}`);
+  return parseClearinghouseState(await res.json());
 }
 
 export { round };

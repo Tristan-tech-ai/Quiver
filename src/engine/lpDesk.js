@@ -82,7 +82,7 @@ export async function lpDesk({ chain = 'ethereum', pool, days = 2, capital = 100
   if (!pool) return { ok: false, reason: 'pool address required (e.g. 0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640 = ETH/USDC 0.05% mainnet)' };
   const t0 = Date.now();
   const meta = await poolMeta(chain, pool);
-  if (!meta) return { ok: false, reason: `could not read pool metadata on-chain for ${pool} on ${chain}` };
+  if (!meta || meta.__failed) return { ok: false, reason: `pool metadata read failed for ${pool} on ${chain}: ${meta?.reason || 'unknown failure'}` };
   const rows = await fetchSwaps(chain, pool, meta, days);
   if (rows.length < 200) return { ok: false, reason: `only ${rows.length} swaps in the last ${days}d — too few to measure anything; refusing rather than reporting noise`, poolMeta: meta };
 

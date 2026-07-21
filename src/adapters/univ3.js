@@ -71,27 +71,46 @@ function toSigned(hexWord, bits) {
   return v;
 }
 
-/** Pool metadata READ FROM CHAIN — never trusted from a constant. Trap 1. */
+/** Classify WHY a pool-metadata read failed — "could not read metadata" hides the difference between a
+ *  typo'd address (no contract code — one wrong hex char produced exactly this during an audit), a contract
+ *  that is not a V3 pool, and an RPC outage. The caller deserves the diagnosis. */
+export function classifyPoolFailure(codeHex) {
+  if (codeHex === '0x' || codeHex === '0x0' || codeHex === '' || codeHex == null) {
+    return 'no contract code at this address on this chain — wrong address or wrong chain (check every hex character)';
+  }
+  return 'a contract exists here but does not answer Uniswap-V3 pool selectors (token0/token1/fee) — not a V3 pool address';
+}
+
+/** Pool metadata READ FROM CHAIN — never trusted from a constant. Trap 1.
+ *  Returns the meta object, or `{ __failed: true, reason }` with a diagnosis (never a bare null). */
 export async function poolMeta(chain, pool) {
   const call = (data) => rpc(chain, 'eth_call', [{ to: pool, data }, 'latest']);
-  const [t0, t1, feeHex] = await Promise.all([call(SEL.token0), call(SEL.token1), call(SEL.fee)]);
+  let t0, t1, feeHex;
+  try {
+    [t0, t1, feeHex] = await Promise.all([call(SEL.token0), call(SEL.token1), call(SEL.fee)]);
+  } catch (e) {
+    return { __failed: true, reason: `RPC unavailable on ${chain} (${String(e.message || e).slice(0, 60)}) — the chain read failed; the address was not evaluated` };
+  }
   // "0x" IS TRUTHY. eth_call against a non-contract (or a contract without this selector) returns empty
   // data, not an error — so a `!t0` guard passes and we slice garbage out of an empty string and report a
   // confident, fabricated pool. Same shape as Arbitrum's blockTimestamp="0x0": test the PARSED VALUE, never
   // the field's existence. A word is 32 bytes => 66 chars with the 0x prefix.
   const word = (h) => (typeof h === 'string' && h.length >= 66 ? h : null);
-  if (!word(t0) || !word(t1) || !word(feeHex)) return null;
+  if (!word(t0) || !word(t1) || !word(feeHex)) {
+    const code = await rpc(chain, 'eth_getCode', [pool, 'latest']).catch(() => null);
+    return { __failed: true, reason: classifyPoolFailure(code) };
+  }
   const a0 = '0x' + t0.slice(26, 66), a1 = '0x' + t1.slice(26, 66);
-  if (!/^0x[0-9a-fA-F]{40}$/.test(a0) || !/^0x[0-9a-fA-F]{40}$/.test(a1)) return null;
+  if (!/^0x[0-9a-fA-F]{40}$/.test(a0) || !/^0x[0-9a-fA-F]{40}$/.test(a1)) return { __failed: true, reason: 'pool selectors answered but returned non-address words — not a standard V3 pool' };
   const feeRaw = parseInt(feeHex, 16);
-  if (!Number.isFinite(feeRaw) || feeRaw <= 0 || feeRaw > 100000) return null;   // real tiers: 100/500/3000/10000
+  if (!Number.isFinite(feeRaw) || feeRaw <= 0 || feeRaw > 100000) return { __failed: true, reason: `fee() returned ${feeRaw} — outside real V3 tiers (100/500/3000/10000); not a standard V3 pool` };
   const [d0h, d1h] = await Promise.all([
     rpc(chain, 'eth_call', [{ to: a0, data: SEL.decimals }, 'latest']),
     rpc(chain, 'eth_call', [{ to: a1, data: SEL.decimals }, 'latest']),
   ]);
-  if (!word(d0h) || !word(d1h)) return null;
+  if (!word(d0h) || !word(d1h)) return { __failed: true, reason: 'pool answered but its token contracts did not answer decimals() — token metadata unreadable' };
   const dec0 = parseInt(d0h, 16), dec1 = parseInt(d1h, 16);
-  if (!(dec0 >= 0 && dec0 <= 36) || !(dec1 >= 0 && dec1 <= 36)) return null;
+  if (!(dec0 >= 0 && dec0 <= 36) || !(dec1 >= 0 && dec1 <= 36)) return { __failed: true, reason: `token decimals parsed to ${dec0}/${dec1} — outside sane bounds; token metadata unreadable` };
   return {
     pool, chain, token0: a0, token1: a1,
     d0: dec0, d1: dec1,                                     // trap 4: derived, never assumed

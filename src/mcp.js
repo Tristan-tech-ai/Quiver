@@ -19,7 +19,7 @@ import { treasuryRisk } from './engine/treasuryRisk.js';
 import { riskAttest } from './engine/riskAttest.js';
 import { eventVol } from './engine/eventVol.js';
 import { portfolioGate } from './engine/portfolioGate.js';
-import { proofEnvelope } from './engine/proof.js';
+import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 import { enrichPerpInputs, enrichPortfolioLegs } from './adapters/hyperliquid.js';
 import { config } from './config.js';
 
@@ -100,11 +100,13 @@ const TOOLS = [
     name: 'portfolio_gate',
     title: 'Cross-Venue Portfolio Gate',
     annotations: annotate('Cross-Venue Portfolio Gate', true),
-    description: 'Cross-venue portfolio risk. Given positions across venues [{venue, asset|symbol, side, size, entryPrice, margin|leverage, maxLeverage|marginTiers}], returns TRUE net exposure per underlying, the leg that liquidates FIRST (the binding constraint), concentration (HHI / effective independent bets), and a correlated-crash stress counting how many legs liquidate SIMULTANEOUSLY when the market moves ±X% (correlation→1, the Oct-10-2025 crash regime). Pass Hyperliquid symbols to auto-fill live mark/leverage/margin-tiers. Self-checked (exposure reconciliation, per-leg liquidation invariant, nearest=min, monotone stress). Call to see whether independently-sized bets are secretly ONE bet that blows up together.',
+    description: 'Cross-venue portfolio risk. Given positions across venues [{venue, asset|symbol, side, size, entryPrice, margin|leverage, maxLeverage|marginTiers}] — OR just account: a Hyperliquid 0x address, whose FULL live book (positions, margins, account equity, the venue\'s own liquidation prices) is pulled keylessly — returns TRUE net exposure per underlying, the leg that liquidates FIRST (the binding constraint), concentration (HHI / effective independent bets), and a correlated-crash stress counting how many legs liquidate SIMULTANEOUSLY when the market moves ±X% (correlation→1, the Oct-10-2025 crash regime). Pass Hyperliquid symbols to auto-fill live mark/leverage/margin-tiers. Self-checked (exposure reconciliation, per-leg liquidation invariant, nearest=min, monotone stress, venue-liquidation cross-check). Call to see whether independently-sized bets are secretly ONE bet that blows up together.',
     inputSchema: {
-      type: 'object', required: ['positions'],
+      type: 'object',
       properties: {
         positions: { type: 'array', description: 'legs: {venue, asset|symbol, side long|short, size, entryPrice, markPrice?, margin|leverage, maxLeverage|maintMarginRate|marginTiers}. A Hyperliquid symbol auto-fills live mark/leverage/tiers.' },
+        account: { type: 'string', description: 'OR: a Hyperliquid account address (0x…) — the full live book (positions, margins, equity, venue liquidation prices) is pulled keylessly; explicit positions take precedence.' },
+        betaTier: { type: 'string', description: 'beta regime for the factor stress: mild | moderate | severe — cross-event validated tiers (pre-registered). Default = worst-case single-event table; explicit betas override.' },
         shockScenariosPct: { type: 'array', description: 'correlated market moves (%) to stress; default [5,10,20,30]' },
       },
     },
@@ -120,9 +122,24 @@ const TOOLS = [
       model: { description: 'model assumptions used' },
     }),
     run: async (a) => {
-      const positions = await enrichPortfolioLegs(a.positions);
-      const input = { ...a, positions };
-      return proofEnvelope('portfolio-gate', input, portfolioGate(input), config.version);
+      let live = null, base = a;
+      if ((!Array.isArray(a?.positions) || !a.positions.length) && /^0x[0-9a-fA-F]{40}$/.test(String(a?.account || '').trim())) {
+        const acct = await fetchHlAccount(String(a.account).trim());
+        if (!acct.positions.length) {
+          return observationEnvelope('portfolio-gate', { account: a.account }, { ok: false, errors: ['no open perp positions on this Hyperliquid account'], accountEquityUsd: acct.accountEquityUsd, withdrawableUsd: acct.withdrawableUsd }, config.version);
+        }
+        base = { ...a, positions: acct.positions, accountEquityUsd: acct.accountEquityUsd };
+        live = { source: 'hyperliquid clearinghouseState (keyless public API)', address: a.account, fetchedAtUtc: new Date().toISOString(), positionsFound: acct.positions.length, accountEquityUsd: acct.accountEquityUsd, totalMarginUsedUsd: acct.totalMarginUsedUsd, withdrawableUsd: acct.withdrawableUsd };
+      }
+      const positions = await enrichPortfolioLegs(base.positions);
+      const input = { ...base, positions };
+      const r = portfolioGate(input);
+      if (live) {
+        r.live = live;
+        r.mathReproducibility = 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the frozen book snapshot fetched at observedAtUtc) and every risk number reproduces. The SNAPSHOT itself is a committed live observation.';
+        return observationEnvelope('portfolio-gate', input, r, config.version);
+      }
+      return proofEnvelope('portfolio-gate', input, r, config.version);
     },
   },
   {

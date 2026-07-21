@@ -16,6 +16,7 @@ import { optionsVsPrediction } from './crossMarket.js';
 import { estimateVrp, realWorldVol, realizedVolPct } from './vrp.js';
 import { fitSVI, sviIvFn } from './ssvi.js';
 import { motBounds } from './mot.js';
+import { compositeVerdict, pickTermSlices } from './compositeVerdict.js';
 
 const num = (x) => (x === undefined || x === null || x === '' ? null : Number(x));
 const DAY = 86400000;
@@ -527,6 +528,23 @@ export async function optionsDesk(currency = 'BTC', { focus = 'all' } = {}) {
   const consensus = marketConsensus(ivRankOut, gex, rvContext, enriched[0]?.skew25dRR ?? null, putOi, callOi);
   const gammaSpotOutlook = spotOutlook(gex, spot);
 
+  // (D) COMPOSITE VERDICT — continuous-score fusion (disclosed weights/formulas, leave-one-out
+  // sensitivity, identity self-checks) of the signals computed above. Pure function; no extra fetch.
+  const { front: termFrontE, back: termBackE } = pickTermSlices(enriched.map((e) => ({ daysOut: e.daysOut, atmIvPct: e.atmIvPct })));
+  const composite = compositeVerdict({
+    ivPercentile: ivRankOut ? (ivRankOut.rank365d?.percentile ?? ivRankOut.rank90d?.percentile ?? ivRankOut.rank30d?.percentile ?? null) : null,
+    frontIvPct: termFrontE?.atmIvPct ?? frontIv, frontIvDaysOut: termFrontE?.daysOut ?? null, rv30Pct: rv,
+    vrpRatio: vrp?.ratioUsed ?? null, vrpSignificant: vrp?.significance?.significantAt05 ?? null,
+    termFront: termFrontE ? { daysOut: termFrontE.daysOut, atmIvPct: termFrontE.atmIvPct } : null,
+    termBack: termBackE ? { daysOut: termBackE.daysOut, atmIvPct: termBackE.atmIvPct } : null,
+    dealerGammaRegime: gex?.regime ?? null,
+    skew25dRR: enriched[0]?.skew25dRR ?? null, atmIvForSkew: enriched[0]?.atmIvPct ?? null,
+    rndSkew: implied?.[0]?.distribution?.rnSkew ?? null,
+    rndSigmaSqrtT: implied?.[0]?.expectedMove?.oneSigmaPct != null ? implied[0].expectedMove.oneSigmaPct / 100 : null,
+    putCallOiRatio: callOi > 0 ? round(putOi / callOi, 2) : null,
+    flowPutSharePct: flow?.flowComposition?.putSharePct ?? null,
+  });
+
   // (A) options ↔ prediction-market divergence (BTC/ETH; graceful empty otherwise). Bounded extra fetch.
   let crossMarket = null;
   if (['BTC', 'ETH'].includes(cur)) {
@@ -571,6 +589,8 @@ export async function optionsDesk(currency = 'BTC', { focus = 'all' } = {}) {
       frontExpectedMovePct: implied?.[0]?.expectedMove?.oneSigmaPct ?? null,
       macroEventBeforeFrontExpiry: implied?.[0]?.macroEventsBeforeExpiry?.[0] ? `${implied[0].macroEventsBeforeExpiry[0].kind} in ${implied[0].macroEventsBeforeExpiry[0].hoursUntil}h` : null,
       volSignalConsensus: consensus?.volatility ? `${consensus.volatility.alignment}${consensus.volatility.lean !== 'mixed' ? ' → ' + consensus.volatility.lean : ''}` : null,
+      compositeVolBand: composite?.volatility?.available ? `${composite.volatility.band} (${composite.volatility.score >= 0 ? '+' : ''}${composite.volatility.score}, conviction ${composite.volatility.conviction.label})` : null,
+      compositeDirectionBand: composite?.direction?.available ? `${composite.direction.band} (${composite.direction.score >= 0 ? '+' : ''}${composite.direction.score}, conviction ${composite.direction.conviction.label})` : null,
       topCrossMarketDivergencePts: crossMarket?.markets?.[0]?.divergencePts ?? null,
       varianceRiskPremiumRatio: vrp?.ratioUsed ?? null,
     } : null,
@@ -579,6 +599,7 @@ export async function optionsDesk(currency = 'BTC', { focus = 'all' } = {}) {
     gex,
     spotOutlook: gammaSpotOutlook,
     consensus,
+    compositeVerdict: composite,
     volSurfaceModel: surfaceFit,
     calendarBoundsMOT: motPairs,
     vrpModel: vrp,
@@ -591,7 +612,7 @@ export async function optionsDesk(currency = 'BTC', { focus = 'all' } = {}) {
     ivTermStructure: expiries.map((e) => ({ expiry: e.expiry, daysOut: e.daysOut, atmIvPct: e.atmIvPct })),
     greeksSurface: focus === 'all' || focus === 'greeks' ? greeksSurface : undefined,
     expiries: focus === 'all' || focus === 'expiries' ? expiries : expiries.slice(0, 3),
-    method: 'Live Deribit + OKX option chains: IV rank/percentile vs DVOL history, GEX/dealer-gamma with gamma-flip level, options flow (large blocks) and open-interest change, per-strike greeks surface + aggregate greeks, true ATM-forward IV interpolation, delta-space 25-delta risk-reversal/butterfly with coverage flags, implied-rate curve from the forward, multi-venue ATM-IV cross-check, and the market-implied view — expected move plus a risk-neutral probability ladder (N(d2) from the smile) for key price levels, overlaid with the scheduled macro prints (CPI/FOMC/NFP) that fall before each expiry.',
+    method: 'Live Deribit + OKX option chains: IV rank/percentile vs DVOL history, GEX/dealer-gamma with gamma-flip level, options flow (large blocks) and open-interest change, per-strike greeks surface + aggregate greeks, true ATM-forward IV interpolation, delta-space 25-delta risk-reversal/butterfly with coverage flags, implied-rate curve from the forward, multi-venue ATM-IV cross-check, and the market-implied view — expected move plus a risk-neutral probability ladder (N(d2) from the smile) for key price levels, overlaid with the scheduled macro prints (CPI/FOMC/NFP) that fall before each expiry. compositeVerdict fuses these signals into one continuous score per axis (volatility richness, directional tilt) with disclosed weights, per-component formulas, leave-one-out pivotal analysis, and identity self-checks — including a lognormal-baseline correction on RND skew and an IV-vs-habitual-premium read when a VRP fit exists.',
     limitations: 'Deribit + OKX are the reference venues, not the entire market. GEX assumes dealer positioning (long call / short put gamma) — a labeled convention, not observed flow. IV rank spans the deepest reachable DVOL history (up to ~1y). OI-change baseline is since first observed on this host. Implied probabilities are RISK-NEUTRAL (the market\'s own pricing, not a real-world forecast) and read off the current smile. Positioning metrics are context, not predictions or advice.',
     elapsedMs: Date.now() - t0,
   };

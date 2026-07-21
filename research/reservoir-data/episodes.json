@@ -1,0 +1,244 @@
+{
+  "generatedAtUtc": "2026-07-21T05:42:18.006Z",
+  "method": "HL 4h BTC candles, rolling 48h peak→trough, cluster ≥5%, close after 24h calm",
+  "episodes": [
+    {
+      "start": "2025-08-01",
+      "end": "2025-08-02",
+      "troughAtUtc": "2025-08-01T20:00:00.000Z",
+      "btcDdPct": 5.43,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-08-14",
+      "end": "2025-08-16",
+      "troughAtUtc": "2025-08-15T12:00:00.000Z",
+      "btcDdPct": 6.27,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-08-24",
+      "end": "2025-08-26",
+      "troughAtUtc": "2025-08-26T00:00:00.000Z",
+      "btcDdPct": 5.78,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-08-29",
+      "end": "2025-08-30",
+      "troughAtUtc": "2025-08-30T00:00:00.000Z",
+      "btcDdPct": 5.52,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-10-10",
+      "end": "2025-10-12",
+      "troughAtUtc": "2025-10-10T20:00:00.000Z",
+      "btcDdPct": 18.54,
+      "severity": "severe"
+    },
+    {
+      "start": "2025-10-14",
+      "end": "2025-10-19",
+      "troughAtUtc": "2025-10-17T08:00:00.000Z",
+      "btcDdPct": 7.77,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-10-21",
+      "end": "2025-10-23",
+      "troughAtUtc": "2025-10-22T08:00:00.000Z",
+      "btcDdPct": 6.87,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-10-29",
+      "end": "2025-10-31",
+      "troughAtUtc": "2025-10-30T12:00:00.000Z",
+      "btcDdPct": 7.17,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-11-03",
+      "end": "2025-11-07",
+      "troughAtUtc": "2025-11-04T20:00:00.000Z",
+      "btcDdPct": 10.69,
+      "severity": "moderate"
+    },
+    {
+      "start": "2025-11-12",
+      "end": "2025-11-16",
+      "troughAtUtc": "2025-11-14T20:00:00.000Z",
+      "btcDdPct": 9.54,
+      "severity": "moderate"
+    },
+    {
+      "start": "2025-11-17",
+      "end": "2025-11-23",
+      "troughAtUtc": "2025-11-21T04:00:00.000Z",
+      "btcDdPct": 13.86,
+      "severity": "severe"
+    },
+    {
+      "start": "2025-12-01",
+      "end": "2025-12-02",
+      "troughAtUtc": "2025-12-01T12:00:00.000Z",
+      "btcDdPct": 8.87,
+      "severity": "moderate"
+    },
+    {
+      "start": "2025-12-05",
+      "end": "2025-12-06",
+      "troughAtUtc": "2025-12-05T16:00:00.000Z",
+      "btcDdPct": 6.49,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-12-11",
+      "end": "2025-12-12",
+      "troughAtUtc": "2025-12-11T12:00:00.000Z",
+      "btcDdPct": 5.65,
+      "severity": "mild"
+    },
+    {
+      "start": "2025-12-15",
+      "end": "2025-12-20",
+      "troughAtUtc": "2025-12-18T20:00:00.000Z",
+      "btcDdPct": 6.59,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-01-08",
+      "end": "2026-01-08",
+      "troughAtUtc": "2026-01-08T04:00:00.000Z",
+      "btcDdPct": 5.1,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-01-20",
+      "end": "2026-01-22",
+      "troughAtUtc": "2026-01-20T16:00:00.000Z",
+      "btcDdPct": 6.57,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-01-29",
+      "end": "2026-02-13",
+      "troughAtUtc": "2026-02-06T00:00:00.000Z",
+      "btcDdPct": 21.88,
+      "severity": "severe"
+    },
+    {
+      "start": "2026-02-16",
+      "end": "2026-02-17",
+      "troughAtUtc": "2026-02-16T12:00:00.000Z",
+      "btcDdPct": 5.19,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-02-23",
+      "end": "2026-02-25",
+      "troughAtUtc": "2026-02-24T04:00:00.000Z",
+      "btcDdPct": 8.15,
+      "severity": "moderate"
+    },
+    {
+      "start": "2026-02-27",
+      "end": "2026-03-04",
+      "troughAtUtc": "2026-02-28T04:00:00.000Z",
+      "btcDdPct": 8.31,
+      "severity": "moderate"
+    },
+    {
+      "start": "2026-03-06",
+      "end": "2026-03-08",
+      "troughAtUtc": "2026-03-07T04:00:00.000Z",
+      "btcDdPct": 8.3,
+      "severity": "moderate"
+    },
+    {
+      "start": "2026-03-18",
+      "end": "2026-03-20",
+      "troughAtUtc": "2026-03-19T12:00:00.000Z",
+      "btcDdPct": 8.06,
+      "severity": "moderate"
+    },
+    {
+      "start": "2026-03-22",
+      "end": "2026-03-25",
+      "troughAtUtc": "2026-03-22T20:00:00.000Z",
+      "btcDdPct": 5.29,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-03-26",
+      "end": "2026-03-28",
+      "troughAtUtc": "2026-03-27T12:00:00.000Z",
+      "btcDdPct": 8.45,
+      "severity": "moderate"
+    },
+    {
+      "start": "2026-04-02",
+      "end": "2026-04-03",
+      "troughAtUtc": "2026-04-02T12:00:00.000Z",
+      "btcDdPct": 5.15,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-04-07",
+      "end": "2026-04-09",
+      "troughAtUtc": "2026-04-07T20:00:00.000Z",
+      "btcDdPct": 5.19,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-05-16",
+      "end": "2026-05-16",
+      "troughAtUtc": "2026-05-16T08:00:00.000Z",
+      "btcDdPct": 5.36,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-05-23",
+      "end": "2026-05-23",
+      "troughAtUtc": "2026-05-23T04:00:00.000Z",
+      "btcDdPct": 5.02,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-05-28",
+      "end": "2026-05-28",
+      "troughAtUtc": "2026-05-28T04:00:00.000Z",
+      "btcDdPct": 6.89,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-06-02",
+      "end": "2026-06-07",
+      "troughAtUtc": "2026-06-04T00:00:00.000Z",
+      "btcDdPct": 13.63,
+      "severity": "severe"
+    },
+    {
+      "start": "2026-06-09",
+      "end": "2026-06-10",
+      "troughAtUtc": "2026-06-10T08:00:00.000Z",
+      "btcDdPct": 5.39,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-06-18",
+      "end": "2026-06-19",
+      "troughAtUtc": "2026-06-18T16:00:00.000Z",
+      "btcDdPct": 6.31,
+      "severity": "mild"
+    },
+    {
+      "start": "2026-06-23",
+      "end": "2026-06-27",
+      "troughAtUtc": "2026-06-24T16:00:00.000Z",
+      "btcDdPct": 8.65,
+      "severity": "moderate"
+    }
+  ]
+}

@@ -5,6 +5,7 @@ import { tokenScan } from './engine/tokenScan.js';
 import { walletAudit } from './engine/walletAudit.js';
 import { tapePulse } from './engine/tapePulse.js';
 import { chartPress } from './engine/chartPress.js';
+import { looksLikeCexSymbol } from './adapters/okx-market.js';
 import { polyFill } from './engine/polyFill.js';
 import { polyDesk } from './engine/polyDesk.js';
 import { optionsDesk } from './engine/optionsDesk.js';
@@ -24,9 +25,9 @@ import { lpRisk } from './engine/lpRisk.js';
 import { treasuryRisk } from './engine/treasuryRisk.js';
 import { riskAttest } from './engine/riskAttest.js';
 import { eventVol } from './engine/eventVol.js';
-import { proofEnvelope } from './engine/proof.js';
+import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 import { portfolioGate } from './engine/portfolioGate.js';
-import { enrichPerpInputs, enrichPortfolioLegs } from './adapters/hyperliquid.js';
+import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -50,42 +51,56 @@ export const SERVICES = [
     name: 'tape-pulse', path: '/api/tape-pulse', price: config.prices.tapePulse,
     blurb: 'Live DEX tape microstructure read (buy/sell imbalance, net flow, whale prints) for a token',
     inputSchema: tokenIn, cacheKey: (b) => `tp:${b.chain}:${b.address}`, cacheTtl: 20000,
-    validate: vToken, run: (i) => tapePulse(i.chain, i.address),
+    validate: vToken, run: async (i) => observationEnvelope('tape-pulse', i, await tapePulse(i.chain, i.address), config.version),
   },
   {
     name: 'chart-press', path: '/api/chart-press', price: config.prices.chartPress,
-    blurb: 'Agent-controlled PNG chart: candles + indicators + drawings, two render tiers, numbers baked in',
+    blurb: 'Agent-controlled PNG/SVG chart: candles + indicators + drawings, DEX token OR CEX symbol, numbers baked in',
     inputSchema: {
-      type: 'object', required: ['chain', 'address'],
+      type: 'object',
       properties: {
-        chain: { type: 'string' }, address: { type: 'string' },
+        chain: { type: 'string', description: 'DEX chain (with address); OR omit and pass symbol for a CEX pair' }, address: { type: 'string', description: 'DEX token contract address' },
+        symbol: { type: 'string', description: 'CEX pair, e.g. BTC-USDT or just BTC (defaults quote USDT) — routes to OKX public candles instead of the DEX feed' },
         interval: { type: 'string', description: '1m|5m|15m|1H|4H|1D' },
         lookback: { type: 'number', description: 'number of candles (10-300)' },
         quality: { type: 'string', description: 'fast (default, browserless) | full (high-detail, browser)' },
         chartType: { type: 'string', description: 'candles (default) | heikin | line | area | renko' },
         logScale: { type: 'boolean', description: 'logarithmic price axis' },
-        indicators: { type: 'array', description: 'e.g. [{type:"EMA",period:20},{type:"BOLL"},{type:"RSI"},{type:"VOL"}]', items: { type: 'object' } },
-        drawings: { type: 'array', description: 'e.g. [{type:"hline",price,label},{type:"rect",p1:{index,price},p2},{type:"fib",p1,p2,extension?},{type:"trendline",p1,p2},{type:"ray",p1,p2},{type:"channel",p1,p2,width},{type:"measure",p1,p2},{type:"vline",index},{type:"text",index,price,text}]', items: { type: 'object' } },
+        format: { type: 'string', description: 'png (default) | svg (vector, fast tier only)' },
+        width: { type: 'number', description: 'image width px (600-2400, default 1200)' },
+        height: { type: 'number', description: 'image height px (400-1600, default 675)' },
+        scale: { type: 'number', description: 'resolution multiplier 1-3 (png): 1200px * 3 = 3600px output' },
+        timezone: { type: 'string', description: 'IANA timezone for axis labels (e.g. Asia/Jakarta); default UTC' },
+        indicators: { type: 'array', description: 'e.g. [{type:"EMA",period:20},{type:"BOLL"},{type:"RSI"},{type:"VOL"},{type:"ICHIMOKU"}]', items: { type: 'object' } },
+        drawings: { type: 'array', description: 'e.g. [{type:"hline",price,label},{type:"rect",p1:{index,price},p2},{type:"fib",p1,p2,extension?},{type:"trendline",p1,p2},{type:"ray",p1,p2},{type:"channel",p1,p2,width},{type:"measure",p1,p2},{type:"vline",index},{type:"text",index,price,text},{type:"longshort",side,entry,stop,target,entryIndex?,exitIndex?},{type:"orderline",side,price,label?}]', items: { type: 'object' } },
         annotations: { type: 'array', description: '[{index,price,text}]', items: { type: 'object' } },
         theme: { type: 'string', description: 'dark | light' },
       },
     },
-    validate: (b) => { const v = vToken(b); if (v.error) return v; return { ...v, interval: b.interval, lookback: b.lookback, quality: b.quality, chartType: b.chartType, logScale: b.logScale, indicators: b.indicators, drawings: b.drawings, annotations: b.annotations, theme: b.theme }; },
-    run: (i, ctx) => chartPress(i.chain, i.address, { interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx.host }),
+    validate: (b) => {
+      const common = { interval: b.interval, lookback: b.lookback, quality: b.quality, chartType: b.chartType, logScale: b.logScale, format: b.format, width: b.width, height: b.height, scale: b.scale, timezone: b.timezone, indicators: b.indicators, drawings: b.drawings, annotations: b.annotations, theme: b.theme };
+      // CEX-symbol path: accept `symbol` (or a symbol placed in `address`/`chain`) with no DEX token needed.
+      if (b.symbol && looksLikeCexSymbol(b.symbol)) return { cex: true, symbol: b.symbol, ...common };
+      if (!b.address && looksLikeCexSymbol(b.chain)) return { cex: true, symbol: b.chain, ...common };
+      const v = vToken(b); if (v.error) return v; return { ...v, ...common };
+    },
+    run: async (i, ctx) => observationEnvelope('chart-press', i, await (i.cex
+      ? chartPress(null, null, { symbol: i.symbol, interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, format: i.format, width: i.width, height: i.height, scale: i.scale, timezone: i.timezone, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx.host })
+      : chartPress(i.chain, i.address, { interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, format: i.format, width: i.width, height: i.height, scale: i.scale, timezone: i.timezone, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx.host })), config.version),
   },
   {
     name: 'poly-fill', path: '/api/poly-fill', price: config.prices.polyFill,
     blurb: 'Pre-trade fill simulation on a Polymarket market: executable avg price + slippage for $X',
     inputSchema: { type: 'object', required: ['market', 'usd'], properties: { market: { type: 'string', description: 'slug / conditionId / question text' }, side: { type: 'string', description: 'YES|NO' }, action: { type: 'string', description: 'buy|sell' }, usd: { type: 'number' }, maxSlippagePct: { type: 'number' } } },
     validate: (b) => (b?.market && Number(b?.usd) > 0 ? { market: String(b.market), side: b.side, action: b.action, usd: Number(b.usd), maxSlippagePct: b.maxSlippagePct != null ? Number(b.maxSlippagePct) : null } : { error: 'require { market, usd>0 }' }),
-    run: (i) => polyFill(i),
+    run: async (i) => observationEnvelope('poly-fill', i, await polyFill(i), config.version),
   },
   {
     name: 'poly-desk', path: '/api/poly-desk', price: config.prices.polyDesk,
     blurb: 'A Polymarket wallet\'s live book: open positions, marks, unrealized PnL, movers',
     inputSchema: { type: 'object', required: ['wallet'], properties: { wallet: { type: 'string', description: 'Polymarket proxy wallet (0x…)' } } },
     validate: (b) => (EVM.test(String(b?.wallet || '').trim()) ? { wallet: String(b.wallet).trim() } : { error: 'wallet must be a 0x… address' }),
-    run: (i) => polyDesk(i.wallet),
+    run: async (i) => observationEnvelope('poly-desk', i, await polyDesk(i.wallet), config.version),
   },
   {
     name: 'options-desk', path: '/api/options-desk', price: config.prices.optionsDesk,
@@ -93,7 +108,7 @@ export const SERVICES = [
     inputSchema: { type: 'object', required: ['currency'], properties: { currency: { type: 'string', description: 'BTC | ETH | SOL' }, focus: { type: 'string', description: 'all | expiries' } } },
     cacheKey: (b) => `od:${String(b.currency).toUpperCase()}`, cacheTtl: 30000,
     validate: (b) => { const c = String(b?.currency || 'BTC').toUpperCase(); return ['BTC', 'ETH', 'SOL'].includes(c) ? { currency: c, focus: b?.focus } : { error: 'currency must be BTC, ETH, or SOL' }; },
-    run: (i) => optionsDesk(i.currency, { focus: i.focus }),
+    run: async (i) => observationEnvelope('options-desk', i, await optionsDesk(i.currency, { focus: i.focus }), config.version),
   },
   {
     name: 'lp-desk', path: '/api/lp-desk', price: config.prices.lpDesk,
@@ -104,7 +119,7 @@ export const SERVICES = [
       if(!['ethereum','base','arbitrum'].includes(chain)) return { error: 'chain must be ethereum, base, or arbitrum' };
       if(!EVM.test(pool)) return { error: 'pool must be a 0x-prefixed EVM address' };
       return { chain, pool, days: b?.days, widthPct: b?.widthPct, capital: b?.capital }; },
-    run: (i) => lpDesk(i),
+    run: async (i) => observationEnvelope('lp-desk', i, await lpDesk(i), config.version),
   },
 
   {
@@ -135,7 +150,7 @@ export const SERVICES = [
       if (b.from && evmA.test(String(b.from))) out.from = String(b.from);
       return out;
     },
-    run: (i) => (i.typedData ? signatureX(i) : calldataX(i)),
+    run: async (i) => observationEnvelope('calldata-x', i, await (i.typedData ? signatureX(i) : calldataX(i)), config.version),
   },
   {
     name: 'protocol-pulse', path: '/api/protocol-pulse', price: config.prices.protocolPulse,
@@ -143,14 +158,14 @@ export const SERVICES = [
     inputSchema: { type: 'object', required: ['protocol'], properties: { protocol: { type: 'string', description: 'protocol name or slug (e.g. aave, lido, gmx)' } } },
     cacheKey: (b) => `pp:${String(b.protocol).toLowerCase()}`, cacheTtl: 300000,
     validate: (b) => (b?.protocol ? { protocol: String(b.protocol) } : { error: 'require { protocol }' }),
-    run: (i) => protocolPulse(i.protocol),
+    run: async (i) => observationEnvelope('protocol-pulse', i, await protocolPulse(i.protocol), config.version),
   },
   {
     name: 'paw-check', path: '/api/paw-check', price: config.prices.pawCheck, register: false, // built + live but off-theme for Quiver; excluded from the ASP listing
     blurb: 'Is this food safe for a dog or cat? Deterministic vet-grounded safety verdict',
     inputSchema: { type: 'object', required: ['food'], properties: { food: { type: 'string' }, species: { type: 'string', description: 'dog | cat' } } },
     validate: (b) => (b?.food ? { food: String(b.food), species: b.species } : { error: 'require { food }' }),
-    run: (i) => pawCheck(i),
+    run: async (i) => observationEnvelope('paw-check', i, await pawCheck(i), config.version),
   },
   {
     name: 'macro-sentry', path: '/api/macro-sentry', price: config.prices.macroSentry,
@@ -168,27 +183,27 @@ export const SERVICES = [
     blurb: 'Fair-value edge read on the live Polymarket BTC/ETH up-or-down window vs market odds',
     inputSchema: { type: 'object', required: ['coin'], properties: { coin: { type: 'string', description: 'BTC | ETH' } } },
     validate: (b) => { const c = String(b?.coin || 'BTC').toUpperCase(); return ['BTC', 'ETH'].includes(c) ? { coin: c } : { error: 'coin must be BTC or ETH' }; },
-    run: (i) => upDownPulse(i.coin),
+    run: async (i) => observationEnvelope('updown-pulse', i, await upDownPulse(i.coin), config.version),
   },
   {
     name: 'loop-digest', path: '/api/loop-digest', price: config.prices.loopDigest,
     blurb: 'Compact since-last-call diff of a wallet (new fills + PnL drift), cursor-based, for loop tops',
     inputSchema: { type: 'object', required: ['chain', 'wallet'], properties: { chain: { type: 'string' }, wallet: { type: 'string' }, cursor: { type: 'string', description: 'cursor from your previous call' } } },
     validate: (b) => { const v = vWallet({ chain: b?.chain, address: b?.wallet }); return v.error ? v : { chain: v.chain, wallet: v.address, cursor: b?.cursor || null }; },
-    run: (i) => loopDigest(i),
+    run: async (i) => observationEnvelope('loop-digest', i, await loopDigest(i), config.version),
   },
   // Veritape forensics (built + validated earlier) — RE-LISTED (on-theme authenticity forensics).
   {
     name: 'token-scan', path: '/api/token-scan', price: config.prices.tokenScan, register: true, // token-scan ships a manipulation-risk read (clean wash% not API-reachable) — disclosed, not hidden
     blurb: 'Manipulation-risk assessment for a token (wash/round-trip patterns) with evidence',
     inputSchema: tokenIn, cacheKey: (b) => `ts:${b.chain}:${b.address}`, cacheTtl: config.cacheTtlMs,
-    validate: vToken, run: (i) => tokenScan(i.chain, i.address),
+    validate: vToken, run: async (i) => observationEnvelope('token-scan', i, await tokenScan(i.chain, i.address), config.version),
   },
   {
     name: 'wallet-audit', path: '/api/wallet-audit', price: config.prices.walletAudit, register: true,
     blurb: 'Track-record authenticity audit for a wallet (win-rate significance + wash cross-check)',
     inputSchema: tokenIn, cacheKey: (b) => `wa:${b.chain}:${b.address}`, cacheTtl: config.cacheTtlMs,
-    validate: vWallet, run: (i) => walletAudit(i.chain, i.address),
+    validate: vWallet, run: async (i) => observationEnvelope('wallet-audit', i, await walletAudit(i.chain, i.address), config.version),
   },
   // ── Risk Brain (Q1) — deterministic, self-verifying risk computation the agent risk layer needs as INPUT.
   //    Each wraps its engine in a T0 proof envelope (re-runnable + self-checked + content-hashed).
@@ -230,17 +245,46 @@ export const SERVICES = [
       type: 'object',
       properties: {
         positions: { type: 'array', description: 'legs across venues: {venue, asset|symbol, side, size, entryPrice, markPrice?, margin|leverage, maxLeverage|maintMarginRate|marginTiers}. A Hyperliquid symbol auto-fills live mark/leverage/margin-tiers.' },
+        account: { type: 'string', description: 'OR: a Hyperliquid account address (0x…) — the FULL live book (positions, margins, account equity, venue liquidation prices) is pulled keylessly and gated; no manual typing. Explicit positions take precedence.' },
+        betaTier: { type: 'string', description: 'beta regime for the factor stress: mild | moderate | severe — cross-event VALIDATED tiers (pre-registered; H1 Spearman 0.657, H2 out-of-sample relative risk 14.3×). Default = the worst-case single-event Oct-10 table. Explicit betas override.' },
         shockScenariosPct: { type: 'array', description: 'correlated market moves (%) to stress; default [5,10,20,30]' },
       },
     },
     validate: (b) => {
-      if (!Array.isArray(b?.positions) || b.positions.length === 0) return { error: 'require positions: a non-empty array of legs' };
-      return b;
+      const hasPositions = Array.isArray(b?.positions) && b.positions.length > 0;
+      const account = typeof b?.account === 'string' ? b.account.trim() : '';
+      if (!hasPositions && !account) return { error: 'require positions (a non-empty array of legs) OR account (a Hyperliquid 0x… address to pull the live book from)' };
+      if (!hasPositions && !EVM.test(account)) return { error: `account "${account}" is not a valid EVM address (0x + 40 hex)` };
+      return hasPositions ? b : { ...b, account };
     },
     run: async (i) => {
-      const positions = await enrichPortfolioLegs(i.positions);   // fill live mark/leverage/tiers per leg (one cached fetch)
-      const input = { ...i, positions };
-      return proofEnvelope('portfolio-gate', input, portfolioGate(input), config.version);
+      let live = null, base = i;
+      if (!Array.isArray(i.positions) || !i.positions.length) {
+        // Account mode: pull the address's full live Hyperliquid book — positions, per-leg margins/modes,
+        // the venue's own liquidation prices (cross-checked in the engine), and the account equity that
+        // powers the cross-margin view. Because the answer embeds a live fetch, account mode ships the
+        // OBSERVATION envelope (adversarial review caught the earlier proof envelope overclaiming
+        // "reproduce this result exactly" over wall-clock data) — with the frozen book echoed in
+        // observation.inputs and the math-is-re-runnable property stated explicitly.
+        const acct = await fetchHlAccount(i.account);
+        if (!acct.positions.length) {
+          return observationEnvelope('portfolio-gate', { account: i.account }, {
+            ok: false, errors: ['no open perp positions on this Hyperliquid account'],
+            accountEquityUsd: acct.accountEquityUsd, withdrawableUsd: acct.withdrawableUsd,
+          }, config.version);
+        }
+        base = { ...i, positions: acct.positions, accountEquityUsd: acct.accountEquityUsd };
+        live = { source: 'hyperliquid clearinghouseState (keyless public API)', address: i.account, fetchedAtUtc: new Date().toISOString(), positionsFound: acct.positions.length, accountEquityUsd: acct.accountEquityUsd, totalMarginUsedUsd: acct.totalMarginUsedUsd, withdrawableUsd: acct.withdrawableUsd };
+      }
+      const positions = await enrichPortfolioLegs(base.positions);   // fill live mark/leverage/tiers per leg (one cached fetch)
+      const input = { ...base, positions };
+      const r = portfolioGate(input);
+      if (live) {
+        r.live = live;
+        r.mathReproducibility = 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the frozen book snapshot fetched at observedAtUtc) and every risk number reproduces. The SNAPSHOT itself is a committed live observation — re-fetch Hyperliquid clearinghouseState for this address to independently check what the book looks like now.';
+        return observationEnvelope('portfolio-gate', input, r, config.version);
+      }
+      return proofEnvelope('portfolio-gate', input, r, config.version);
     },
   },
   {

@@ -36,9 +36,10 @@ test('portfolio-gate: a correlated crash liquidates correlated LONGS together (m
   assert.equal(r.checks.find((c) => c.name.startsWith('correlated')).pass, true);
 });
 
-test('portfolio-gate: all four self-checks pass on a valid book; empty book is rejected (no fabrication)', () => {
+test('portfolio-gate: all self-checks pass on a valid book; empty book is rejected (no fabrication)', () => {
   const r = portfolioGate(book);
-  assert.equal(r.checks.length, 4);
+  assert.ok(r.checks.length >= 6); // 4 original + 2 factor-beta (+ cross-margin dominance when margins known)
   assert.ok(r.checks.every((c) => c.pass));
+  assert.ok(r.betaScaledStress && Array.isArray(r.betaScaledStress.scenarios), 'factor-beta stress present');
   assert.equal(portfolioGate({ positions: [] }).ok, false);
 });

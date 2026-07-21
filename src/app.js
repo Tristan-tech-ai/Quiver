@@ -153,7 +153,7 @@ app.get(['/paper', '/whitepaper', '/docs'], (_req, res) => {
 
 // Public artifact serving for rendered cards (already paid for at generation time).
 app.get('/card/:id', (req, res) => {
-  const id = String(req.params.id).replace(/\.png$/, '');
+  const id = String(req.params.id).replace(/\.(png|svg)$/, '');
   const c = getCard(id);
   if (!c) return res.status(404).json({ error: 'card_not_found_or_expired' });
   res.set('content-type', c.contentType);

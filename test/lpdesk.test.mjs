@@ -62,3 +62,12 @@ test('lpDesk REFUSES rather than reporting noise when there are too few swaps', 
   assert.equal(r.ok, false, 'must not return a sweep for a non-pool');
   assert.ok(/metadata|swaps|refus/i.test(r.reason), 'says why');
 });
+
+// OFFLINE locks (no RPC): failure-diagnosis contract. Both FAIL pre-fix: classifyPoolFailure did not
+// exist, and poolMeta returned a bare null that erased the reason.
+test('classifyPoolFailure: empty code = wrong-address diagnosis; present code = not-a-pool diagnosis', async () => {
+  const { classifyPoolFailure } = await import('../src/adapters/univ3.js');
+  assert.ok(classifyPoolFailure('0x').includes('no contract code'));
+  assert.ok(classifyPoolFailure(null).includes('no contract code'));
+  assert.ok(classifyPoolFailure('0x6080604052').includes('not a V3 pool'));
+});

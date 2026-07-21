@@ -30,5 +30,27 @@ export function gapCv(timestampsMs) {
   return Math.sqrt(variance) / mean;
 }
 
+// Simple-OLS slope with an analytic 95% confidence interval (normal approximation). For a regression
+// coefficient like Kyle's λ, the point estimate alone hides whether the impact is even distinguishable
+// from zero — the CI answers that. df = n-2; SE(β) = sqrt( (SSE/df) / Sxx ); CI = β ± 1.96·SE.
+// Returns null when the fit is degenerate (no x-variance) or underpowered (df < 1). z is the normal
+// multiplier (1.96 ≈ 95%); this is a large-sample approximation, disclosed by the caller.
+export function olsSlopeCI(xs, ys, z = 1.96) {
+  const n = Math.min(xs.length, ys.length);
+  if (n < 3) return null;
+  const mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  for (let i = 0; i < n; i++) { const dx = xs[i] - mx, dy = ys[i] - my; sxy += dx * dy; sxx += dx * dx; syy += dy * dy; }
+  if (!(sxx > 0)) return null;                       // no x-variance → slope undefined
+  const slope = sxy / sxx;
+  const r2 = syy > 0 ? (sxy * sxy) / (sxx * syy) : null;
+  const df = n - 2;
+  if (df < 1) return { slope, r2, se: null, ciLo: null, ciHi: null, excludesZero: null, n };
+  const sse = Math.max(0, syy - slope * sxy);        // residual sum of squares (>=0 up to fp)
+  const se = Math.sqrt((sse / df) / sxx);
+  const ciLo = slope - z * se, ciHi = slope + z * se;
+  return { slope, r2, se, ciLo, ciHi, excludesZero: ciLo > 0 || ciHi < 0, n };
+}
+
 export const clamp01 = (x) => Math.max(0, Math.min(1, x));
 export const round = (x, dp = 2) => (x === null || x === undefined || Number.isNaN(x) ? null : Number(Number(x).toFixed(dp)));

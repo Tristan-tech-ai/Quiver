@@ -1,0 +1,26 @@
+{
+ "atUtc": "2026-07-21T07:20:20.852Z",
+ "rows": [
+  {
+   "svc": "chart-press",
+   "http": 200,
+   "priceUsd": 0.02,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0xa8dcf4952314ec33b880a5a42420f157b7b3e18eb641291645733cc80a54784e",
+   "env": "observation",
+   "hashOk": true
+  },
+  {
+   "svc": "poly-desk",
+   "http": 200,
+   "priceUsd": 0.01,
+   "settled": true,
+   "network": "eip155:196",
+   "tx": "0x220cbd6b200d30770273c1c8b2d60a070633dc0820b48cd04da8b8d2a7bfd27c",
+   "env": "observation",
+   "hashOk": true
+  }
+ ],
+ "totalSpentUsd": 0.03
+}

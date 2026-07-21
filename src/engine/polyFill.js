@@ -26,12 +26,19 @@ function impactModel(levels, mid) {
   return { k, r2: sstot > 0 ? 1 - ssres / sstot : null, visibleDepthUsd: cumUsd, pts };
 }
 
-export async function polyFill({ market, side = 'YES', action = 'buy', usd = 100, maxSlippagePct = null }) {
+export async function polyFill({ market, side = 'YES', action = 'buy', usd = 100, maxSlippagePct = null }, deps = pm) {
   const t0 = Date.now();
-  const m = await pm.resolveMarket(market);
-  const ids = pm.clobTokenIds(m);
+  const m = await deps.resolveMarket(market);
+  const ids = deps.clobTokenIds(m);
   const tokenId = String(side).toUpperCase() === 'NO' ? ids.no : ids.yes;
-  const book = await pm.book(tokenId);
+  const book = await deps.book(tokenId);
+
+  // Book freshness: the CLOB response carries a server timestamp — surface it instead of promising
+  // "at call time" unverified. Absent timestamp = freshness UNVERIFIABLE, said out loud.
+  const serverTs = Number(book?.timestamp) || null;
+  const bookFreshness = serverTs
+    ? { serverTimestampUtc: new Date(serverTs).toISOString(), ageMs: Math.max(0, Date.now() - serverTs) }
+    : { serverTimestampUtc: null, ageMs: null, note: 'CLOB response carried no server timestamp — book freshness is unverifiable for this call.' };
 
   // Buying YES consumes asks; selling consumes bids.
   const levels = (action === 'sell' ? book.bids : book.asks || [])
@@ -41,14 +48,19 @@ export async function polyFill({ market, side = 'YES', action = 'buy', usd = 100
 
   const bestBid = Math.max(...(book.bids || []).map((l) => Number(l.price)), 0);
   const bestAsk = Math.min(...(book.asks || []).map((l) => Number(l.price)), 1);
-  const mid = bestBid && bestAsk <= 1 ? (bestBid + bestAsk) / 2 : null;
+  // A crossed book (best bid above best ask) means the snapshot is inconsistent/mid-update — a midpoint
+  // computed from it is fiction. Refuse the mid rather than average a lie.
+  const bookCrossed = bestBid > 0 && bestAsk <= 1 && bestBid > bestAsk;
+  const mid = !bookCrossed && bestBid && bestAsk <= 1 ? (bestBid + bestAsk) / 2 : null;
 
   if (!levels.length) {
     return { service: 'poly-fill', version: config.version, market: m.slug, question: m.question, verdict: 'NO_LIQUIDITY', note: `No ${action === 'sell' ? 'bids' : 'asks'} on the ${side} book right now.` };
   }
 
-  // Walk the book with $usd.
-  let remainingUsd = usd, shares = 0, spentUsd = 0;
+  // Walk the book with $usd. Consumption walks the WHOLE book — the verdict must reflect true depth,
+  // never a display cap (a 25-level consumption cap here once mislabeled deep granular books as
+  // INSUFFICIENT_DEPTH). Only the RECORDED rows are capped.
+  let remainingUsd = usd, shares = 0, spentUsd = 0, levelsConsumed = 0;
   const walk = [];
   for (const l of levels) {
     if (remainingUsd <= 0) break;
@@ -56,8 +68,8 @@ export async function polyFill({ market, side = 'YES', action = 'buy', usd = 100
     const takeUsd = Math.min(remainingUsd, levelUsd);
     const takeShares = takeUsd / l.price;
     shares += takeShares; spentUsd += takeUsd; remainingUsd -= takeUsd;
-    walk.push({ price: l.price, usdFilled: round(takeUsd, 2), sharesFilled: round(takeShares, 1) });
-    if (walk.length >= 25) break;
+    levelsConsumed += 1;
+    if (walk.length < 25) walk.push({ price: l.price, usdFilled: round(takeUsd, 2), sharesFilled: round(takeShares, 1) });
   }
   const avgPrice = shares > 0 ? spentUsd / shares : null;
   const slippagePct = avgPrice && mid ? ((avgPrice - mid) / mid) * 100 * (action === 'sell' ? -1 : 1) : null;
@@ -96,7 +108,9 @@ export async function polyFill({ market, side = 'YES', action = 'buy', usd = 100
     version: config.version,
     market: m.slug, question: m.question, endDate: m.endDate,
     side: String(side).toUpperCase(), action, requestedUsd: usd,
-    verdict: filledFully ? (slippagePct !== null && Math.abs(slippagePct) > 10 ? 'FILLS_WITH_HEAVY_SLIPPAGE' : 'FILLS_CLEAN') : 'INSUFFICIENT_DEPTH',
+    verdict: bookCrossed ? 'BOOK_CROSSED' : filledFully ? (slippagePct !== null && Math.abs(slippagePct) > 10 ? 'FILLS_WITH_HEAVY_SLIPPAGE' : 'FILLS_CLEAN') : 'INSUFFICIENT_DEPTH',
+    bookFreshness,
+    ...(bookCrossed ? { bookCrossedNote: `Best bid ${round(bestBid * 100, 2)}c > best ask ${round(bestAsk * 100, 2)}c — inconsistent snapshot (mid refused; fill math still walks the real resting levels, but re-fetch before acting).` } : {}),
     fill: {
       avgPriceCents: avgPrice ? round(avgPrice * 100, 2) : null,
       midCents: mid ? round(mid * 100, 2) : null,
@@ -104,7 +118,7 @@ export async function polyFill({ market, side = 'YES', action = 'buy', usd = 100
       sharesBought: round(shares, 1),
       usdFilled: round(spentUsd, 2),
       usdUnfilled: round(Math.max(0, remainingUsd), 2),
-      levelsConsumed: walk.length,
+      levelsConsumed,
       maxUsdWithinSlippage: maxSlippagePct !== null ? round(maxCleanUsd, 2) : undefined,
       targetSlippagePct: maxSlippagePct ?? undefined,
     },

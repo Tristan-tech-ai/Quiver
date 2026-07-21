@@ -9,18 +9,28 @@ import { config } from '../config.js';
 
 const num = (x) => (x === undefined || x === null || x === '' ? null : Number(x));
 
-export async function walletAudit(chain, address) {
+export async function walletAudit(chain, address, deps = data) {
   const t0 = Date.now();
   const [ovRaw, ov7Raw] = await Promise.allSettled([
-    data.portfolioOverview(chain, address, 4), // 1M
-    data.portfolioOverview(chain, address, 3), // 7D
+    deps.portfolioOverview(chain, address, 4), // 1M
+    deps.portfolioOverview(chain, address, 3), // 7D
   ]);
-  const ov = ovRaw.status === 'fulfilled' ? ovRaw.value : null;
+  // A REJECTED overview fetch is an outage, not an empty track record — reporting "no trading history"
+  // when the data source is down would grade a busy wallet as blank (absence-as-success).
+  if (ovRaw.status === 'rejected') {
+    return {
+      service: 'wallet-audit', version: config.version, chain, wallet: address,
+      grade: null, verdict: 'DATA_UNAVAILABLE', confidence: 0,
+      note: 'The portfolio-overview fetch FAILED — this wallet\'s track record is UNKNOWN for this call, not empty. Retry.',
+      components: [], evidence: [],
+    };
+  }
+  const ov = ovRaw.value;
   if (!ov || (num(ov.buyTxCount) === null && num(ov.winRate) === null)) {
     return {
       service: 'wallet-audit', version: config.version, chain, wallet: address,
       grade: null, verdict: 'INSUFFICIENT_DATA', confidence: 0,
-      note: 'No trading history found for this wallet on this chain in the last month.',
+      note: 'The fetch succeeded and returned no usable trading history for this wallet on this chain in the last month — genuinely thin/absent record.',
       components: [], evidence: [],
     };
   }
@@ -30,6 +40,17 @@ export async function walletAudit(chain, address) {
   const buys = num(ov.buyTxCount) || 0;
   const sells = num(ov.sellTxCount) || 0;
   const txs = buys + sells;
+  // Zero real trades (the OKX overview returns 0s, not null, for an unused wallet — so the earlier
+  // null-guard doesn't catch it): there is NO track record to grade. Refuse rather than emit a graded
+  // UNPROVEN, which reads as "we assessed a record" when there is none.
+  if (txs === 0) {
+    return {
+      service: 'wallet-audit', version: config.version, chain, wallet: address,
+      grade: null, verdict: 'INSUFFICIENT_DATA', confidence: 0,
+      note: 'The fetch succeeded but this wallet has zero DEX trades in the window — there is no track record to grade (not a failure, just an empty history).',
+      components: [], evidence: [], txCount: 0,
+    };
+  }
   const buyVol = num(ov.buyTxVolume) || 0;
   const sellVol = num(ov.sellTxVolume) || 0;
   const pnlUsd = num(ov.realizedPnlUsd) || 0;

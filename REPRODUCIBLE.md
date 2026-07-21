@@ -21,6 +21,13 @@ git clone https://github.com/Tristan-tech-ai/Quiver && cd Quiver && npm ci
 Compare it against `GET /build` on the live server (which reports `codeHash` **and the Node version it runs on**)
 and against `proof.codeHash` on any answer. All three must match.
 
+> **Line endings (important on Windows).** The codeHash is computed over the source **bytes**, and the deployed
+> source uses **LF**. The repo ships a `.gitattributes` (`* text=auto eol=lf`) so a fresh clone checks out LF on
+> every OS — but if you cloned an older revision, or your Git rewrote endings, a Windows `core.autocrlf=true`
+> checkout turns `.js` into CRLF and the recomputed hash will differ. Normalize with
+> `git config core.autocrlf false && git checkout -- .` (or re-clone) before comparing. This is a byte-encoding
+> detail, not a code difference.
+
 ## 2. Re-run the engine → identical result
 Because the engines are deterministic, re-running the open engine on `proof.inputs` reproduces the result:
 ```js

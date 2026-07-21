@@ -1,0 +1,27 @@
+# Enforce LF for all text so a clone on ANY OS reproduces the exact bytes the server hashed.
+# The deployed codeHash (/build, proof.js buildId) is computed over LF source. Without this, a Windows
+# checkout with core.autocrlf=true rewrites .js line endings to CRLF, the recomputed buildId diverges
+# from /build, and that falsely reads as "live code != repo" — the worst possible false alarm for a
+# product whose whole claim is verifiability. See REPRODUCIBLE.md.
+* text=auto eol=lf
+*.js    text eol=lf
+*.mjs   text eol=lf
+*.cjs   text eol=lf
+*.ts    text eol=lf
+*.json  text eol=lf
+*.md    text eol=lf
+*.html  text eol=lf
+*.css   text eol=lf
+*.yml   text eol=lf
+*.yaml  text eol=lf
+*.sh    text eol=lf
+
+# Binary assets — never normalize.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.woff binary
+*.woff2 binary

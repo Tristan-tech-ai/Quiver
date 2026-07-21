@@ -9,16 +9,27 @@ const DAY = 86400000;
 
 export async function protocolPulse(query, deps = llama) {
   const t0 = Date.now();
-  const meta = await deps.resolveProtocol(query);
+  // Upstream (DefiLlama) is a live dependency and hiccups transiently. A fetch failure must surface as a
+  // clean, honest DATA_UNAVAILABLE — never a raw 500 that reads as "the service is broken" (and, per the
+  // billing contract, `ok:false` here means the caller is not charged for a non-answer). Distinct from
+  // NOT_FOUND, which is a real answer ("we looked, it doesn't exist").
+  const unavailable = (e) => ({ service: 'protocol-pulse', version: config.version, query, ok: false, verdict: 'DATA_UNAVAILABLE', note: `DefiLlama upstream unavailable for "${query}" (${String(e?.message || e).slice(0, 100)}). Transient — retry.` });
+
+  let meta;
+  try { meta = await deps.resolveProtocol(query); }
+  catch (e) { return unavailable(e); }
   if (!meta) return { service: 'protocol-pulse', version: config.version, query, verdict: 'NOT_FOUND', note: `No DeFi protocol matched "${query}" on DefiLlama.` };
 
   // A failed hack-registry fetch must NOT read as "no incidents" — absence-as-success is the exact
   // defect class this codebase already shipped once (see VERIFIER_DISCIPLINE instance 15). Track it.
   let registryUnavailable = false;
-  const [p, allHacks] = await Promise.all([
-    deps.protocol(meta.slug),
-    deps.hacks().catch(() => { registryUnavailable = true; return []; }),
-  ]);
+  let p, allHacks;
+  try {
+    [p, allHacks] = await Promise.all([
+      deps.protocol(meta.slug),
+      deps.hacks().catch(() => { registryUnavailable = true; return []; }),
+    ]);
+  } catch (e) { return unavailable(e); }
 
   // TVL series (aggregate).
   const series = (p.tvl || []).map((x) => ({ t: x.date * 1000, v: x.totalLiquidityUSD })).filter((x) => x.v != null);

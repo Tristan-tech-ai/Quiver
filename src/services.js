@@ -176,7 +176,10 @@ export const SERVICES = [
       atmIvPct: { type: 'number', description: 'ATM implied vol in % (e.g. 60)' },
     } },
     validate: (b) => ({ hours: b?.hours ? Number(b.hours) : 72, spot: Number(b?.spot) > 0 ? Number(b.spot) : null, atmIvPct: Number(b?.atmIvPct) > 0 ? Number(b.atmIvPct) : null }),
-    run: (i) => proofEnvelope('macro-sentry', i, macroSentry(i), config.version),
+    // Observation, not proof: the event set is filtered against "now" (which events are still ahead), so the
+    // same inputs yield a different answer at a different time — it is NOT re-runnable to the identical
+    // result, exactly the property `proof` claims. A signed, timestamped observation is the honest envelope.
+    run: (i) => observationEnvelope('macro-sentry', i, macroSentry(i), config.version),
   },
   {
     name: 'updown-pulse', path: '/api/updown-pulse', price: config.prices.upDownPulse,
@@ -221,6 +224,15 @@ export const SERVICES = [
         maintMarginRate: { type: 'number', description: 'e.g. 0.0125 (or pass maxLeverage/symbol; mmr=0.5/maxLev)' }, maxLeverage: { type: 'number' },
         markPrice: { type: 'number' }, fundingRateHourly: { type: 'number' }, horizonHours: { type: 'number' },
       },
+      // Runtime constraints made machine-checkable (were enforced only in validate(), invisible to a buyer's
+      // schema validator): a price source, a size, collateral, and a maintenance-margin source are each
+      // required — any one option in each group satisfies it.
+      allOf: [
+        { anyOf: [{ required: ['entryPrice'] }, { required: ['symbol'] }], description: 'price: entryPrice OR symbol (defaults to live mark)' },
+        { anyOf: [{ required: ['size'] }, { required: ['notional'] }], description: 'size: size (base units) OR notional' },
+        { anyOf: [{ required: ['margin'] }, { required: ['leverage'] }], description: 'collateral: margin OR leverage' },
+        { anyOf: [{ required: ['maintMarginRate'] }, { required: ['maxLeverage'] }, { required: ['symbol'] }], description: 'maintenance: maintMarginRate OR maxLeverage OR symbol' },
+      ],
     },
     validate: (b) => {
       const hasSym = typeof b?.symbol === 'string' && b.symbol.trim().length > 0;
@@ -249,6 +261,9 @@ export const SERVICES = [
         betaTier: { type: 'string', description: 'beta regime for the factor stress: mild | moderate | severe — cross-event VALIDATED tiers (pre-registered; H1 Spearman 0.657, H2 out-of-sample relative risk 14.3×). Default = the worst-case single-event Oct-10 table. Explicit betas override.' },
         shockScenariosPct: { type: 'array', description: 'correlated market moves (%) to stress; default [5,10,20,30]' },
       },
+      // Exactly one book source is required: an explicit `positions` array OR an `account` address to pull
+      // the live book from. (`positions` wins if both are sent.)
+      anyOf: [{ required: ['positions'] }, { required: ['account'] }],
     },
     validate: (b) => {
       const hasPositions = Array.isArray(b?.positions) && b.positions.length > 0;

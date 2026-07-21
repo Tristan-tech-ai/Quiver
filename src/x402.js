@@ -12,6 +12,23 @@ import { recordCall } from './recurrence.js';
 const b64 = (obj) => Buffer.from(JSON.stringify(obj), 'utf8').toString('base64');
 const unb64 = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
 
+// Billing contract: a caller is charged only for a DELIVERED result. An answer the engine itself
+// rejected as invalid input (`ok:false`) is not a delivery — it must be FREE, uniformly with the
+// validation-throw path (which already fails before settlement). This closes the inconsistency where
+// input that slipped past `validate()` but was rejected inside the engine got settled while a thrown
+// validation error did not. Pure + exported so the rule is unit-locked without a live facilitator.
+export function isChargeable(result) {
+  return !(result && result.ok === false);
+}
+
+// Normalize the facilitator's settlement status for the receipt. The OKX facilitator can report
+// status:"timeout" (its confirmation poll timed out) even when success:true and a txHash exists — a
+// contradictory "success + timeout" that a status-respecting client could mis-retry on. Once we've
+// determined the payment settled, the honest label is a settled one.
+export function settledStatus(sdata) {
+  return ['settled', 'success', 'confirmed'].includes(sdata.status) ? sdata.status : 'settled';
+}
+
 function paymentRequirements(net, { priceUsdt, resourceUrl, description, inputSchema }) {
   const req = {
     scheme: 'exact',
@@ -163,7 +180,18 @@ export function paid({ priceUsdt, description, inputSchema }) {
     try {
       result = await handler(req);
     } catch (e) {
-      return res.status(500).json({ error: 'engine_error', detail: String(e.message || e) });
+      // Respect an explicit status set by the handler: a business-input rejection carries status 400
+      // (`bad_input`) and must not masquerade as a server fault (500) that trips buyer monitoring.
+      const status = Number.isInteger(e?.status) ? e.status : 500;
+      const code = status >= 400 && status < 500 ? 'bad_input' : 'engine_error';
+      return res.status(status).json({ error: code, detail: String(e.message || e).replace(/^bad_input:\s*/, '') });
+    }
+
+    // 2b) An input the engine rejected (ok:false) is not a delivered result — do NOT settle. The caller
+    // gets the rejection (with its reasons) for free, consistent with the validation-throw path above.
+    if (!isChargeable(result)) {
+      res.set('PAYMENT-RESPONSE', b64({ success: false, status: 'not_charged', reason: 'input rejected by engine — no settlement', network: requirements.network }));
+      return res.status(200).json(result);
     }
 
     // 3) Settle synchronously, then serve.
@@ -191,7 +219,7 @@ export function paid({ priceUsdt, description, inputSchema }) {
       network: requirements.network,
       payer: sdata.payer || vdata.payer || null,
       amount: requirements.amount,
-      status: sdata.status || 'settled',
+      status: settledStatus(sdata),
     }));
     return res.status(200).json(result);
   };

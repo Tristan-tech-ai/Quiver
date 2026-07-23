@@ -29,6 +29,23 @@ export function settledStatus(sdata) {
   return ['settled', 'success', 'confirmed'].includes(sdata.status) ? sdata.status : 'settled';
 }
 
+// Settlement acceptance (BUG-011, buyer-desk reconciliation): a settle response of success:true with
+// status:"timeout" and NO transaction hash empirically never lands on-chain (68/68 such calls in the
+// day-1 desk ledger produced no transfer — a silent ~7% revenue leak), while responses carrying a
+// transaction hash land (sampled 5/5, receipt status 0x1). The transaction field — not the success
+// flag — is the discriminator. success-without-transaction earns ONE idempotent retry (EIP-3009
+// nonces make a duplicate /settle harmless: if the first actually landed, the second cannot
+// double-spend); still nothing => NOT settled, and the caller (who keeps their funds) gets a 402.
+export function settleDecision(sdata) {
+  const hasTx = !!(sdata.transaction || sdata.txHash);
+  const confirmed = ['settled', 'success', 'confirmed'].includes(sdata.status);
+  const success = sdata.success === true || sdata.success === 'true';
+  if (hasTx && (success || confirmed)) return 'settled';
+  if (confirmed) return 'settled';
+  if (success) return 'retry';
+  return 'failed';
+}
+
 function paymentRequirements(net, { priceUsdt, resourceUrl, description, inputSchema }) {
   const req = {
     scheme: 'exact',
@@ -206,10 +223,23 @@ export function paid({ priceUsdt, description, inputSchema }) {
     } catch (e) {
       return res.status(502).json({ error: 'settle_unreachable', detail: String(e.message || e) });
     }
-    const sdata = settle.json?.data ?? settle.json ?? {};
-    const settled = sdata.success === true || sdata.success === 'true' || sdata.status === 'settled' || sdata.status === 'success';
-    if (!settled) {
-      return respond402(res, accepts, resourceUrl, `Settlement failed: ${sdata.errorReason || settle.json?.msg || 'unknown'}`);
+    let sdata = settle.json?.data ?? settle.json ?? {};
+    let decision = settleDecision(sdata);
+    // Settle observability (BUG-011 postmortem gap: nothing recorded the facilitator's raw answer,
+    // so the leak was only measurable from the BUYER's ledger). One line per settle, always.
+    console.log(JSON.stringify({ evt: 'settle', network: requirements.network, decision, status: sdata.status ?? null, success: sdata.success ?? null, tx: sdata.transaction || sdata.txHash || null }));
+    if (decision === 'retry') {
+      try {
+        const again = await facilitator(net, '/settle', { x402Version: 2, paymentPayload, paymentRequirements: requirements, syncSettle: true });
+        sdata = again.json?.data ?? again.json ?? {};
+      } catch { /* keep the first response; the decision below rules */ }
+      decision = settleDecision(sdata);
+      console.log(JSON.stringify({ evt: 'settle_retry', network: requirements.network, decision, status: sdata.status ?? null, success: sdata.success ?? null, tx: sdata.transaction || sdata.txHash || null }));
+    }
+    if (decision !== 'settled') {
+      return respond402(res, accepts, resourceUrl, decision === 'retry'
+        ? 'Settlement unconfirmed: the facilitator reported success without a transaction hash twice — the payment was NOT captured and you were not charged; please retry.'
+        : `Settlement failed: ${sdata.errorReason || settle.json?.msg || 'unknown'}`);
     }
 
     try { recordCall(sdata.payer || vdata.payer, (req.path || '').replace(/^\/api\//, '')); } catch { /* instrumentation must never break a paid call */ }

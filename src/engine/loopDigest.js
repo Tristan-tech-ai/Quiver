@@ -85,9 +85,23 @@ export async function loopDigest({ chain, wallet, cursor = null }, deps = data) 
   }
 
   const newCursor = saveSnap(chain, wallet, nowSnap);
+
+  // A zero-row read is a ZERO-INFORMATION read (BUG: buyer desk paid 75x for txsFetched:0 on a
+  // wallet with real on-chain activity). The market API returns the same empty list for "no DEX
+  // fills" and "chain/wallet not indexed" — indistinguishable from here, so it is disclosed and,
+  // under the billing contract (ok:false = not a delivered answer), FREE. Cursor semantics survive.
+  const emptyRead = txs.length === 0
+    ? {
+        ok: false,
+        verdict: 'NO_DATA',
+        coverageNote: `Zero transactions came back for this wallet on ${chain}. This service reads DEX fills indexed by the market API; an empty read can mean EITHER no DEX activity for this wallet OR a chain/wallet the index does not cover — the API does not distinguish, so this call is free. Plain token transfers, x402 payments and CEX orders are NOT DEX fills and will never appear in this digest.`,
+      }
+    : {};
+
   return {
     service: 'loop-digest',
     version: config.version,
+    ...emptyRead,
     chain, wallet,
     cursor: newCursor,
     cursorStatus: cursorKnown ? 'diffed' : cursor ? 'unknown-rebaselined' : 'baseline-stored',

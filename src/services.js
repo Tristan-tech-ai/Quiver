@@ -46,6 +46,35 @@ function vToken(b) {
 }
 function vWallet(b) { return vToken(b); }
 
+// A refusal must TEACH. A caller that reached the wrong service, or whose params were dropped in
+// transit (the marketplace funnel does this), can only self-correct if the rejection says what this
+// service IS and what it expects. Derived from the service's own published inputSchema + blurb, so
+// the hint can never drift from the listing — and so every service gets one without hand-editing 22
+// error strings. Applied only when the validator's own message doesn't already name the service.
+export function inputHint(s) {
+  const sc = s?.inputSchema || {};
+  const props = sc.properties || {};
+  const bits = [];
+  const req = Array.isArray(sc.required) ? sc.required.filter((k) => props[k]) : [];
+  if (req.length) {
+    bits.push(`requires { ${req.map((k) => `"${k}": <${props[k].description || props[k].type || 'value'}>`).join(', ')} }`);
+  }
+  const orKeys = (g) => (Array.isArray(g.anyOf) ? g.anyOf.map((o) => (o.required || []).join('+')).filter(Boolean).join(' OR ') : '');
+  const groups = [...(Array.isArray(sc.allOf) ? sc.allOf : []), ...(sc.anyOf ? [sc] : [])]
+    .map((g) => g.description || orKeys(g)).filter(Boolean);
+  if (groups.length) bits.push(groups.join('; '));
+  if (!bits.length) {
+    const keys = Object.keys(props).slice(0, 6);
+    if (keys.length) bits.push(`accepts { ${keys.join(', ')} }`);
+  }
+  return `${s.name} — ${s.blurb}${bits.length ? '. ' + bits.join(' | ') : ''}`.slice(0, 400);
+}
+
+// The one place that turns a validator's verdict into the message a caller actually reads.
+export function refusalDetail(s, err) {
+  return String(err).includes(s.name) ? String(err) : `${err} | ${inputHint(s)}`;
+}
+
 export const SERVICES = [
   {
     name: 'tape-pulse', path: '/api/tape-pulse', price: config.prices.tapePulse,

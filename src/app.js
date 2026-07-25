@@ -6,7 +6,7 @@ import { config } from './config.js';
 import { paid } from './x402.js';
 import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
-import { SERVICES, byName } from './services.js';
+import { SERVICES, byName, refusalDetail } from './services.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { _internal } from './engine/proof.js';
@@ -179,7 +179,7 @@ app.get('/diag/scan', async (req, res) => {
   const body = { ...req.query };
   if (body.usd) body.usd = Number(body.usd);
   const v = svc.validate(body);
-  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: v.error });
+  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error) });
   try {
     res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` }));
   } catch (e) {
@@ -194,7 +194,7 @@ app.post('/diag/scanpost', async (req, res) => {
   const svc = byName[req.body?.svc];
   if (!svc) return res.status(400).json({ error: 'unknown svc' });
   const v = svc.validate(req.body?.body || {});
-  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: v.error });
+  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error) });
   try { res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` })); }
   catch (e) { res.status(500).json({ svc: svc.name, error: 'engine_error', detail: String(e.message || e).slice(0, 400) }); }
 });
@@ -309,7 +309,7 @@ for (const s of SERVICES) {
   })(async (req) => {
     const raw = (req.body && Object.keys(req.body).length) ? req.body : (req.query || {});
     const v = s.validate(raw);
-    if (v.error) { const err = new Error(`bad_input: ${v.error}`); err.status = 400; throw err; }
+    if (v.error) { const err = new Error(`bad_input: ${refusalDetail(s, v.error)}`); err.status = 400; throw err; }
     req.input = v;
     const ctx = { host: `${req.protocol}://${req.get('host')}` };
     if (s.cacheKey) return cached(s.cacheKey(req.input), s.cacheTtl || config.cacheTtlMs, () => s.run(req.input, ctx));

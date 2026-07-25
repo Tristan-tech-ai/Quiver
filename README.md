@@ -8,6 +8,7 @@ Autonomous trading and wallet agents can pay for a service in-band over HTTP, bu
 - **Technical documentation:** [read online](https://quiver-production-c3a8.up.railway.app/paper) · [PDF (Google Drive)](https://drive.google.com/file/d/1K44jmBBLyFed1qF6Ib62YRh8J-jMQ-xW/view?usp=sharing)
 - **Remote MCP:** `https://quiver-production-c3a8.up.railway.app/mcp` — Streamable HTTP, 9 risk-brain tools, free (fair-use daily quota); callable by any MCP client (Claude, Cursor, …) — on the [official MCP registry](https://registry.modelcontextprotocol.io) as `quiver-risk-brain`
 - **Use it in 5 minutes:** [QUICKSTART.md](QUICKSTART.md) · framework snippets (ElizaOS, LangChain, CrewAI, OpenAI Agents, Vercel AI SDK, Virtuals): [INTEGRATIONS.md](INTEGRATIONS.md)
+- **Service status (independent):** [status page](https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/) — measured from AWS every 2 minutes, deliberately hosted off the service it watches, so the record stays reachable even when the host is not ([JSON](https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/?format=json))
 - **On-chain identity:** ERC-8004 agent `#5152` on X Layer (`eip155:196`)
 - **Payment (dual rail):** x402 v2 `exact` — USD₮0 on X Layer (`eip155:196`, OKX facilitator) **and** USDC on Base (`eip155:8453`, Coinbase CDP facilitator); ~0.005–0.05 per call
 

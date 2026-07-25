@@ -107,7 +107,22 @@ export const SERVICES = [
     blurb: 'Live crypto options intelligence from Deribit: IV term structure, skew, max pain, put/call OI, DVOL regime',
     inputSchema: { type: 'object', required: ['currency'], properties: { currency: { type: 'string', description: 'BTC | ETH | SOL' }, focus: { type: 'string', description: 'all | expiries' } } },
     cacheKey: (b) => `od:${String(b.currency).toUpperCase()}`, cacheTtl: 30000,
-    validate: (b) => { const c = String(b?.currency || 'BTC').toUpperCase(); return ['BTC', 'ETH', 'SOL'].includes(c) ? { currency: c, focus: b?.focus } : { error: 'currency must be BTC, ETH, or SOL' }; },
+    // A REQUIRED subject parameter is never silently defaulted. A call whose params were dropped in
+    // transit (the marketplace funnel does this) would otherwise receive a confident BTC options
+    // dossier for a question it never asked, and be charged for it — indistinguishable, from the
+    // caller's seat, from Quiver answering the wrong question. Refuse instead (free, per the billing
+    // contract) and name the service the caller most likely wanted, so an agent can self-correct.
+    validate: (b) => {
+      const raw = b?.currency;
+      if (raw === undefined || raw === null || String(raw).trim() === '') {
+        return { error: 'currency is required (BTC | ETH | SOL). This endpoint returns crypto OPTIONS analytics only. For a DeFi protocol health check (e.g. aave, lido, gmx) use /api/protocol-pulse; for token safety use /api/token-scan.' };
+      }
+      const c = String(raw).trim().toUpperCase();
+      if (!['BTC', 'ETH', 'SOL'].includes(c)) {
+        return { error: `options-desk covers BTC, ETH and SOL only, not "${String(raw).trim().slice(0, 24)}". If you meant a DeFi protocol health check (e.g. aave, lido, gmx), use /api/protocol-pulse.` };
+      }
+      return { currency: c, focus: b?.focus };
+    },
     run: async (i) => observationEnvelope('options-desk', i, await optionsDesk(i.currency, { focus: i.focus }), config.version),
   },
   {
@@ -185,7 +200,17 @@ export const SERVICES = [
     name: 'updown-pulse', path: '/api/updown-pulse', price: config.prices.upDownPulse,
     blurb: 'Fair-value edge read on the live Polymarket BTC/ETH up-or-down window vs market odds',
     inputSchema: { type: 'object', required: ['coin'], properties: { coin: { type: 'string', description: 'BTC | ETH' } } },
-    validate: (b) => { const c = String(b?.coin || 'BTC').toUpperCase(); return ['BTC', 'ETH'].includes(c) ? { coin: c } : { error: 'coin must be BTC or ETH' }; },
+    validate: (b) => { // same no-silent-default rule as options-desk (see its validate)
+      const raw = b?.coin;
+      if (raw === undefined || raw === null || String(raw).trim() === '') {
+        return { error: 'coin is required (BTC | ETH). This endpoint reads the live Polymarket up-or-down window for BTC/ETH only. For perp liquidation risk use /api/perp-gate; for a DeFi protocol health check use /api/protocol-pulse.' };
+      }
+      const c = String(raw).trim().toUpperCase();
+      if (!['BTC', 'ETH'].includes(c)) {
+        return { error: `updown-pulse covers BTC and ETH only, not "${String(raw).trim().slice(0, 24)}". For perp liquidation risk use /api/perp-gate; for a DeFi protocol health check (e.g. aave) use /api/protocol-pulse.` };
+      }
+      return { coin: c };
+    },
     run: async (i) => observationEnvelope('updown-pulse', i, await upDownPulse(i.coin), config.version),
   },
   {

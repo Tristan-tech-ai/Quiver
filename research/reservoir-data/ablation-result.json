@@ -1,0 +1,29 @@
+{
+  "question": "Does beta-scaling carry the crash flag's discriminative power, or would raw distance-to-liquidation do the same?",
+  "why": "Within a crash, accounts nearer liquidation liquidate. A relative risk reported against an unstated baseline can therefore look impressive while measuring arithmetic. This runs the identical pipeline twice on the same snapshot and victim set, once with the pre-registered crash betas and once with beta forced to 1, with the raw threshold set to the quantile that flags the SAME number of accounts so the two arms are compared at equal flagged-population size.",
+  "method": "reservoir-data/ablation.sql (Jun) and ablation-feb.sql (Feb), DuckDB over the same local parquet snapshots used by h2.sql / h2b.sql",
+  "events": [
+    {
+      "event": "2026-06-03/04 out-of-sample",
+      "accounts": 100034,
+      "flaggedBoth": 43807,
+      "betaThreshold": 13.63,
+      "rawThresholdMatched": 24.33,
+      "betaScaled": { "pctFlaggedWiped": 25.37, "pctClearedWiped": 1.78, "relativeRisk": 14.22 },
+      "rawDistance": { "pctFlaggedWiped": 25.32, "pctClearedWiped": 1.83, "relativeRisk": 13.85 }
+    },
+    {
+      "event": "2026-02-05/06 out-of-sample",
+      "accounts": 66148,
+      "flaggedBoth": 27539,
+      "betaThreshold": 21.88,
+      "rawThresholdMatched": 35.43,
+      "betaScaled": { "pctFlaggedWiped": 43.97, "pctClearedWiped": 3.30, "relativeRisk": 13.30 },
+      "rawDistance": { "pctFlaggedWiped": 43.99, "pctClearedWiped": 3.29, "relativeRisk": 13.36 }
+    }
+  ],
+  "finding": "Beta-scaling adds no measurable discrimination on either event: 14.22 vs 13.85 in June (beta marginally ahead) and 13.30 vs 13.36 in February (raw marginally ahead). The flag's power is carried by distance-to-liquidation itself.",
+  "secondaryFinding": "The threshold is not more transportable in beta units either. Feb/Jun threshold ratio is 1.61 in beta-scaled units against 1.46 in raw units, so a single fixed cutoff travels slightly worse after scaling, not better.",
+  "whatSurvives": "The flag still separates strongly and non-trivially: in June 25.4% of flagged accounts were liquidated against 1.8% of cleared ones, and 74.6% of flagged accounts survived, so the flag is discriminative rather than tautological. What the study validates is that distance-to-liquidation, computed correctly from live venue data with the right maintenance-margin tiers, predicts liquidation in a crash. It does not validate the beta layer.",
+  "consequence": "The paper's headline relative risks stand, but they are now reported against this baseline rather than against an unstated one, and the beta transportability result is no longer presented as carrying the prediction."
+}

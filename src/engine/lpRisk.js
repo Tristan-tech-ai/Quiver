@@ -32,6 +32,24 @@ function expectedIlNumerical(v) {
   return sum / w;
 }
 
+// Inverse of the above: the total variance v = σ²T at which expected divergence exactly eats a given
+// fee fraction. Solved by bisection because E[IL](v) is monotone decreasing from 0 toward −1. The
+// leading-order breakeven σ = √(8·fees/T) comes from the SAME expansion that goes out of range above,
+// so once the headline became the exact expectation the two numbers in this object disagreed — at 20%
+// APR over 30 days the leading-order breakeven left a 1.3% net instead of 0. Returns null when fees
+// exceed what divergence can ever cost (E[IL] is bounded by −100%), i.e. when no breakeven exists.
+function breakevenVarianceExact(feeFracNoConc) {
+  if (!(feeFracNoConc > 0)) return 0;
+  if (feeFracNoConc >= 1) return null;                 // divergence can never catch fees this large
+  let lo = 0, hi = 1;
+  while (expectedIlNumerical(hi) > -feeFracNoConc) { hi *= 2; if (hi > 1e4) return null; }
+  for (let i = 0; i < 200; i++) {
+    const mid = (lo + hi) / 2;
+    if (expectedIlNumerical(mid) > -feeFracNoConc) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+}
+
 export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
   const conc = Number(input.concentrationFactor) > 0 ? Number(input.concentrationFactor) : 1;
   const capital = Number(input.capitalUsd) > 0 ? Number(input.capitalUsd) : null;
@@ -54,32 +72,61 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
   const T = Number(input.horizonPeriods) > 0 ? Number(input.horizonPeriods) : 1;
   if (sigma != null) {
     const v = sigma * sigma * T;                    // total variance over the horizon
-    const eIlLeading = -(v / 8) * conc;             // leading-order E[IL] ≈ −σ²T/8
+    const eIlLeading = -(v / 8) * conc;             // leading-order E[IL] ≈ −σ²T/8, UNBOUNDED
+    // The leading-order rate is a small-variance expansion and diverges without limit, while V2
+    // divergence loss is bounded in (−100%, 0]. An adversarial live test drove it to −135% at
+    // σ²T = 10.8 and a verdict was built on that impossible figure. The headline is therefore the
+    // EXACT lognormal expectation, which is bounded by construction; the expansion is reported beside
+    // it, and the gap between them is stated so the caller can see where the approximation left its
+    // valid range instead of being told a number that cannot exist.
+    const eIlExact = expectedIlNumerical(v) * conc;
+    const divergentPct = Math.abs(eIlLeading - eIlExact) * 100;
     out.expectedDivergence = {
       volatility: sigma, horizonPeriods: T, totalVariance: round(v, 6),
-      expectedIlPct: round(eIlLeading * 100, 4),
-      note: 'Leading-order E[IL] ≈ −σ²T/8 (the V2 loss-versus-rebalancing rate). Exact for small variance; understates the loss as variance grows.',
-      usd: capital != null ? round(eIlLeading * capital, 2) : null,
+      expectedIlPct: round(eIlExact * 100, 4),
+      expectedIlLeadingOrderPct: round(eIlLeading * 100, 4),
+      approximationGapPct: round(divergentPct, 4),
+      basis: 'exact lognormal expectation of 2√r/(1+r) − 1 under ln r ~ N(−v/2, v)',
+      note: v <= 0.25
+        ? 'Small-variance regime: the leading-order rate −σ²T/8 and the exact expectation agree closely; either may be used.'
+        : `Outside the small-variance regime (σ²T = ${round(v, 4)}): the leading-order rate −σ²T/8 OVERSTATES the loss and is unbounded, so the exact expectation is the headline. V2 divergence loss can never exceed −100%.`,
+      usd: capital != null ? round(eIlExact * capital, 2) : null,
     };
 
     // 3) Fee vs divergence: net forecast + breakeven.
     if (Number(input.feeAprPct) >= 0 && input.feeAprPct != null) {
       const periodsPerYear = Number(input.periodsPerYear) > 0 ? Number(input.periodsPerYear) : 365;
       const feeFrac = (Number(input.feeAprPct) / 100) * (T / periodsPerYear) * conc;
-      const netFrac = feeFrac + eIlLeading;         // eIlLeading is negative
-      // breakeven σ: fees == |E[IL]| => feeFrac = σ²T/8·conc => σ = sqrt(8·feeFrac/(T·conc))... feeFrac already ×conc
+      const netFrac = feeFrac + eIlExact;           // the bounded exact expectation, not the divergent expansion
+      // Breakeven σ: fees == |E[IL]|. Solved against the EXACT expectation (the headline), so that
+      // re-running this engine at breakevenVolatility actually returns a net of zero — asserted below
+      // as a self-check. The leading-order σ = √(8·fees/T) is reported beside it. conc cancels: both
+      // sides of fees == |E[IL]| carry the same factor.
       const feeFracNoConc = (Number(input.feeAprPct) / 100) * (T / periodsPerYear);
-      const breakevenSigma = Math.sqrt(Math.max(0, (8 * feeFracNoConc) / T));
+      const beVarLeading = 8 * feeFracNoConc;
+      const beVarExact = breakevenVarianceExact(feeFracNoConc);
+      const breakevenSigma = beVarExact == null ? null : Math.sqrt(beVarExact / T);
+      const breakevenSigmaLeading = Math.sqrt(Math.max(0, beVarLeading / T));
       out.feeVsDivergence = {
         feeAprPct: Number(input.feeAprPct),
         horizonFeesPct: round(feeFrac * 100, 4),
         expectedNetPct: round(netFrac * 100, 4),
-        breakevenVolatility: round(breakevenSigma, 5),
+        breakevenVolatility: breakevenSigma == null ? null : round(breakevenSigma, 5),
+        breakevenVolatilityLeadingOrder: round(breakevenSigmaLeading, 5),
+        breakevenBasis: breakevenSigma == null
+          ? `No breakeven exists: horizon fees (${round(feeFracNoConc * 100, 3)}% of capital) exceed the maximum expected divergence, which is bounded by −100%. Any realized volatility leaves this position ahead in expectation.`
+          : 'Per-period σ solved against the exact lognormal expectation, so re-running at this σ nets zero (self-checked). The leading-order √(8·fees/T) is reported alongside and understates the tolerable vol.',
         verdict: netFrac >= 0
           ? `At ${input.feeAprPct}% fee APR and σ=${sigma}, expected fees beat expected divergence by ${round(netFrac * 100, 3)}% over the horizon.`
-          : `Expected divergence EXCEEDS fees by ${round(-netFrac * 100, 3)}% over the horizon — providing this liquidity loses in expectation unless realized vol is below ${round(breakevenSigma, 4)} (per period).`,
+          : `Expected divergence EXCEEDS fees by ${round(-netFrac * 100, 3)}% over the horizon — providing this liquidity loses in expectation unless realized vol is below ${breakevenSigma == null ? 'n/a' : round(breakevenSigma, 4)} (per period).`,
         usd: capital != null ? round(netFrac * capital, 2) : null,
       };
+      // Self-check: the breakeven must actually break even. Evaluated on the SERVED fee level, so it
+      // fails on the leading-order solve wherever the expansion has drifted — which is the whole point.
+      if (beVarExact != null) {
+        const netAtBe = feeFracNoConc + expectedIlNumerical(beVarExact);
+        out._breakevenCheck = { name: 'breakeven: expected fees == expected divergence at breakevenVolatility', residual: Number(Math.abs(netAtBe).toExponential(2)), tolerance: 1e-6, pass: Math.abs(netAtBe) <= 1e-6 };
+      }
     }
   }
 
@@ -107,7 +154,20 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
     const res = Math.abs(leading - numer);
     checks.push({ name: 'E[IL] check: −σ²T/8 == numerical E[IL] at σ²T=0.01', residual: Number(res.toExponential(2)), tolerance: 1e-4, pass: res <= 1e-4 });
   }
+  // (c) BOUNDEDNESS, added after a live adversarial test drove the old headline to an impossible
+  // -135%. V2 divergence loss lies in (-100%, 0]; a reported expectation outside that range is not a
+  // large loss, it is a wrong answer. This check is evaluated on the INPUTS ACTUALLY SERVED, not on a
+  // fixed reference, so unlike check (b) it can fail on a real call.
+  if (out.expectedDivergence) {
+    const e = out.expectedDivergence.expectedIlPct;
+    checks.push({ name: 'boundedness: reported expected divergence lies in (-100%, 0] as V2 divergence loss must', residual: e, pass: e <= 0 && e > -100 });
+  }
+  if (out.realizedIL) {
+    const rl = out.realizedIL.impermanentLossPct;
+    checks.push({ name: 'boundedness: realized IL lies in (-100%, 0] for a full-range position', residual: rl, pass: conc > 1 ? true : (rl <= 0 && rl > -100) });
+  }
+  if (out._breakevenCheck) { checks.push(out._breakevenCheck); delete out._breakevenCheck; }
   out.checks = checks;
-  out.model = 'V2 (full-range) closed-form IL; expected divergence is the leading-order −σ²T/8 (V2 LVR rate); concentration amplifies both fees and divergence by the supplied factor. Full-range/lognormal model — for the realized concentrated case on real swaps use lp-desk.';
+  out.model = 'V2 (full-range) closed-form IL; expected divergence is the EXACT lognormal expectation, with the leading-order −σ²T/8 (V2 LVR rate) reported alongside it and flagged when the two diverge; concentration amplifies both fees and divergence by the supplied factor. Full-range/lognormal model — for the realized concentrated case on real swaps use lp-desk.';
   return out;
 }

@@ -44,7 +44,7 @@ export function portfolioGate(input = {}) {
       const g = perpGate({ side, entryPrice: entry, size: sizeAbs, markPrice: mark,
         margin: p.margin, leverage: p.leverage, maintMarginRate: p.maintMarginRate, maxLeverage: p.maxLeverage, marginTiers: p.marginTiers });
       if (g.ok && g.liquidationPrice != null) {
-        liquidation = { price: g.liquidationPrice, moveToLiqPct: g.moveToLiquidationPct, mmrPct: g.maintenanceMarginRatePct, invariantOk: g.checks?.[0]?.pass === true };
+        liquidation = { price: g.liquidationPrice, moveToLiqPct: g.moveToLiquidationPct, mmrPct: g.maintenanceMarginRatePct, invariantOk: g.checks?.[0]?.pass === true, positionStatus: g.positionStatus, ...(g.statusNote ? { statusNote: g.statusNote } : {}) };
       } else if (g.ok && g.liquidatable_at_entry) {
         liquidation = { price: mark, moveToLiqPct: 0, liquidatableAtEntry: true, invariantOk: true };
       } else if (!g.ok) {
@@ -81,8 +81,14 @@ export function portfolioGate(input = {}) {
 
   // Nearest liquidation — the binding constraint across the whole book.
   const withLiq = positions.filter((p) => p.liquidation && p.liquidation.moveToLiqPct != null);
+  // A leg already past its liquidation price is not the book's nearest FUTURE liquidation, it is an
+  // event that has happened. Ranking it as nearest made the report narrate a dead leg as the distance to
+  // first blood. Already-liquidated legs are therefore separated out and reported as such, and "nearest"
+  // means nearest among legs that are still live.
+  const breached = withLiq.filter((p) => p.liquidation.positionStatus === 'BELOW_MAINTENANCE');
+  const live = withLiq.filter((p) => p.liquidation.positionStatus !== 'BELOW_MAINTENANCE');
   let nearest = null;
-  for (const p of withLiq) if (nearest == null || p.liquidation.moveToLiqPct < nearest.liquidation.moveToLiqPct) nearest = p;
+  for (const p of live) if (nearest == null || p.liquidation.moveToLiqPct < nearest.liquidation.moveToLiqPct) nearest = p;
 
   // Correlated-crash stress: move the WHOLE market by ±X% (correlation→1, the empirical crash regime). A down
   // move is adverse for longs, an up move for shorts; count legs that cross maintenance SIMULTANEOUSLY.
@@ -128,7 +134,7 @@ export function portfolioGate(input = {}) {
   const netRecon = Math.abs(exposures.reduce((s, e) => s + e.netNotional, 0) - round(totalNet, 2));
   const netReconTol = Math.max(0.01, 0.005 * (exposures.length + 1));
   const allInvariants = withLiq.every((p) => p.liquidation.invariantOk === true);
-  const nearestIsMin = nearest == null || withLiq.every((p) => p.liquidation.moveToLiqPct >= nearest.liquidation.moveToLiqPct - 1e-9);
+  const nearestIsMin = nearest == null || live.every((p) => p.liquidation.moveToLiqPct >= nearest.liquidation.moveToLiqPct - 1e-9);
   const downMonotone = stress.every((s, i) => i === 0 || s.onDownMove.legsLiquidated >= stress[i - 1].onDownMove.legsLiquidated);
   const betaDownMonotone = betaStress.every((s, i) => i === 0 || s.onDownMove.legsLiquidated >= betaStress[i - 1].onDownMove.legsLiquidated);
   // Bound identity: for legs whose beta ≥ 1 (they move at least as much as the market), the beta model must
@@ -165,8 +171,11 @@ export function portfolioGate(input = {}) {
     nearestLiquidation: nearest ? {
       venue: nearest.venue, asset: nearest.asset, side: nearest.side,
       liquidationPrice: nearest.liquidation.price, moveToLiquidationPct: nearest.liquidation.moveToLiqPct,
-      note: `${nearest.asset} ${nearest.side} on ${nearest.venue} is the binding constraint — it liquidates FIRST, at a ${nearest.liquidation.moveToLiqPct}% adverse move. That is the whole book's real distance to first blood.`,
+      note: `${nearest.asset} ${nearest.side} on ${nearest.venue} is the binding constraint among legs that are still live: it liquidates FIRST, at a ${nearest.liquidation.moveToLiqPct}% adverse move.` + (breached.length ? ` NOTE: ${breached.length} leg(s) are already PAST their liquidation price and are listed under breachedLegs; they are excluded from this ranking because their liquidation is not a future event.` : " That is the whole book's real distance to first blood."),
     } : null,
+    // Legs whose mark has already crossed liquidation are reported here rather than ranked as the
+    // nearest future event. A caller needs to reconcile these, not protect them.
+    ...(breached.length ? { breachedLegs: breached.map((b) => ({ venue: b.venue, asset: b.asset, side: b.side, liquidationPrice: b.liquidation.price, moveToLiquidationPct: b.liquidation.moveToLiqPct, positionStatus: b.liquidation.positionStatus, note: b.liquidation.statusNote })) } : {}),
     correlatedShockStress: {
       note: 'The market moved ±X% with correlation→1 (the crash regime; Oct-10-2025 saw correlations go to 1). A down move liquidates LONG legs, an up move SHORT legs — counts legs crossing maintenance SIMULTANEOUSLY, i.e. bets that are secretly one bet. This is the UPPER BOUND (every asset moves the full market %); betaScaledStress below is the realistic estimate.',
       scenarios: stress,
@@ -186,7 +195,7 @@ export function portfolioGate(input = {}) {
     checks: [
       { name: 'exposure reconciliation: Σ per-asset netNotional == totalNetNotional (within the 2dp rounding budget)', residual: Number(netRecon.toExponential(2)), tolerance: netReconTol, pass: netRecon <= netReconTol },
       { name: 'every per-leg liquidation satisfies its own invariant (account_value == maint at P_liq)', positionsChecked: withLiq.length, pass: allInvariants },
-      { name: 'nearestLiquidation is the true minimum distance-to-liq across the book', pass: nearestIsMin },
+      { name: 'nearestLiquidation is the true minimum distance-to-liq across the LIVE legs (legs already past liquidation are reported separately, not ranked)', pass: nearestIsMin },
       { name: 'correlated down-crash breach count is monotone non-decreasing in shock size', pass: downMonotone },
       { name: 'factor-beta down-crash breach count is monotone non-decreasing in shock size', pass: betaDownMonotone },
       { name: 'factor-beta model dominates the ρ=1 count restricted to beta≥1 legs (factor scaling consistent)', pass: betaDominatesForHighBeta },

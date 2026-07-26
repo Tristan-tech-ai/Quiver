@@ -61,7 +61,7 @@ The batch attestation (`risk-attest`) is signed EIP-712 and EAS-ready, so a sing
 ```bash
 npm install
 cp .env.example .env    # fill in OKX dev-portal (+ optional Coinbase CDP for the Base rail) credentials
-npm test                # 257 model-free tests (put-call parity, no-lookahead, martingale, greek finite-difference, liquidation invariant, …) + 5 live-archive tests behind an RPC flag
+npm test                # 270 model-free tests (put-call parity, no-lookahead, martingale, greek finite-difference, liquidation invariant, …) + 5 live-archive tests behind an RPC flag
 npm start               # serves on the configured port
 ```
 

@@ -5,16 +5,31 @@
 //
 // GROUND TRUTH & SELF-CHECKS (the discipline): a Merkle proof must be COMPLETE (every real leaf verifies
 // against the root) and SOUND (a non-member leaf must NOT verify). Both are asserted on every call — if the
-// tree/proof code were wrong, one of them fails loudly. sha256, sorted-pair (OpenZeppelin-compatible), so
+// tree/proof code were wrong, one of them fails loudly. sha256 over packed 32-byte words, sorted pairs, with domain-separated leaves and nodes, so
 // verification is order-independent and re-implementable by any counterparty.
 import { createHash } from 'node:crypto';
 import { signEip712, verifyEip712, _internal } from './proof.js';
 
 const sha256 = (s) => createHash('sha256').update(s).digest('hex');
-const hashPair = (a, b) => sha256(a <= b ? a + b : b + a); // sorted -> order-independent
 
-function buildTree(leaves) {
-  const layers = [leaves.slice()];
+// Hashing over PACKED 32-BYTE WORDS, not over hex text. An adversarial live test showed the earlier
+// version folded ASCII hex strings, which makes a proof unverifiable by any on-chain verifier that
+// hashes bytes — the arithmetic was self-consistent and useless to the one consumer that matters.
+const bytes = (hex) => Buffer.from(hex, 'hex');
+
+// DOMAIN SEPARATION. Leaves are tagged 0x00 and internal nodes 0x01, so an internal node cannot be
+// presented as a member leaf. Without it, any node in the tree verifies against the root with a
+// one-element proof — a soundness break in the only service whose purpose is proving membership.
+const LEAF_TAG = Buffer.from([0x00]);
+const NODE_TAG = Buffer.from([0x01]);
+const hashLeaf = (hex) => sha256(Buffer.concat([LEAF_TAG, bytes(hex)]));
+const hashPair = (a, b) => {
+  const [lo, hi] = a <= b ? [a, b] : [b, a]; // sorted -> order-independent, as on-chain verifiers expect
+  return sha256(Buffer.concat([NODE_TAG, bytes(lo), bytes(hi)]));
+};
+
+function buildTree(leafHashes) {
+  const layers = [leafHashes.slice()];
   while (layers[layers.length - 1].length > 1) {
     const prev = layers[layers.length - 1];
     const next = [];
@@ -38,10 +53,12 @@ function proofFor(layers, index) {
   return proof;
 }
 
+// `leaf` is the raw contentHash (hex, no 0x). It is tagged as a leaf before folding, which is what
+// makes an internal node fail here instead of verifying.
 export function verifyInclusion(leaf, proof, root) {
-  let h = leaf;
-  for (const sib of proof) h = hashPair(h, sib);
-  return h === root;
+  let h = hashLeaf(String(leaf).replace(/^0x/, '').toLowerCase());
+  for (const sib of proof) h = hashPair(h, String(sib).replace(/^0x/, '').toLowerCase());
+  return h === String(root).replace(/^0x/, '').toLowerCase();
 }
 
 const normalizeHash = (h) => (typeof h === 'string' ? h.replace(/^0x/, '').toLowerCase() : null);
@@ -57,13 +74,21 @@ export function riskAttest(input = {}) {
   // A duplicate leaf is almost always a mistake (two identical computations attested twice) — disclose it.
   const dupes = leaves.length - new Set(leaves).size;
 
-  const { root, layers } = buildTree(leaves);
+  // The tree is built over TAGGED leaves; `leaves` stays the caller's content-hashes so proofs and
+  // attestations are reported in the caller's own terms.
+  const { root, layers } = buildTree(leaves.map(hashLeaf));
   const attestations = leaves.map((leaf, i) => ({ index: i, leaf, proof: proofFor(layers, i) }));
 
-  // Self-checks: completeness (all verify) + soundness (a fabricated non-member does not).
+  // Self-checks: completeness, plus TWO soundness checks. The first (a random non-member) is the easy
+  // one and cannot catch a structural break. The second presents an INTERNAL NODE as a member leaf —
+  // the attack that actually worked against the pre-fix tree — so this check can fail in the direction
+  // that matters. A verifier that cannot fail is the failure mode this whole service exists to avoid.
   const allVerify = attestations.every((a) => verifyInclusion(a.leaf, a.proof, root));
   const nonMember = sha256(leaves[0] + '::not-a-member');
   const soundness = !verifyInclusion(nonMember, attestations[0].proof, root);
+  const internalNode = layers.length > 2 ? layers[1][0] : null; // a real node, one level above the leaves
+  const nodeSibling = layers.length > 2 && layers[1].length > 1 ? [layers[1][1]] : [];
+  const soundnessNode = internalNode === null ? true : !verifyInclusion(internalNode, nodeSibling, root);
 
   // EIP-712 typed attestation over the root — EAS-ready (parseable NAMED fields, not an opaque hash). When a
   // signing key is configured this is a standards-based attestation any wallet/contract/EAS can read; the
@@ -89,17 +114,18 @@ export function riskAttest(input = {}) {
     merkleRoot: '0x' + root,
     leafCount: leaves.length,
     duplicateLeaves: dupes,
-    algorithm: 'sha256, sorted-pair binary Merkle (OpenZeppelin-compatible)',
+    algorithm: 'sha256 over PACKED 32-byte words, sorted pairs, domain-separated: leaf = sha256(0x00 || contentHash), node = sha256(0x01 || min(a,b) || max(a,b)). NOT OpenZeppelin MerkleProof-compatible, which folds keccak256 without a domain tag — an on-chain verifier for this tree is a short loop using the sha256 precompile (address 0x02), given below.',
     attestations: attestations.map((a) => ({ index: a.index, contentHash: '0x' + a.leaf, proof: a.proof.map((p) => '0x' + p) })),
     anchor: {
       instruction: `Anchor merkleRoot on-chain in one transaction from your wallet to attest all ${leaves.length} computations at once. Publish the root; anyone then verifies a computation was attested by checking its inclusion proof against the anchored root — no trust in Quiver.`,
       note: 'The on-chain write is yours (Quiver never holds your keys). This service prepares the root and proofs; it does not broadcast.',
     },
-    verify: 'For a computation with contentHash L and its proof P: fold sha256(sorted(h, sibling)) up P; the result equals merkleRoot iff L was in the attested batch.',
+    verify: 'For contentHash L (32 bytes) and proof P: h = sha256(0x00 || L); then for each sibling s in P, h = sha256(0x01 || min(h,s) || max(h,s)) comparing as byte strings; h equals merkleRoot iff L was in the batch. Solidity: bytes32 h = sha256(abi.encodePacked(bytes1(0x00), leaf)); for (uint i; i < p.length; ++i) { h = h <= p[i] ? sha256(abi.encodePacked(bytes1(0x01), h, p[i])) : sha256(abi.encodePacked(bytes1(0x01), p[i], h)); } return h == root;',
     ...(easAttestation ? { easAttestation } : {}),
     checks: [
       { name: 'completeness: every leaf verifies against the root', pass: allVerify },
       { name: 'soundness: a fabricated non-member leaf does NOT verify', pass: soundness },
+      { name: 'soundness: an INTERNAL NODE presented as a member leaf does NOT verify (domain separation holds)', pass: soundnessNode },
       ...(easAttestation ? [{ name: 'EIP-712 attestation signature recovers to the Quiver signer', pass: easVerifyOk === true }] : []),
     ],
   };

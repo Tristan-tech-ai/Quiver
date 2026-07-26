@@ -28,6 +28,8 @@ test('risk-attest: the EIP-712 attestation is deterministic (same batch → same
 
 test('risk-attest: all self-checks pass including the EIP-712 signature recovery check', () => {
   const r = riskAttest({ contentHashes: hashes });
-  assert.equal(r.checks.length, 3);
+  // 4, not 3: completeness, non-member soundness, INTERNAL-NODE soundness (added after a live test
+  // showed an internal node verifying as a member leaf), and the EIP-712 recovery check.
+  assert.equal(r.checks.length, 4);
   assert.ok(r.checks.every((c) => c.pass));
 });

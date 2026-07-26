@@ -127,6 +127,15 @@ export function perpGate(p = {}, { eps = 1e-6 } = {}) {
     inputs: { side: s === 1 ? 'long' : 'short', entryPrice: P0, size: round(q, 8), notionalEntry: round(notionalEntry, 2), margin: round(M, 2), maintMarginRate: mmr, markPrice: ref },
     liquidationPrice: round(pLiq, 2),
     moveToLiquidationPct: round(moveToLiqPct, 3),
+    // A negative distance is not a small distance: the mark has already passed the liquidation price,
+    // so the event the number describes is in the past. An adversarial live test found this reported as
+    // a plain negative percentage with no flag, which portfolio-gate then narrated as the book's nearest
+    // FUTURE liquidation. Naming the state explicitly is the difference between a caller de-risking a
+    // live position and a caller acting on one that is already gone.
+    positionStatus: moveToLiqPct < 0 ? 'BELOW_MAINTENANCE' : 'ABOVE_MAINTENANCE',
+    ...(moveToLiqPct < 0 ? {
+      statusNote: `The mark (${round(ref, 2)}) is already beyond the liquidation price (${round(pLiq, 2)}). moveToLiquidationPct is negative because the threshold has been crossed, not because liquidation is near: on the venue this position is at or past liquidation now. Treat it as a position to reconcile, not one to protect.`,
+    } : {}),
     effectiveLeverage: round(effLeverage, 2),
     initialMarginRatePct: round(initialMarginRate * 100, 3),
     maintenanceMarginRatePct: round(mmr * 100, 3),

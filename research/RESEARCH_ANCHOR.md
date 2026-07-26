@@ -2,17 +2,23 @@
 
 The crash study in Section 6 of the technical documentation rests on the files below. This manifest exists so a reader can establish two things without our cooperation.
 
-**First, that these files have not changed.** Recompute the SHA-256 of each file in a clone of this repository and compare against the table. Every hash must match. Feeding those fourteen hashes, in the order listed, to Quiver's own `risk-attest` service (or any Merkle implementation using the same ordering) must reproduce this root:
+**First, that these files have not changed.** Recompute the SHA-256 of each file in a clone of this repository and compare against the table. Every hash must match. Feeding those fourteen hashes, in the order listed, to Quiver's own `risk-attest` service (or any Merkle implementation using the same ordering and the same leaf/node tagging) must reproduce this root:
 
 ```
-merkleRoot     0x5f9da9985453d65dc30c2d94c20d3313b9138bb8386c9c57bef83c23cf3a8369
+merkleRoot     0x79965facc7f122e2a48bf0f39be79c2e1375d24e9915bfa163f54e49d34ab0d5
 itemCount      14
-engineVersion  q1-bce7e7bccb16ea1b
+engineVersion  q1-9b8581c13825e94b
 ```
 
 **Second, what this does and does not prove.** It proves the bytes are unchanged relative to this published manifest, which is itself timestamped by this repository's commit history. It does **not** prove those files existed on the dates the study reports. A hash published today cannot back-date itself, and no wording in the paper claims otherwise.
 
 What supports the pre-registration claim is narrower, and should be read as narrow: the calibration file contains only 2025 stress episodes; the decision thresholds appear in `h2.sql` and `h2b.sql` as literal constants rather than as anything fitted at query time; and the commit history shows the order in which those files appeared. All three are author-controlled. A reader who wants the strong form of this guarantee should want an anchor made *before* the results existed. We did not make one, and it cannot be obtained retroactively.
+
+## The root changed on 26 July 2026, and the reason matters
+
+An earlier version of this file published the root `0x5f9da9985453d65dc30c2d94c20d3313b9138bb8386c9c57bef83c23cf3a8369` over these same fourteen files. That root was produced by a defective `risk-attest`: it folded the hashes as ASCII hex **text** rather than as packed 32-byte words, and it did not domain-separate leaves from internal nodes, so an internal node of the tree verified against the root as though it were a member. An adversarial reviewer with live access found both. The engine was fixed (build `q1-bce7e7bccb16ea1b` → `q1-9b8581c13825e94b`), a soundness self-check that presents an internal node as a leaf now runs on every call, and the root over the same fourteen files is therefore different.
+
+**The per-file SHA-256 hashes in the table below are unchanged** — compare them against the earlier revision of this file in the commit history. That is the part that actually pins the research artifacts, and it did not move. What moved is the way those fourteen hashes are combined into one, which is a property of the tree, not of the files. If you are checking whether the study's inputs were edited, check the fourteen file hashes; the root is a convenience for checking all of them at once.
 
 ## Files
 
@@ -54,7 +60,7 @@ sha256sum \
   research/reservoir-data/ablation-result.json
 ```
 
-Then batch those hashes through `POST /api/risk-attest` with `{ "contentHashes": [ ... ] }` in the order above, and compare `merkleRoot`.
+Then batch those hashes through `POST /api/risk-attest` with `{ "contentHashes": [ ... ] }` in the order above, and compare `merkleRoot`. The service also returns the tagging rule and a Solidity verifier for the tree, so the root can be recomputed without calling us at all: leaf = `sha256(0x00 || fileHash)`, node = `sha256(0x01 || min(a,b) || max(a,b))` over packed bytes, pairing left to right and promoting an odd trailing node.
 
 ## On-chain anchor
 

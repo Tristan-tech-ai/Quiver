@@ -7,7 +7,7 @@ The crash study in Section 6 of the technical documentation rests on the files b
 ```
 merkleRoot     0x79965facc7f122e2a48bf0f39be79c2e1375d24e9915bfa163f54e49d34ab0d5
 itemCount      14
-engineVersion  q1-9b8581c13825e94b
+engineVersion  q1-68fae54ea919492c
 ```
 
 **Second, what this does and does not prove.** It proves the bytes are unchanged relative to this published manifest, which is itself timestamped by this repository's commit history. It does **not** prove those files existed on the dates the study reports. A hash published today cannot back-date itself, and no wording in the paper claims otherwise.
@@ -16,7 +16,7 @@ What supports the pre-registration claim is narrower, and should be read as narr
 
 ## The root changed on 26 July 2026, and the reason matters
 
-An earlier version of this file published the root `0x5f9da9985453d65dc30c2d94c20d3313b9138bb8386c9c57bef83c23cf3a8369` over these same fourteen files. That root was produced by a defective `risk-attest`: it folded the hashes as ASCII hex **text** rather than as packed 32-byte words, and it did not domain-separate leaves from internal nodes, so an internal node of the tree verified against the root as though it were a member. An adversarial reviewer with live access found both. The engine was fixed (build `q1-bce7e7bccb16ea1b` → `q1-9b8581c13825e94b`), a soundness self-check that presents an internal node as a leaf now runs on every call, and the root over the same fourteen files is therefore different.
+An earlier version of this file published the root `0x5f9da9985453d65dc30c2d94c20d3313b9138bb8386c9c57bef83c23cf3a8369` over these same fourteen files. That root was produced by a defective `risk-attest`: it folded the hashes as ASCII hex **text** rather than as packed 32-byte words, and it did not domain-separate leaves from internal nodes, so an internal node of the tree verified against the root as though it were a member. An adversarial reviewer with live access found both. The engine was fixed (build `q1-bce7e7bccb16ea1b` → `q1-68fae54ea919492c`), a soundness self-check that presents an internal node as a leaf now runs on every call, and the root over the same fourteen files is therefore different.
 
 **The per-file SHA-256 hashes in the table below are unchanged** — compare them against the earlier revision of this file in the commit history. That is the part that actually pins the research artifacts, and it did not move. What moved is the way those fourteen hashes are combined into one, which is a property of the tree, not of the files. If you are checking whether the study's inputs were edited, check the fourteen file hashes; the root is a convenience for checking all of them at once.
 

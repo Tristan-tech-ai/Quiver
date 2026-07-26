@@ -86,8 +86,18 @@ export async function chartPress(chain, address, opts = {}, deps = data) {
     }
     symbol = symbol || price.tokenSymbol || 'TOKEN';
   }
-  const spot = num(price.price) ?? bars[bars.length - 1].c;
-  const change24h = num(price.priceChange24H) ?? (((bars[bars.length - 1].c - bars[0].o) / bars[0].o) * 100);
+  // The token price feed and the candle series are two different measurements of the same market, and
+  // they disagree by a few basis points because the feed is a live quote while the last candle is a
+  // closed bar. Prefer the feed (it is fresher), fall back to the last drawn close, and RECORD WHICH —
+  // the provenance used to claim every fact came from the drawn series, which was false for exactly
+  // these two fields, so a reader comparing priceUsd against the price label on the image found a
+  // mismatch the response denied was possible.
+  const spotFeed = num(price.price);
+  const spot = spotFeed ?? bars[bars.length - 1].c;
+  const priceSource = spotFeed != null ? 'token-price-feed (live quote)' : 'last drawn candle close';
+  const change24hFeed = num(price.priceChange24H);
+  const change24h = change24hFeed ?? (((bars[bars.length - 1].c - bars[0].o) / bars[0].o) * 100);
+  const change24hSource = change24hFeed != null ? 'token-price-feed (live quote)' : 'first-to-last drawn candle';
 
   // Tier selection: opt-in FULL, or auto-escalate if a requested indicator is not SSR-supported.
   // SVG output forces the fast tier (the browser tier is a raster screenshot by construction).
@@ -115,6 +125,8 @@ export async function chartPress(chain, address, opts = {}, deps = data) {
   const id = putCard(isSvg ? Buffer.from(out, 'utf8') : out, isSvg ? 'image/svg+xml' : 'image/png');
   const facts = {
     symbol, priceUsd: spot ? Number(spot.toPrecision(6)) : null,
+    priceSource, change24hSource,
+    lastDrawnCandleClose: round(bars[bars.length - 1].c, 8),
     change24hPct: round(change24h, 2),
     volume24hUsd: round(num(price.volume24H)), liquidityUsd: round(num(price.liquidity)), holders: num(price.holders),
     interval, bars: bars.length, chartType, logScale,
@@ -138,16 +150,16 @@ export async function chartPress(chain, address, opts = {}, deps = data) {
     provenance: isCex
       ? {
           source: `OKX public CEX candles for ${cexInstId}, ${interval} interval (bar ${cexMarket.mapBar(interval)}), ${bars.length} bars.`,
-          reconciledTo: 'The facts block (price, 24h change, high, low) is computed from the SAME candle series drawn on the image — the numbers cannot drift from the picture.',
+          reconciledTo: 'The facts block (price, 24h change, high, low) is computed from the SAME candle series drawn on the image — the numbers cannot drift from the picture. On this CEX path there is no separate price feed, so facts.priceUsd IS the last drawn candle close; facts.priceSource states that explicitly.',
           reCheck: `Independently verify: GET https://www.okx.com/api/v5/market/candles?instId=${cexInstId}&bar=${cexMarket.mapBar(interval)} and compare OHLC to the plotted candles and the facts block.`,
         }
       : {
           source: `OKX DEX market data (candles + price-info) for ${address} on ${chain}, ${interval} interval, ${bars.length} bars.`,
-          reconciledTo: 'The facts block (price, 24h change, volume, high, low) is computed from the SAME candle series drawn on the image — the numbers cannot drift from the picture.',
+          reconciledTo: `facts.high and facts.low are computed from the SAME candle series drawn on the image, so they cannot drift from the picture. facts.priceUsd and facts.change24hPct come from ${priceSource === 'token-price-feed (live quote)' ? 'the token price feed, NOT from the drawn candles' : 'the drawn candles (the price feed did not answer)'} — facts.priceSource and facts.change24hSource say which on every response, and facts.lastDrawnCandleClose gives the number the image labels, so the two can be compared instead of assumed equal. A few basis points between a live quote and a closed bar is the feed being fresher than the last candle, not a disagreement.`,
           reCheck: `Independently verify: fetch the OKX DEX candles for this token at ${interval} and compare OHLC/volume to the plotted candles and the facts block.`,
         },
     suggestedAlt: `$${symbol} ${facts.change24hPct >= 0 ? '+' : ''}${facts.change24hPct}% (24h) on the ${interval} chart`,
-    method: 'Two-tier server-side chart rendering: a fast browserless engine with an opt-in high-detail browser tier that falls back to fast on any failure. Chart types: candles, heikin (Heikin-Ashi), line, area, renko; optional log price scale. Drawings: hline, vline, area, rectangle, trendline, ray, channel, fib (retracement/extension), measured-move, text/arrow, longshort (entry/stop/target R:R position box), orderline (side-labeled order level). Indicators include Ichimoku (hand-rolled, explicitly aligned: spans displaced +26, chikou −26; forward cloud beyond the last bar is not drawn). Output: png (width/height/scale up to 3x) or svg (fast tier only); axis labels in any IANA timezone (invalid tz falls back to UTC, disclosed in facts.timezone). Indicators are always computed on the real time bars; only the price glyph changes. The facts block mirrors the exact numbers on the image.',
+    method: 'Two-tier server-side chart rendering: a fast browserless engine with an opt-in high-detail browser tier that falls back to fast on any failure. Chart types: candles, heikin (Heikin-Ashi), line, area, renko; optional log price scale. Drawings: hline, vline, area, rectangle, trendline, ray, channel, fib (retracement/extension), measured-move, text/arrow, longshort (entry/stop/target R:R position box), orderline (side-labeled order level). Indicators include Ichimoku (hand-rolled, explicitly aligned: spans displaced +26, chikou −26; forward cloud beyond the last bar is not drawn). Output: png (width/height/scale up to 3x) or svg (fast tier only); axis labels in any IANA timezone (invalid tz falls back to UTC, disclosed in facts.timezone). Indicators are always computed on the real time bars; only the price glyph changes. facts.high/low are computed from the drawn series; facts.priceUsd and facts.change24hPct may instead come from the live token price feed, and facts.priceSource / facts.change24hSource / facts.lastDrawnCandleClose let a reader tell which and compare.',
     elapsedMs: Date.now() - t0,
   };
 }

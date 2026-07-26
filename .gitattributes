@@ -15,6 +15,10 @@
 *.yml   text eol=lf
 *.yaml  text eol=lf
 *.sh    text eol=lf
+# .sql is in the research manifest whose hashes a reader recomputes from a clone. It was relying on
+# `text=auto` sniffing, and one query file sat in the worktree with a stray CRLF while git stored LF —
+# invisible to `git status`, which compares post-normalisation, and fatal to a published sha256.
+*.sql   text eol=lf
 
 # Binary assets — never normalize.
 *.png  binary

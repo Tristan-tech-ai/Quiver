@@ -5,7 +5,7 @@ The crash study in Section 6 of the technical documentation rests on the files b
 **First, that these files have not changed.** Recompute the SHA-256 of each file in a clone of this repository and compare against the table. Every hash must match. Feeding those fourteen hashes, in the order listed, to Quiver's own `risk-attest` service (or any Merkle implementation using the same ordering and the same leaf/node tagging) must reproduce this root:
 
 ```
-merkleRoot     0x79965facc7f122e2a48bf0f39be79c2e1375d24e9915bfa163f54e49d34ab0d5
+merkleRoot     0xd376b71f94d54967325fbddc60b5d35d478884f1a70e63e0844532c24642c784
 itemCount      14
 engineVersion  q1-68fae54ea919492c
 ```
@@ -14,11 +14,17 @@ engineVersion  q1-68fae54ea919492c
 
 What supports the pre-registration claim is narrower, and should be read as narrow: the calibration file contains only 2025 stress episodes; the decision thresholds appear in `h2.sql` and `h2b.sql` as literal constants rather than as anything fitted at query time; and the commit history shows the order in which those files appeared. All three are author-controlled. A reader who wants the strong form of this guarantee should want an anchor made *before* the results existed. We did not make one, and it cannot be obtained retroactively.
 
-## The root changed on 26 July 2026, and the reason matters
+## The root changed twice on 26 July 2026, for two different reasons
 
-An earlier version of this file published the root `0x5f9da9985453d65dc30c2d94c20d3313b9138bb8386c9c57bef83c23cf3a8369` over these same fourteen files. That root was produced by a defective `risk-attest`: it folded the hashes as ASCII hex **text** rather than as packed 32-byte words, and it did not domain-separate leaves from internal nodes, so an internal node of the tree verified against the root as though it were a member. An adversarial reviewer with live access found both. The engine was fixed (build `q1-bce7e7bccb16ea1b` → `q1-68fae54ea919492c`), a soundness self-check that presents an internal node as a leaf now runs on every call, and the root over the same fourteen files is therefore different.
+Both are worth stating, because one of them means an earlier version of this file did not do what it told you to do.
 
-**The per-file SHA-256 hashes in the table below are unchanged** — compare them against the earlier revision of this file in the commit history. That is the part that actually pins the research artifacts, and it did not move. What moved is the way those fourteen hashes are combined into one, which is a property of the tree, not of the files. If you are checking whether the study's inputs were edited, check the fourteen file hashes; the root is a convenience for checking all of them at once.
+**First, the tree was wrong.** The root `0x5f9da9985453d65dc30c2d94c20d3313b9138bb8386c9c57bef83c23cf3a8369` was produced by a defective `risk-attest`: it folded the hashes as ASCII hex **text** rather than as packed 32-byte words, so no on-chain verifier could check a proof it issued, and it did not domain-separate leaves from internal nodes, so an internal node of the tree verified against the root as though it were a member. An adversarial reviewer with live access found both. The engine was fixed (build `q1-bce7e7bccb16ea1b` → `q1-68fae54ea919492c`), a soundness self-check that presents an internal node as a leaf now runs on every call, and the root over the same fourteen files became `0x79965facc7f122e2a48bf0f39be79c2e1375d24e9915bfa163f54e49d34ab0d5`. The fourteen per-file hashes did not change, and that is the part which actually pins the research.
+
+**Second, one of those fourteen hashes was not reproducible from a clone — which is the whole point of this file.** `h2b.sql` sat in the working copy carrying a single CRLF while git stored it with LF, so the published hash was computed over 2,013 bytes and anyone following the instructions below would compute it over the 2,012 bytes a checkout actually gives them, and get a different answer. `git status` cannot see this: with `text=auto` it compares files after normalising line endings, so the divergence is invisible exactly where it does damage. It was caught by running this file's own instructions against a fresh clone instead of trusting them. The file is now normalised, `.gitattributes` pins `*.sql` to LF explicitly rather than relying on content sniffing, and the root is `0xd376b71f94d54967325fbddc60b5d35d478884f1a70e63e0844532c24642c784`.
+
+The honest consequence: **before this revision, the manifest could not be fully verified by the procedure it published** — thirteen of fourteen hashes matched a clone and the fourteenth did not, which for a document about verifiability is a failure and not a footnote. It is fixed, and the fix is checked by the same procedure a reader would run.
+
+If you are checking whether the study's inputs were edited, check the fourteen file hashes; the root is a convenience for checking all of them at once, and a change in the root with the file hashes intact means the tree or the encoding moved, not the research.
 
 ## Files
 
@@ -30,7 +36,7 @@ An earlier version of this file published the root `0x5f9da9985453d65dc30c2d94c2
 | `research/reservoir-data/episodes.json` | `49e87b3959c08c7552b086f814c199a20ee029c8804c81176d2142688f20a707` | 5892 |
 | `research/reservoir-data/h1-result.json` | `1e5c5eb9820bced10b1bd8112517a3852ce010c28ca2d9abf61c3c72d6c5832a` | 548 |
 | `research/reservoir-data/h2.sql` | `92285d5457b236ea8602f418b4fcea954322430ceec559268f69e1dcae93de65` | 2004 |
-| `research/reservoir-data/h2b.sql` | `c975bc73fabef522b43e918e4a1735daca4e073e77d33b78a1cccc82da7d3391` | 2013 |
+| `research/reservoir-data/h2b.sql` | `2e9d76d204d29b4c04795ddf33635d2d072203194f9970a0b956ecb96ca22af2` | 2012 |
 | `research/reservoir-data/gen-h2.mjs` | `10bd819528ef620e9529df0a66b2835691193185bbda865b49634f914bee2261` | 2667 |
 | `research/reservoir-data/measure-betas-episodes.mjs` | `d51687df2a419b79b9c0427f39817f5472e7e254e5eb0720eff00f68d4dbb485` | 5900 |
 | `research/reservoir-data/detect-episodes.mjs` | `4701c02391400211b376f46afc5c16deedafed5f4898828af4ddf4f22d7dccba` | 3441 |

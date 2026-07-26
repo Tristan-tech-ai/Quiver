@@ -5,8 +5,7 @@ const path = require('path');
 const { pathToFileURL } = require('url');
 
 const shots = [
-  ['limits', () => document.getElementById('s8').scrollIntoView()],
-  ['gaps', () => { const h = [...document.querySelectorAll('h3')].find((x) => x.textContent.includes('Known gaps')); h.scrollIntoView(); }],
+  ['chart', () => { const h = [...document.querySelectorAll('h3')].find((x) => x.textContent.includes('Charting')); h.scrollIntoView(); }],
 ];
 
 (async () => {
@@ -16,7 +15,7 @@ const shots = [
   await page.emulateMedia({ media: 'print' });
   for (const [name, fn] of shots) {
     await page.evaluate(fn);
-    await page.waitForTimeout(600);
+    await page.waitForTimeout(800);
     await page.screenshot({ path: path.resolve(__dirname, `../assets/_shot-${name}.png`) });
   }
   await browser.close();

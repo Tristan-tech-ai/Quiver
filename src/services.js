@@ -337,6 +337,12 @@ export const SERVICES = [
       // keeps reproducing. Built off the request path — see util/snark.js for why 703 ms of Plonk
       // proving does not belong in a response the caller is waiting on.
       if (wantSnark === true || wantSnark === 'true') {
+        // Only the request is handed over, deliberately. The engine echoes a `margin` in `r.inputs`
+        // and passing that through looks like the careful thing to do — it is the engine's own
+        // number, after all — but it is `round(M, 2)`, rounded for display. Certifying it would
+        // prove a position 0.0019 away from the one that was priced, and the divergence guard would
+        // not have caught it: the resulting shift in liquidation price is 0.00015, well inside the
+        // half-cent the guard allows. The witness recomputes margin at full precision instead.
         buildInBackground(env.proof.contentHash, env.proof.inputs, r.liquidationPrice);
         env.snark = {
           protocol: 'plonk',

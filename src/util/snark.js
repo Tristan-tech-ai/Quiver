@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { attestSignals } from './attest.js';
 
 const require = createRequire(import.meta.url);
 const scale = require('./scale.cjs');
@@ -72,12 +73,14 @@ function put(contentHash, rec) {
  */
 export function witnessFor(echoedInputs, liquidationPrice) {
   const { side, entryPrice, size, maintMarginRate, leverage } = echoedInputs || {};
-  // The engine takes EITHER margin or leverage and derives the other; it publishes neither back, so
-  // the witness has to recompute margin using the engine's own expression, in the engine's own order:
+  // The engine takes EITHER margin or leverage and derives the other. It does echo a `margin` back,
+  // but as `round(M, 2)` for display, so reading it would certify a position up to half a cent of
+  // margin away from the one that was priced — and the divergence guard would wave that through,
+  // because the liquidation price only moves 0.00015 in response. So margin is recomputed here at
+  // full precision, with the engine's expression in the engine's order:
   //   notionalEntry = q * P0;  M = margin ?? notionalEntry / leverage
   // Any other arrangement of the same algebra can land on a different double, and a witness built on
-  // a different double is a proof about a different position. The divergence guard below is what
-  // stops that from being a silent failure.
+  // a different double is a proof about a different position.
   const margin = echoedInputs && echoedInputs.margin != null
     ? Number(echoedInputs.margin)
     : (Number(leverage) > 0 && Number.isFinite(size) && Number.isFinite(entryPrice) ? (size * entryPrice) / Number(leverage) : NaN);
@@ -128,6 +131,9 @@ export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
     const { proof, publicSignals } = await sj[PROTOCOL].prove(zkey, wtns);
     put(contentHash, {
       status: 'ready', protocol: PROTOCOL, proof, publicSignals,
+      // Signed here rather than at request time because the signals do not exist until the witness
+      // is built — and signing anything earlier would be signing a guess at them.
+      signalsAttestation: attestSignals(publicSignals),
       encoded: Object.fromEntries(Object.entries(w.encoded).map(([k, v]) => [k, String(v)])),
       // Distance between the circuit's integer solve and the price as SERVED. The served price is
       // rounded to 2dp for display, so this is dominated by that rounding, not by grid error — the

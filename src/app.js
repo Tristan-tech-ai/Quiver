@@ -9,6 +9,7 @@ import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
+import { getProof, verificationKey, warmProver } from './util/snark.js';
 import { _internal, engineSourceFiles } from './engine/proof.js';
 
 // The same directory buildId() hashes, resolved the same way, so /build cannot describe a rule over
@@ -31,6 +32,8 @@ const PAPER_PARTS = [];
 for (let i = 1; i <= 40; i++) {
   try { PAPER_PARTS.push(readFileSync(join(__dir, `../assets/whitepaper.part${i}.md`), 'utf8')); } catch { break; }
 }
+
+warmProver().catch(() => { /* proving is optional; the service must boot without it */ });
 
 const app = express();
 app.disable('x-powered-by');
@@ -97,7 +100,7 @@ app.get(['/.well-known/agent-card.json', '/agent.json'], (_req, res) => res.json
   name: 'Quiver',
   description: 'The verifiable risk brain for autonomous agents — deterministic, proof-carrying risk computation over x402 + MCP.',
   identity: IDENTITY(),
-  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', docsHuman: '/paper/human', build: '/build' },
+  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', docsMachineReadable: ['/paper/1', '/paper/2', '/paper/3', '/paper/4', '/paper/5', '/paper/6', '/paper/full'], build: '/build', proof: '/proof/<contentHash>', verificationKey: '/proof/vk' },
   payment: PAYMENT(),
   repo: 'https://github.com/Tristan-tech-ai/Quiver',
   version: config.version,
@@ -115,7 +118,7 @@ engine on the inputs to reproduce the result byte-for-byte: correctness you re-d
 Identity: ERC-8004 agent #5152 on X Layer (eip155:196), owner 0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b
 Payment: x402 v2 exact — USD₮0 on X Layer (eip155:196) and USDC on Base (eip155:8453); unpaid requests get the 402 challenge with both rails
 Free tier: POST /mcp (Streamable HTTP MCP, 9 risk tools, fair-use daily quota)
-Docs: /paper (technical documentation, machine-readable and unabridged) · /paper/human (typeset, with figures) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
+Docs: /paper (technical documentation, typeset) · /paper/1../paper/6 (same text, plain markdown, AI-readable) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
 
 ## Paid services (x402)
 ${svc}
@@ -196,6 +199,45 @@ app.post('/mcp', async (req, res) => {
   } catch (e) {
     return res.status(500).json({ jsonrpc: '2.0', id: msg.id, error: { code: -32603, message: String(e.message || e) } });
   }
+});
+
+// Succinct-proof retrieval. Free, because a proof of an answer somebody else already paid for costs
+// us nothing to hand over, and because a third party checking a number they did not buy is exactly
+// the situation this whole envelope exists for.
+//
+// `/proof/vk` is matched first: a verification key is not a content hash, and letting it fall into
+// the parameterised route would answer "no such proof" for the one document a verifier needs most.
+app.get('/proof/vk', (_req, res) => {
+  const vk = verificationKey();
+  if (!vk) return res.status(404).json({ error: 'verification_key_unavailable' });
+  res.set('cache-control', 'public, max-age=86400');
+  res.json({
+    protocol: 'plonk',
+    note: 'Verify with: snarkjs plonk verify <this> <publicSignals> <proof>. Plonk rather than Groth16 deliberately — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so a proof under it is forgeable by us. This key derives from the public Hermez powers-of-tau.',
+    verificationKey: vk,
+  });
+});
+
+app.get('/proof/:contentHash', (req, res) => {
+  const h = String(req.params.contentHash || '').toLowerCase();
+  if (!/^[0-9a-f]{64}$/.test(h)) {
+    return res.status(400).json({ error: 'bad_content_hash', note: 'Pass the 64-character proof.contentHash from a perp-gate response.' });
+  }
+  const rec = getProof(h);
+  if (!rec) {
+    return res.status(404).json({
+      error: 'no_proof_for_that_hash',
+      note: 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.',
+    });
+  }
+  if (rec.status === 'building') return res.status(202).json({ status: 'building', retryAfterMs: 900, contentHash: h });
+  if (rec.status !== 'ready') return res.status(409).json({ status: rec.status, error: rec.error || null, contentHash: h });
+  res.json({
+    status: 'ready', contentHash: h, protocol: rec.protocol,
+    proof: rec.proof, publicSignals: rec.publicSignals,
+    encodedInputs: rec.encoded, gapToServedPrice: rec.gapToServedPrice,
+    verificationKey: '/proof/vk', verify: rec.verify,
+  });
 });
 
 // Public technical documentation. One document, two shapes, and `/paper` keeps its original meaning:

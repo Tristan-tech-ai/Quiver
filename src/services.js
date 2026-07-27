@@ -2,6 +2,7 @@
 // Each drives: the paid POST route, the gated /diag/scan tester, and the / index.
 import { config } from './config.js';
 import { gridSnapFields } from './util/grid.js';
+import { buildInBackground } from './util/snark.js';
 import { tokenScan } from './engine/tokenScan.js';
 import { walletAudit } from './engine/walletAudit.js';
 import { tapePulse } from './engine/tapePulse.js';
@@ -298,7 +299,11 @@ export const SERVICES = [
     },
     run: async (i) => {
       const e = await enrichPerpInputs(i);
-      const { live, ...raw } = e;                     // provenance is metadata, not a computation input
+      // `snark` is a delivery preference, not a term in the identity. Leaving it in `compute` would
+      // put it inside proof.inputs and therefore inside the content hash, so the same position would
+      // hash differently depending on whether a proof was requested — and the published worked proof
+      // would stop reproducing for anyone who asked for one.
+      const { live, snark: wantSnark, ...raw } = e;   // provenance and preferences are not inputs
       // Snap onto the 1e-9 grid the succinct-proof circuit works over, so the identity a proof
       // certifies is the identity this answer was computed from rather than one 3.5e-6 away. Measured
       // over 3,000 positions: worst divergence falls from 3.53e-6 to 5.53e-10, none above 1e-9.
@@ -326,7 +331,22 @@ export const SERVICES = [
         return observationEnvelope('perp-gate', compute, r, config.version);
       }
       // Caller supplied every input: nothing was fetched, so the answer really is re-runnable.
-      return proofEnvelope('perp-gate', compute, r, config.version);
+      const env = proofEnvelope('perp-gate', compute, r, config.version);
+      // A succinct proof, when asked for. Attached as a SIBLING of `proof`, never inside `result`,
+      // so the content hash covers exactly what it covered before and the published worked proof
+      // keeps reproducing. Built off the request path — see util/snark.js for why 703 ms of Plonk
+      // proving does not belong in a response the caller is waiting on.
+      if (wantSnark === true || wantSnark === 'true') {
+        buildInBackground(env.proof.contentHash, env.proof.inputs, r.liquidationPrice);
+        env.snark = {
+          protocol: 'plonk',
+          status: 'building',
+          retrieveAt: `/proof/${env.proof.contentHash}`,
+          verificationKey: '/proof/vk',
+          note: 'A succinct proof of the liquidation identity for exactly these inputs, over the public Hermez reference string. Proving takes about 0.7s, so it is built off this request rather than inside it — fetch it at the URL above, free. It certifies the identity on a 1e-9 grid; the inputs echoed here are already snapped to that grid, so the proof and this answer describe the same position.',
+        };
+      }
+      return env;
     },
   },
   {

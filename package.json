@@ -27,6 +27,7 @@
     "playwright": "^1.61.1",
     "playwright-core": "^1.61.1",
     "pngjs": "^7.0.0",
+    "snarkjs": "^0.7.6",
     "technicalindicators": "^3.1.0"
   }
 }

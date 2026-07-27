@@ -101,6 +101,12 @@ const LOG = /(research[\\/](BUYER_|zk[\\/])|MISSION_CONTROL|CHECKPOINT|DEEP_UNDE
 const problems = [];
 const note = (file, line, msg) => problems.push({ file: relative(ROOT, file), line, msg });
 const lineOf = (s, idx) => s.slice(0, idx).split('\n').length;
+// Is this text a QUOTATION of an older claim? Correction tables have to print the wrong sentence
+// beside the right one — `| "**External recurrence is zero**" | six payers, 44 payments | …` — or the
+// record of what we got wrong cannot be published at all, which would be a strange thing for a
+// project whose argument is that it publishes what it got wrong. Markdown emphasis is allowed
+// between the quote mark and the text, which is where the first version of this let one through.
+const isQuoted = (s, i) => /["“]\**\s*$/.test(s.slice(Math.max(0, i - 6), i));
 
 for (const f of docs) {
   const s = readFileSync(f, 'utf8');
@@ -128,10 +134,21 @@ for (const f of docs) {
     if (missing.length) note(f, lineOf(s, s.indexOf('/paper/')),
       `enumerates parts but omits /paper/${missing.join(', /paper/')}`);
   }
-  for (const [w, n] of [['six', 6], ['seven', 7], ['eight', 8], ['five', 5]]) {
-    const re = new RegExp(`${w}\\s+(AI-readable\\s+)?parts`, 'i');
-    const m = re.exec(s);
-    if (m && n !== FACTS.partCount) note(f, lineOf(s, m.index), `says "${m[0]}" but there are ${FACTS.partCount}`);
+  // Any qualifier is allowed between the number and "parts" — "six AI-readable parts", "six
+  // machine-readable parts". The first version whitelisted `AI-readable` alone and walked straight
+  // past "six machine-readable parts" in the HackQuest fields, which is the same class of hole as
+  // requiring a bare space around a bold number: a check that only sees the phrasing it was written
+  // against is a check for one document, not for the property.
+  for (const [w, n] of isLog ? [] : [['five', 5], ['six', 6], ['seven', 7], ['eight', 8], ['nine', 9]]) {
+    const re = new RegExp(`\\b${w}\\s+(?:[a-z-]+\\s+){0,2}parts\\b`, 'gi');
+    let m;
+    while ((m = re.exec(s))) {
+      if (n === FACTS.partCount) continue;
+      // Quoted, exactly as with test counts: a correction table has to be able to print the wrong
+      // phrasing beside the right one, or the record of what we got wrong cannot be published.
+      if (/["“]\s*$/.test(s.slice(Math.max(0, m.index - 3), m.index))) continue;
+      note(f, lineOf(s, m.index), `says "${m[0]}" but there are ${FACTS.partCount}`);
+    }
   }
 
   // 2. Test counts, in the HEADLINE form only — "N model-free tests", "N automated tests". The paper
@@ -197,9 +214,18 @@ for (const f of docs) {
       /gets the envelope, not the proof/i,
       /None of these is shipping/i,
       /Groth16 is the published artifact/i,
+      // Retracted by on-chain measurement: six external payer addresses sent 44 payments over eight
+      // days and four of the six returned. This sentence was corrected in the description and left
+      // standing in a field on the same page, which is the exact failure that page warns about.
+      /external recurrence is (currently )?zero/i,
+      /none has returned for a third/i,
     ]) {
-      const m = re.exec(s);
-      if (m) note(f, lineOf(s, m.index), `states "${m[0].slice(0, 60)}" — contradicted by ${FACTS.registry}`);
+      let mm;
+      const rx = new RegExp(re.source, re.flags.includes("g") ? re.flags : re.flags + "g");
+      while ((mm = rx.exec(s))) {
+        if (isQuoted(s, mm.index)) continue;
+        note(f, lineOf(s, mm.index), `states "${mm[0].slice(0, 60)}" — contradicted by ${FACTS.registry}`);
+      }
     }
   }
 }

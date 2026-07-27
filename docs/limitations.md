@@ -134,4 +134,4 @@ rushed.
   so between-payer isolation is still untested.
 - **The crash study validates the quantity, not our arithmetic on it.** The flag reads the venue's own
   published liquidation price; it never calls `perp-gate`. See [verification](verification.md).
-- **External recurrence is zero.** Three external wallets, one or two calls each, none returned.
+- **External recurrence is small, not absent — and the earlier claim that it was zero was wrong.** Six payer addresses that are not ours sent 44 payments over the eight days to 27 July 2026, and four of the six paid more than once. The zero came from an in-memory counter that resets on every deploy; the corrected figure is recomputable from the USD₮0 transfer log on X Layer and needs nothing from us.

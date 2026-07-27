@@ -144,11 +144,11 @@ export const SERVICES = [
     validate: (b) => {
       const raw = b?.currency;
       if (raw === undefined || raw === null || String(raw).trim() === '') {
-        return { error: 'currency is required (BTC | ETH | SOL). This endpoint returns crypto OPTIONS analytics only. For a DeFi protocol health check (e.g. aave, lido, gmx) use /api/protocol-pulse; for token safety use /api/token-scan.' };
+        return { error: 'currency is required (BTC | ETH | SOL). This endpoint returns crypto OPTIONS analytics only, and it cannot answer a protocol health question at any price. For a DeFi protocol health check (e.g. aave, lido, gmx) the call you want is: POST /api/protocol-pulse with {"protocol":"aave"}. For token safety: POST /api/token-scan with {"chain":"ethereum","address":"0x..."}. This refusal is free — you were not charged.' };
       }
       const c = String(raw).trim().toUpperCase();
       if (!['BTC', 'ETH', 'SOL'].includes(c)) {
-        return { error: `options-desk covers BTC, ETH and SOL only, not "${String(raw).trim().slice(0, 24)}". If you meant a DeFi protocol health check (e.g. aave, lido, gmx), use /api/protocol-pulse.` };
+        return { error: `options-desk covers BTC, ETH and SOL only, not "${String(raw).trim().slice(0, 24)}" — and no parameter makes it answer a protocol health question. If that is what you wanted, the call is: POST /api/protocol-pulse with {"protocol":"${String(raw).trim().slice(0,24).toLowerCase()}"}. This refusal is free — you were not charged.` };
       }
       return { currency: c, focus: b?.focus };
     },

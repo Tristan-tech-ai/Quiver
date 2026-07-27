@@ -1,0 +1,106 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Quiver — the verifiable risk brain for AI agents</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="22 pay-per-call risk computations for autonomous agents, over x402. Every deterministic answer carries a proof you re-derive yourself.">
+<style>
+  :root { --ink:#12161d; --dim:#5a6675; --line:#dde3ea; --accent:#12408a; --bg:#fff; --code:#f4f6f9; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink:#e8edf4; --dim:#98a4b4; --line:#2a323d; --accent:#7ba7f0; --bg:#0f1319; --code:#161c24; }
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:760px; margin:0 auto; padding:44px 22px 72px; }
+  h1 { font-size:26px; margin:0 0 6px; letter-spacing:-.01em; }
+  .sub { color:var(--dim); margin:0 0 26px; font-size:16px; }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.09em; color:var(--dim); margin:34px 0 10px; font-weight:600; }
+  a { color:var(--accent); }
+  code, pre { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:13px; }
+  pre { background:var(--code); border:1px solid var(--line); border-radius:7px; padding:12px 13px; overflow-x:auto; margin:0 0 8px; }
+  .lede { border-left:3px solid var(--accent); padding:2px 0 2px 15px; margin:0 0 26px; }
+  .lede b { font-weight:600; }
+  .facts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin:0 0 6px; padding:0; list-style:none; }
+  .facts li { border:1px solid var(--line); border-radius:7px; padding:9px 11px; }
+  .facts span { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--dim); margin-bottom:2px; }
+  .note { color:var(--dim); font-size:13.5px; margin:6px 0 0; }
+  footer { margin-top:38px; padding-top:16px; border-top:1px solid var(--line); color:var(--dim); font-size:13px; }
+  footer a { margin-right:14px; display:inline-block; }
+</style>
+<main>
+  <h1>Quiver</h1>
+  <p class="sub">The verifiable risk brain for AI agents. Twenty-two priced computations an autonomous
+  agent calls over HTTP and pays for in-band. No chat, no human in the loop.</p>
+
+  <div class="lede">
+    <p style="margin:0"><b>An agent should not have to trust a number it just bought.</b> Every
+    deterministic answer here ships the inputs it used, the engine's build identity, a self-check
+    against the condition the answer was solved from, and a signed content hash — so the caller
+    <b>re-derives the result instead of believing it</b>. Live-market reads cannot promise a re-run and
+    say so, in a different envelope. The distinction is enforced in code.</p>
+  </div>
+
+  <h2>Check that in ten seconds, without paying or asking us</h2>
+  <pre>curl -s https://quiver-production-c3a8.up.railway.app/build</pre>
+  <p class="note">Returns the engine's build hash <em>and the exact rule that produced it</em> — the
+  file list, the ordering, the digest. Clone
+  <a href="https://github.com/Tristan-tech-ai/Quiver">the repository</a>, follow that rule, and you get
+  the same string. It is a SHA-256 over source bytes, so it reproduces outside JavaScript entirely.</p>
+
+  <pre>curl -s -X POST https://quiver-production-c3a8.up.railway.app/api/perp-gate \
+  -H 'content-type: application/json' -d '{"side":"long","entryPrice":64000,"size":1,"leverage":10}'</pre>
+  <p class="note">Answers <code>402 Payment Required</code> with the x402 challenge — asset, amount,
+  recipient, network, on both rails. Every one of the twenty-two paid routes does. Nothing computes
+  for free over an unpaid request.</p>
+
+  <h2>Ninety seconds, if you would rather watch than read</h2>
+  <p class="note"><a href="https://x.com/Quiverrrs/status/2080225222880526720">Launch thread with the
+  demo video</a> — what an agent asks for, what comes back, and where the proof lives in the response.</p>
+
+  <h2>What it is</h2>
+  <ul class="facts">
+    <li><span>Identity</span>ERC-8004 agent #5152</li>
+    <li><span>Payment</span>x402 — USD₮0 on X Layer, USDC on Base</li>
+    <li><span>Price</span>$0.005 – $0.05 per call</li>
+    <li><span>Free for agents</span>MCP at <code>/mcp</code></li>
+  </ul>
+  <p class="note">The nine deterministic risk engines are reachable free over a remote MCP endpoint —
+  add the URL to any MCP client and call them, proof envelope included.</p>
+
+  <h2>What it computes</h2>
+  <p style="margin:0 0 6px">Perpetual liquidation distance and funding drag · cross-venue portfolio
+  exposure with correlated-crash stress · position sizing with risk of ruin · arbitrage-free options
+  analytics (SVI surface, risk-neutral density, greeks, dealer gamma, variance risk premium) ·
+  event-implied expected move · EIP-712 transaction safety and permit-drainer decoding · live DEX
+  microstructure (Kyle's lambda, Amihud, VPIN) · prediction-market fill simulation · DeFi protocol
+  health · macro event radar · wallet forensics · treasury and LP risk · agent-controlled charts ·
+  batched on-chain attestation.</p>
+
+  <h2>Read the whole thing</h2>
+  <p class="note">Full technical documentation with methods, ten tables and 73 references:
+  <a href="/paper">/paper</a> (typeset). Reading with an AI, or want one section? The identical text
+  is served as plain markdown in six parts, each small enough for a single fetch. Nothing is
+  abridged — a test asserts the parts concatenate to the whole.</p>
+  <ul class="facts" style="grid-template-columns:repeat(auto-fit,minmax(210px,1fr))">
+    <li><span><a href="/paper/1">/paper/1</a></span>abstract · architecture · design principles</li>
+    <li><span><a href="/paper/2">/paper/2</a></span>the twenty-two services</li>
+    <li><span><a href="/paper/3">/paper/3</a></span>methodology</li>
+    <li><span><a href="/paper/4">/paper/4</a></span>verification · <b>limitations</b> · related work</li>
+    <li><span><a href="/paper/5">/paper/5</a></span>the build · roadmap · conclusion</li>
+    <li><span><a href="/paper/6">/paper/6</a></span>appendices · <b>checkable artifacts</b> · references</li>
+  </ul>
+  <p class="note">If you are assessing this and have two minutes, read
+  <a href="/paper/4">part 4</a> — it is the limitations, including the ablation that undercuts our own
+  headline result — and <a href="/paper/6">part 6</a>, which is every artifact you can check without
+  our cooperation, each with the command that checks it. Or the whole document in one response:
+  <a href="/paper/full">/paper/full</a>.</p>
+
+  <footer>
+    <a href="/paper">Documentation</a>
+    <a href="/build">Build identity</a>
+    <a href="/mcp">MCP endpoint</a>
+    <a href="https://github.com/Tristan-tech-ai/Quiver">Source</a>
+    <a href="https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/">Availability, measured externally</a>
+    <div style="margin-top:10px">Machine-readable service index: this same URL with
+      <code>Accept: application/json</code>.</div>
+  </footer>
+</main>

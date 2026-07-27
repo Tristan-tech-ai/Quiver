@@ -24,7 +24,7 @@ Two mechanisms keep the services honest: an automated test suite of model-free i
 
 ### 6.1 The invariant test suite
 
-The financial mathematics is locked by 354 automated tests that run under the built-in Node test runner [54] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
+The financial mathematics is locked by 358 automated tests that run under the built-in Node test runner [54] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
 
 **Table 2 — representative invariants from the 333-test suite. All currently pass.**
 

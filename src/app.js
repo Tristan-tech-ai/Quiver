@@ -24,6 +24,9 @@ try { WHITEPAPER = readFileSync(join(__dir, '../assets/whitepaper.html'), 'utf8'
 // why it is served in parts rather than whole.
 let PAPER_MD = '';
 try { PAPER_MD = readFileSync(join(__dir, '../assets/whitepaper.md'), 'utf8'); } catch { PAPER_MD = ''; }
+// Human landing page for `/`, served only when the caller asks for HTML — see the index route.
+let LANDING = '';
+try { LANDING = readFileSync(join(__dir, '../assets/landing.html'), 'utf8'); } catch { LANDING = ''; }
 const PAPER_PARTS = [];
 for (let i = 1; i <= 40; i++) {
   try { PAPER_PARTS.push(readFileSync(join(__dir, `../assets/whitepaper.part${i}.md`), 'utf8')); } catch { break; }
@@ -55,7 +58,13 @@ const PAYMENT = () => ({
   network: config.network,
   asset: 'USDT (X Layer)',
 });
-app.get('/', (_req, res) => res.json({
+// The index answers two very different readers, so it answers them differently. An agent — or curl,
+// which sends `*/*` — gets the machine service index, unchanged and first, because that is the
+// contract anything automated depends on. A browser, which asks for text/html, gets a page: the
+// endpoint URL appears in the submission and in the registry entry, and a human who clicks it and
+// receives four kilobytes of raw JSON has learned nothing about whether this is a finished product.
+// `res.format` keys are ordered deliberately: json first makes it the default for `*/*`.
+const INDEX_JSON = () => ({
   name: 'Quiver',
   tagline: 'A quiver of agent tools — one call.',
   identity: IDENTITY(),
@@ -63,13 +72,25 @@ app.get('/', (_req, res) => res.json({
   payment: PAYMENT(),
   mcp: 'POST /mcp — Streamable HTTP MCP endpoint; add this URL to any MCP client (Claude/Cursor/LangChain) to call the verifiable risk brain (free, fair-use daily quota)',
   docs: '/paper',
-  docsHuman: '/paper/human',
+  docsMachineReadable: ['/paper/1', '/paper/2', '/paper/3', '/paper/4', '/paper/5', '/paper/6', '/paper/full'],
   build: '/build',
   agentCard: '/.well-known/agent-card.json',
   llms: '/llms.txt',
   repo: 'https://github.com/Tristan-tech-ai/Quiver',
   version: config.version,
-}));
+});
+app.get('/', (req, res) => {
+  res.format({
+    json: () => res.json(INDEX_JSON()),
+    html: () => {
+      if (!LANDING) return res.json(INDEX_JSON());   // never fail the index over a missing asset
+      res.set('content-type', 'text/html; charset=utf-8');
+      res.set('cache-control', 'public, max-age=600');
+      res.send(LANDING);
+    },
+    default: () => res.json(INDEX_JSON()),
+  });
+});
 
 // Agent card — the discovery endpoint identity-scanners look for (also aliased at /agent.json).
 app.get(['/.well-known/agent-card.json', '/agent.json'], (_req, res) => res.json({

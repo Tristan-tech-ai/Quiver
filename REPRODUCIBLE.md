@@ -16,7 +16,17 @@ envelope; here is exactly how a third party checks it — no trust in Quiver req
 The codeHash is a sha256 of the engine source files, so it is deterministic and rebuild-checkable:
 ```
 git clone https://github.com/Tristan-tech-ai/Quiver && cd Quiver && npm ci
-# codeHash = 'q1-' + sha256( for each src/engine/*.js sorted by name: `${filename}:${contents}` joined by "\n" ).slice(0,16)
+
+# codeHash = 'q1-' + sha256( for each .js under src/engine RECURSIVELY, keyed by its path
+#            RELATIVE to src/engine and sorted by that key: `${relpath}:${contents}` joined by "\n" ).slice(0,16)
+#
+# Recursively, and that word is load-bearing. This recipe previously said `src/engine/*.js`, which is
+# 35 files and misses src/engine/chart/ — 42 kB of rendering and indicator code that chart-press
+# imports. The hash itself had the same gap and both were fixed together on 27 July 2026; a reader
+# following the old line would have computed a different value from the one /build serves and been
+# right to distrust it. The current hash covers 38 files.
+
+node -e "const{readdirSync,readFileSync}=require('fs'),{createHash}=require('crypto');const w=(d,p='')=>readdirSync(d,{withFileTypes:true}).flatMap(e=>{const r=p?p+'/'+e.name:e.name;return e.isDirectory()?w(d+'/'+e.name,r):e.name.endsWith('.js')?[r]:[]}).sort();const f=w('src/engine');console.log('q1-'+createHash('sha256').update(f.map(x=>x+':'+readFileSync('src/engine/'+x,'utf8')).join('\n')).digest('hex').slice(0,16),'over',f.length,'files')"
 ```
 Compare it against `GET /build` on the live server (which reports `codeHash` **and the Node version it runs on**)
 and against `proof.codeHash` on any answer. All three must match.

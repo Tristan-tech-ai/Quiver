@@ -1,0 +1,11 @@
+{
+  "at": "2026-07-27T17:50:04.553Z",
+  "protocol": "plonk",
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "deployedBytecodeBytes": 7270,
+  "deployGas": 1455520,
+  "verifyGasHonest": 273901,
+  "rejectionCases": 9,
+  "allRejected": true,
+  "gate": true
+}

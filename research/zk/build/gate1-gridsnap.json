@@ -1,0 +1,9 @@
+{
+  "at": "2026-07-27T17:55:41.845Z",
+  "sampled": 3000,
+  "unsnappedWorst": 0.0000035339617170393467,
+  "inputsSnappedWorst": 1.2514647096395493e-9,
+  "fullySnappedWorst": 5.238689482212067e-10,
+  "overBound": 0,
+  "gate": true
+}

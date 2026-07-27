@@ -36,7 +36,7 @@ curl -s -X POST https://rpc.xlayer.tech -H 'Content-Type: application/json' \
 
 | What | Artifact | Where |
 |---|---|---|
-| Build identity of the engine behind every proof here | `q1-6f46d53490b3a29f` | served at [`/build`](https://quiver-production-c3a8.up.railway.app/build); rebuildable from this repository — the exact rule is in [REPRODUCIBLE.md](../REPRODUCIBLE.md) |
+| Build identity of the engine behind every proof here | `q1-e1fa99d08887d6cc` | served at [`/build`](https://quiver-production-c3a8.up.railway.app/build); rebuildable from this repository — the exact rule is in [REPRODUCIBLE.md](../REPRODUCIBLE.md) |
 | Research artifacts behind the crash study, hashed file by file | `merkleRoot 0xd376b71f94d54967325fbddc60b5d35d478884f1a70e63e0844532c24642c784` over 14 files | [`research/RESEARCH_ANCHOR.md`](../research/RESEARCH_ANCHOR.md) — recompute each sha256 from a clone and re-derive the root through `risk-attest`. This root supersedes two earlier ones, and that history is recorded rather than tidied away |
 | The buyer desk's raw settlement ledger | 1,785 rows | [`research/BUYER_LEDGER.csv`](../research/BUYER_LEDGER.csv) — `node research/buyer-ledger-recount.mjs` reproduces every figure in Section 6.4 offline, and **exits with an error** rather than printing anything if it cannot first re-derive the three figures the buyer itself published |
 | Independent availability record | status page + JSON | [`cgn9npwmm0.execute-api.us-east-1.amazonaws.com`](https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/) — hosted off this service, so it stays reachable when the service is not |
@@ -64,14 +64,14 @@ moveToLiquidationPct    8.861
 positionStatus          ABOVE_MAINTENANCE
 
 proof.engine            perp-gate
-proof.codeHash          q1-6f46d53490b3a29f
+proof.codeHash          q1-e1fa99d08887d6cc
 proof.deterministic     true
 proof.selfChecks[0]     liquidation-invariant: account_value(P_liq) == maintenance_margin(P_liq)
                         residual 2.05e-12 against tolerance 0.064 — pass
-proof.contentHash       43ffdabad52a4ed2d86c75bb3fbb6206723e688fb58fa45701ed4391227b475a
+proof.contentHash       8575ce5ae5bfae9cdfdfc604250f8032e4ba85fb33560386586b7538d0ab0960
 proof.signature.signer  0x946324E0E5d7D77206731E35Ef4044a383e2a8C2
-proof.signature         0x9432b951019da98359e80785331e4e734b17a1f1dac74dce7188861bd6015552
-                        3533509986e35afd438e52a0c5227431f32a53ccdca05bb6a3accb5300ddcf4f1c
+proof.signature         0xcabfb1954b39b306c041d546fb151582cc7d31dce403fbdaa056d7be824188fb
+                        274d2f9af2a1aa01469c2d96998c871f3a36b4ac8a6762c36f0b9d2e45c824111b
 ```
 
 **Four checks, none of which needs us:**

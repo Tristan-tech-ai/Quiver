@@ -7,7 +7,7 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 
 - **Live endpoint:** https://quiver-production-c3a8.up.railway.app — [`/build`](https://quiver-production-c3a8.up.railway.app/build) and [`/paper`](https://quiver-production-c3a8.up.railway.app/paper) are free; the paper is also served as plain markdown in six AI-readable parts at `/paper/1` … `/paper/6`
 - **Free MCP:** `https://quiver-production-c3a8.up.railway.app/mcp` — Streamable HTTP, the nine risk-brain tools, fair-use daily quota; on the [official MCP registry](https://registry.modelcontextprotocol.io) as `quiver-risk-brain`
-- **On-chain identity:** ERC-8004 agent `#5152` on X Layer (`eip155:196`) · **Build:** `q1-6f46d53490b3a29f`
+- **On-chain identity:** ERC-8004 agent `#5152` on X Layer (`eip155:196`) · **Build:** `q1-e1fa99d08887d6cc`
 - **Payment (dual rail):** x402 v2 `exact` — USD₮0 on X Layer (OKX facilitator) **and** USDC on Base (Coinbase CDP facilitator); 0.005–0.05 per call
 - **Availability, measured from outside:** [status page](https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/) ([JSON](https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/?format=json)) — hosted deliberately off the service it watches, so the record survives an outage
 - **Use it in five minutes:** [QUICKSTART.md](QUICKSTART.md) · framework snippets: [INTEGRATIONS.md](INTEGRATIONS.md)
@@ -27,7 +27,7 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 | **Strongest evidence** | A population-scale replay of the October 2025 crash and two out-of-sample 2026 crashes: flagged accounts were liquidated at 14.3× and 13.3× the rate of cleared ones — on a flag that fires on 41.6% and 43.8% of accounts, which belongs beside the ratio and not after it. → [verification](docs/verification.md) |
 | **Strongest counter-evidence, ours** | Our own ablation reduces that result to raw distance-to-liquidation — and that distance is the *venue's* published number, not one this engine computed, so the study validates the quantity rather than our arithmetic on it. The flag also fires on 42–44% of accounts. Both sit beside the headline, not in a footnote. |
 | **Traction, honestly** | Near zero. Three external wallets have paid for one or two calls each; none has returned. Everything else is our own disclosed quality-assurance traffic and is never counted as sales. |
-| **Tests** | **363** model-free tests, 358 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
+| **Tests** | **367** model-free tests, 362 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
 | **What it refuses to do** | Output a directional edge. Infer dealer positioning it cannot measure. Call a variance premium significant when it is not. Guess when the data is missing — it answers `DATA_UNAVAILABLE`, for free. |
 
 ---
@@ -127,7 +127,7 @@ you keep your money.
 
 ```bash
 npm ci
-npm test      # 363 model-free tests — no network access required
+npm test      # 367 model-free tests — no network access required
 npm start     # serves on the configured port
 ```
 

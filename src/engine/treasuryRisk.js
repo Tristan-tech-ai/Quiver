@@ -97,7 +97,14 @@ export function treasuryRisk(input = {}) {
   const wSum = weights.reduce((a, b) => a + b, 0);
   const assetShares = {}; for (const p of positions) assetShares[p.asset] = (assetShares[p.asset] || 0) + p.amountUsd / total;
   const hhiRecompute = Object.values(assetShares).reduce((s, w) => s + w * w, 0);
-  const hhiRes = Math.abs(hhiRecompute - byAsset.hhi);
+  // Round-then-verify, violated by the verifier itself — the SAME defect the last check in this array
+  // already documents, sitting unfixed one line above it. `byAsset.hhi` is published rounded to 4dp
+  // while this recomputation is full precision, so the residual IS the rounding, and a 1e-9 tolerance
+  // rejects it. Any book whose Σwᵢ² misses the 4-decimal grid — which is most books with more than one
+  // asset — was handed `allSelfChecksPass: false` on a correct answer, and therefore an answer this
+  // service then declines to bill for. A check that cannot pass is the same failure as one that cannot
+  // fail. Compare at the precision actually served: a real arithmetic error still moves the 4th decimal.
+  const hhiRes = Math.abs(round(hhiRecompute, 4) - byAsset.hhi);
   const boundsOk = byAsset.hhi >= 1 / byAsset.groups - 1e-9 && byAsset.hhi <= 1 + 1e-9;
   // Depeg identity on the worst single: recompute independently.
   let depegRes = 0;
@@ -127,10 +134,14 @@ export function treasuryRisk(input = {}) {
       : `No single exposure exceeds ${limit}%. Worst single-depeg (to ${floor}) costs ${worstSingle ? worstSingle.lossPct : 0}% of the book.`,
     model: 'Concentration = HHI over USD shares; depeg loss = Σ amount·(peg−price)/peg; risk-adjusted yield subtracts annualised expected depeg loss where probabilities are supplied. Deterministic; no market data fetched.',
     checks: [
-      { name: 'weights sum to 1', residual: Number(Math.abs(wSum - 1).toExponential(2)), pass: Math.abs(wSum - 1) <= 1e-12 },
-      { name: 'HHI(asset) == Σ wᵢ² and 1/n ≤ HHI ≤ 1', residual: Number(hhiRes.toExponential(2)), pass: hhiRes <= 1e-9 && boundsOk },
-      { name: 'depeg-loss identity on worst-single (independent recompute)', residual: Number(depegRes.toExponential(2)), pass: depegRes <= 1e-6 },
-      { name: 'correlated-crash loss == Σ per-asset floor losses (joint-loss identity)', residual: Number(Math.abs(crashLoss - assets.reduce((s, a) => s + depegLoss(a, floor), 0)).toExponential(2)), pass: Math.abs(crashLoss - assets.reduce((s, a) => s + depegLoss(a, floor), 0)) <= 1e-6 * Math.max(1, total) },
+      // Each check publishes the tolerance it was judged against. A residual with no tolerance beside it
+      // tells a reader the number but not the standard, which is the same gap as a hash with no rule.
+      { name: 'weights sum to 1', residual: Number(Math.abs(wSum - 1).toExponential(2)), tolerance: 1e-12, pass: Math.abs(wSum - 1) <= 1e-12 },
+      { name: 'HHI(asset) == Σ wᵢ² and 1/n ≤ HHI ≤ 1, compared at the 4dp precision it is published to', residual: Number(hhiRes.toExponential(2)), tolerance: 1e-12, pass: hhiRes <= 1e-12 && boundsOk },
+      { name: 'depeg-loss identity on worst-single (independent recompute)', residual: Number(depegRes.toExponential(2)), tolerance: 1e-6, pass: depegRes <= 1e-6 },
+      // This tolerance scales with the book, so it is published as the number it actually was rather
+      // than as a formula the caller would have to evaluate themselves.
+      { name: 'correlated-crash loss == Σ per-asset floor losses (joint-loss identity)', residual: Number(Math.abs(crashLoss - assets.reduce((s, a) => s + depegLoss(a, floor), 0)).toExponential(2)), tolerance: Number((1e-6 * Math.max(1, total)).toExponential(2)), pass: Math.abs(crashLoss - assets.reduce((s, a) => s + depegLoss(a, floor), 0)) <= 1e-6 * Math.max(1, total) },
       // Compare UNROUNDED to UNROUNDED: byAsset.effectiveExposures is rounded to 2dp for display, so
       // checking the identity against it with a 1e-6 tolerance failed on any book whose 1/HHI has >2dp —
       // the identity was true, the CHECK was broken (round-then-verify, violated by the verifier itself).

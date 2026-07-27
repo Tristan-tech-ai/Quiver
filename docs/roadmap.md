@@ -109,7 +109,7 @@ shipping in the version described here, and each is disclosed in the relevant se
    one of them has a runtime question. The *code* hash is `sha256` over the engine's source bytes and
    performs no arithmetic at all, so it is runtime-independent by construction rather than by promise
    — and that is checkable: feeding the same file list through coreutils `sha256sum`, outside
-   JavaScript entirely, returns `q1-6f46d53490b3a29f`, the identical string the service serves.
+   JavaScript entirely, returns `q1-e1fa99d08887d6cc`, the identical string the service serves.
    `/build` publishes the selection and ordering rule alongside the hash so the recomputation can be
    done in any language. The residual risk is the *content* hash, over computed floating-point
    results: basic IEEE-754 arithmetic is bit-identical across platforms, transcendentals

@@ -8,10 +8,10 @@
 > - **Part 2** — `/paper/2` — 4. Service Catalogue
 > - **Part 3** — `/paper/3` — 5. Methodology
 > - **Part 4** — `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures
-> - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
-> - **Part 6** — `/paper/6` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
+> - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon
+> - **Part 6** — `/paper/6` — 12. Conclusion  |  Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (240 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (242 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
@@ -24,7 +24,7 @@ Two mechanisms keep the services honest: an automated test suite of model-free i
 
 ### 6.1 The invariant test suite
 
-The financial mathematics is locked by 367 automated tests that run under the built-in Node test runner [34] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
+The financial mathematics is locked by 386 automated tests that run under the built-in Node test runner [34] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
 
 **Table 2 — representative invariants from the 333-test suite. All currently pass.**
 
@@ -271,4 +271,4 @@ A service is only as trustworthy as its account of what it cannot do. The follow
 
 ---
 
-**Continues in part 5 of 6: `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion**
+**Continues in part 5 of 6: `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon**

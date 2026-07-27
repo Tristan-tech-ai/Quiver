@@ -7,11 +7,11 @@
 > - **Part 1** — `/paper/1` — Abstract  |  At a Glance  |  Contents  |  1. Introduction  |  2. System Architecture  |  3. Design Principles
 > - **Part 2** — `/paper/2` — 4. Service Catalogue
 > - **Part 3** — `/paper/3` — 5. Methodology
-> - **Part 4** — `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures  |  9. Related Work and Positioning
-> - **Part 5** — `/paper/5` — 10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
+> - **Part 4** — `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures
+> - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 6** — `/paper/6` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (239 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (240 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper/human`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
@@ -213,4 +213,4 @@ Live-market services cannot make the re-run promise — the market moves between
 
 ---
 
-**Continues in part 4 of 6: `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures  |  9. Related Work and Positioning**
+**Continues in part 4 of 6: `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures**

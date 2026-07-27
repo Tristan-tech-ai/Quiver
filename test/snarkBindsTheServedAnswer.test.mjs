@@ -12,7 +12,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { byName } from '../src/services.js';
-import { getProof, verificationKey } from '../src/util/snark.js';
+import { getProof, verificationKey, stopProver, warmProver } from '../src/util/snark.js';
 
 const require = createRequire(import.meta.url);
 const scale = require('../src/util/scale.cjs');
@@ -25,10 +25,14 @@ const SIG = { residual: 0, tolerance: 1, mHat: 2, qHat: 3, p0Hat: 4, s: 5, mmrHa
 process.env.QUIVER_SIGNING_KEY = process.env.QUIVER_SIGNING_KEY
   || '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
 
-// snarkjs spins up a BN254 worker pool and never tears it down, so a test process that has proved
-// anything hangs after the last assertion instead of exiting. A long-lived server does not care; a
-// test runner does, and a suite that never exits looks exactly like a suite that never finishes.
-after(async () => { try { await globalThis.curve_bn128?.terminate(); } catch { /* nothing to close */ } });
+// Two things outlive the last assertion. The prover is a forked process, and snarkjs — imported on
+// THIS thread by the verification tests below — spins up a BN254 worker pool it never tears down.
+// Either one keeps the runner alive, and a suite that never exits looks exactly like a suite that
+// never finishes.
+after(async () => {
+  try { await stopProver(); } catch { /* already gone */ }
+  try { await globalThis.curve_bn128?.terminate(); } catch { /* nothing to close */ }
+});
 
 async function proven(input, { timeoutMs = 90_000 } = {}) {
   const out = await byName['perp-gate'].run({ ...input, snark: true });
@@ -197,4 +201,35 @@ test('the retrieval endpoint surfaces the attestation, not just the proof', asyn
   } finally {
     await new Promise((r) => server.close(r));
   }
+});
+
+test('proving does not block the thread that serves requests', async () => {
+  // The regression this exists for was found by measuring production, not by reading code: p50 was a
+  // comfortable 369 ms and p95 was one full second. The cause was that "off the request path" still
+  // meant "on the only thread there is" — a proof for one caller froze the event loop for 506 ms and
+  // every other caller paid, including the ones who had asked for no proof at all.
+  //
+  // A latency assertion against a remote host would be a flake generator. Event-loop lag is the
+  // honest local proxy: if this thread is free, a request arriving mid-proof is served on time.
+  await warmProver();
+  await new Promise((r) => setTimeout(r, 4000));   // let the prover load snarkjs and the 5.3MB key
+
+  let worst = 0;
+  let last = Date.now();
+  const tick = setInterval(() => { const now = Date.now(); worst = Math.max(worst, now - last - 10); last = now; }, 10);
+  await new Promise((r) => setTimeout(r, 200));
+  worst = 0; last = Date.now();                    // discard warm-up jitter
+
+  const out = await byName['perp-gate'].run({ side: 'short', entryPrice: 1875.25, size: 4.5, leverage: 7, maintMarginRate: 0.012, snark: true });
+  const deadline = Date.now() + 90_000;
+  for (;;) {
+    const rec = getProof(out.proof.contentHash);
+    if (rec && rec.status !== 'building') break;
+    if (Date.now() > deadline) break;
+    await new Promise((r) => setTimeout(r, 10));
+  }
+  clearInterval(tick);
+
+  assert.equal(getProof(out.proof.contentHash).status, 'ready', 'the proof must still get built');
+  assert.ok(worst < 200, `event loop stalled ${worst}ms while proving — it was 506ms before the prover moved off-thread`);
 });

@@ -13,12 +13,16 @@
 // usual speed carrying a retrieval URL, the proof is built in the background, and a free GET fetches
 // it by content hash — which also lets a third party pull the proof for someone else's answer.
 //
-// snarkjs costs 2,066 ms to import cold. That is started at boot without being awaited, so a request
-// arriving later finds it resolved and the cold-start cost lands on the container, not the caller.
+// AND IT LEAVES THIS THREAD. Deferring the work off the request path was not enough. Node runs one
+// thread, so a proof being built for caller A blocked the event loop for up to 506 ms — measured —
+// and caller B, who asked for no proof at all, paid for it. Production showed that as a p95 of one
+// full second. The prover now lives in a worker (proverWorker.mjs) along with the snarkjs import and
+// the 5.3 MB key, and this file keeps only integer encoding and a queue.
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { fork } from 'node:child_process';
 import { attestSignals } from './attest.js';
 
 const require = createRequire(import.meta.url);
@@ -27,28 +31,60 @@ const scale = require('./scale.cjs');
 const ZK = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'zk');
 const PROTOCOL = 'plonk';
 
-let snarkjsP = null;      // the import, started eagerly and awaited lazily
-let zkey = null;
-let wasm = null;
-let witnessCalcP = null;
+// One long-lived worker. Spawning per proof would pay the snarkjs import and the 5.3MB zkey read
+// every time; keeping one alive pays it once and leaves the main thread untouched either way.
+let worker = null;
+let nextJob = 1;
+const pending = new Map();   // job id -> { resolve, reject }
 
-/** Start loading the prover without blocking boot. Safe to call more than once. */
-export function warmProver() {
-  if (snarkjsP) return snarkjsP;
-  snarkjsP = import('snarkjs')
-    .then((m) => m.default ?? m)
-    .catch((e) => { snarkjsP = null; throw e; });
-  return snarkjsP;
+function ensureWorker() {
+  if (worker) return worker;
+  worker = fork(fileURLToPath(new URL('./proverWorker.mjs', import.meta.url)), [], { stdio: ['ignore', 'inherit', 'inherit', 'ipc'] });
+  worker.on('message', (m) => {
+    if (!m || m.warmed !== undefined) return;              // warm acknowledgement, nothing to settle
+    const p = pending.get(m.id);
+    if (!p) return;
+    pending.delete(m.id);
+    if (m.error) p.reject(new Error(m.error)); else p.resolve(m);
+  });
+  // If the worker dies — OOM, an unhandled fault in WASM — every job waiting on it must be told,
+  // or a caller polls `building` forever and the queue never drains. The next request respawns it.
+  const die = (why) => {
+    for (const [, p] of pending) p.reject(new Error(`prover worker ${why}`));
+    pending.clear();
+    worker = null;
+  };
+  worker.on('error', (e) => die(`failed: ${e && e.message}`));
+  worker.on('exit', (code) => { if (worker) die(`exited with code ${code}`); });
+  worker.unref();   // a proving process must never be the reason the parent refuses to shut down
+  return worker;
 }
 
-function artifacts() {
-  if (!zkey) zkey = new Uint8Array(readFileSync(join(ZK, 'liquidation_plonk.zkey')));
-  if (!wasm) wasm = readFileSync(join(ZK, 'liquidation_js', 'liquidation.wasm'));
-  if (!witnessCalcP) {
-    const builder = require(join(ZK, 'liquidation_js', 'witness_calculator.cjs'));
-    witnessCalcP = builder(wasm);
-  }
-  return witnessCalcP;
+function prove(witness) {
+  const w = ensureWorker();
+  const id = nextJob++;
+  return new Promise((resolve, reject) => {
+    pending.set(id, { resolve, reject });
+    w.send({ id, witness });
+  });
+}
+
+/**
+ * Start the worker and have it load snarkjs and the proving key, without blocking boot and without
+ * doing any of it on this thread. Safe to call more than once.
+ */
+export function warmProver() {
+  const w = ensureWorker();
+  w.send({ warm: true });
+  return Promise.resolve(w);
+}
+
+/** Shut the prover down. Tests need this; a long-lived server does not. */
+export async function stopProver() {
+  if (!worker) return;
+  const w = worker;
+  worker = null;
+  w.kill();
 }
 
 // Content-hash-keyed store. Identical inputs produce an identical proof, so a repeat request is
@@ -139,10 +175,7 @@ export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
   put(contentHash, { status: 'building' });
   queued++;
   queue = queue.then(async () => {
-    const sj = await warmProver();
-    const calc = await artifacts();
-    const wtns = await calc.calculateWTNSBin(w.witness, 0);
-    const { proof, publicSignals } = await sj[PROTOCOL].prove(zkey, wtns);
+    const { proof, publicSignals } = await prove(w.witness);
     put(contentHash, {
       status: 'ready', protocol: PROTOCOL, proof, publicSignals,
       // Signed here rather than at request time because the signals do not exist until the witness

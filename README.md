@@ -27,7 +27,8 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 | **Strongest evidence** | A population-scale replay of the October 2025 crash and two out-of-sample 2026 crashes: flagged accounts were liquidated at 14.3× and 13.3× the rate of cleared ones — on a flag that fires on 41.6% and 43.8% of accounts, which belongs beside the ratio and not after it. → [verification](docs/verification.md) |
 | **Strongest counter-evidence, ours** | Our own ablation reduces that result to raw distance-to-liquidation — and that distance is the *venue's* published number, not one this engine computed, so the study validates the quantity rather than our arithmetic on it. The flag also fires on 42–44% of accounts. Both sit beside the headline, not in a footnote. |
 | **Traction, honestly** | Small, and measured on chain rather than from our own counter. Six payer addresses that are not ours sent **44 payments totalling 0.575 USD₮0** over the eight days to 27 July 2026; **four of the six paid more than once**, one returning across 2.55 days. Half a dollar is not a business. An earlier version said three wallets and zero recurrence — that came from an in-memory instrument that resets on every deploy. → [verification](docs/verification.md) |
-| **Tests** | **372** model-free tests, 367 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
+| **Verified on chain** | Add `"snark": true` to a perp-gate call and a **PLONK proof** of the liquidation identity is built off the request path; [`QuiverProofRegistry`](https://www.okx.com/web3/explorer/xlayer/address/0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60) on X Layer checks the arithmetic itself and records the outcome. Live since 28 July 2026: one transaction [accepting a proof bought from the live endpoint](https://www.okx.com/web3/explorer/xlayer/tx/0x50397d713b96414800fef2dc6c2b4b8a48bd89d7f793683df9deddfbe73f368a) and one [rejecting a tampered copy](https://www.okx.com/web3/explorer/xlayer/tx/0x97502c78e61958a9a1013a257bf281c665684e214d6474c41444eb0294cb4aac). The chain holds `58329.113924051` against the `58329.11` that was sold. **Nothing about our identity, uptime or reputation is load-bearing in that sentence** — a seller who lies produces a proof that fails in public. → [on-chain verification](docs/onchain-verification.md) |
+| **Tests** | **386** model-free tests, 381 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
 | **What it refuses to do** | Output a directional edge. Infer dealer positioning it cannot measure. Call a variance premium significant when it is not. Guess when the data is missing — it answers `DATA_UNAVAILABLE`, for free. |
 
 ---
@@ -127,7 +128,7 @@ you keep your money.
 
 ```bash
 npm ci
-npm test      # 372 model-free tests — no network access required
+npm test      # 386 model-free tests — no network access required
 npm start     # serves on the configured port
 ```
 

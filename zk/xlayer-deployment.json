@@ -1,0 +1,19 @@
+{
+  "at": "2026-07-27T19:50:35.486Z",
+  "chainId": 196,
+  "rpc": "https://xlayer.drpc.org",
+  "verifier": "0x59F6Aa860eE0d26Db873f7c7015CE869170b3b25",
+  "registry": "0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60",
+  "attestor": "0x946324E0E5d7D77206731E35Ef4044a383e2a8C2",
+  "deployVerifierTx": "0xc5182e9ed1686bf58acfc7c343b9024bafa0fa26ad285fccd3f00e5b82b9b7b1",
+  "deployRegistryTx": "0x37b17dbfe869cab0e7dad41f933c6c1e501ece5f407fca7644966226c6a77bf4",
+  "acceptTx": "0x50397d713b96414800fef2dc6c2b4b8a48bd89d7f793683df9deddfbe73f368a",
+  "acceptGas": "468459",
+  "rejectTx": "0x97502c78e61958a9a1013a257bf281c665684e214d6474c41444eb0294cb4aac",
+  "rejectGas": "333155",
+  "contentHash": "8575ce5ae5bfae9cdfdfc604250f8032e4ba85fb33560386586b7538d0ab0960",
+  "signalsDigest": "0x25669da50feb5d2dc6f6daaade452e7d22324183706330174218c8196c036206",
+  "liquidationPrice": 58329.11,
+  "explorer": "https://www.okx.com/web3/explorer/xlayer/address/0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60",
+  "note": "The verifier was deployed by an earlier run of this script that then failed on the registry — it selected the IPlonkVerifier interface out of the compilation output instead of the registry. The verifier was reused rather than redeployed, after fetching the code at that address and comparing it byte-for-byte against this build (7,270 bytes, identical)."
+}

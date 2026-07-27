@@ -38,7 +38,7 @@ You get back the money-math **plus a proof envelope**:
   "checks": [ /* liquidation-invariant self-check */ ],
   "proof": {
     "engine": "perp-gate",
-    "codeHash": "q1-3e36dcbe3a0a7843",     // == /build codeHash; rebuild from source to reproduce
+    "codeHash": "q1-e1fa99d08887d6cc",     // == /build codeHash; rebuild from source to reproduce
     "inputs":  { /* echoed */ },
     "selfChecks": [ /* each re-checkable */ ],
     "allSelfChecksPass": true,

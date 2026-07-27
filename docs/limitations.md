@@ -75,7 +75,11 @@ visible, and reports Kyle's lambda with a confidence label.
 
 Events are a hardcoded table transcribed from published Federal Reserve, BLS and BEA schedules, which
 makes the service deterministic and free of an upstream that can fail mid-call — a deliberate trade,
-but a trade. Past the last transcribed release it reports an empty window rather than a wrong one.
+but a trade. Past the last transcribed release it does not report a clear window: it returns
+`CALENDAR_EXHAUSTED`, a third verdict distinct from both `CLEAR` and `EVENTS_AHEAD`, alongside
+`certified: false` and a note saying that absence of events beyond the horizon is unknown rather than
+clear. A caller can therefore tell "nothing is scheduled" from "I cannot see that far" — the
+distinction that matters to anything trading around a release.
 
 ### 9. [structural] None of this is financial advice
 
@@ -87,8 +91,8 @@ all, because short-horizon direction is empirically indistinguishable from a coi
 
 One container, one region, trial tier. The record is published rather than promised: over the
 measured window, **99.63% of cycles clean (3,508 of 3,521)**, with four isolated single-cycle blips
-and one genuine outage of about eighteen minutes on 24 July 2026, during which the platform edge
-accepted TLS but returned no bytes.
+that cleared on the next cycle and nine consecutive failures spanning one genuine outage of about
+eighteen minutes on 24 July 2026, during which the platform edge accepted TLS but returned no bytes.
 
 Two consequences are worth stating plainly. During such an outage Quiver cannot explain itself — the
 component that would apologise is the unreachable one — which is why the availability record is

@@ -8,7 +8,7 @@ crashes, and an outside party paying real money to check the answers.
 
 ---
 
-## 1. The invariant suite — 338 tests, 333 passing, 5 skipped, 0 failing
+## 1. The invariant suite — 356 tests, 351 passing, 5 skipped, 0 failing
 
 Model-free properties that must hold for *any* inputs, so a regression in the mathematics breaks the
 build rather than shipping a wrong number. It runs under the built-in Node test runner with no

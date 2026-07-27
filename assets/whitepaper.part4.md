@@ -1,0 +1,285 @@
+# Quiver — Technical Documentation — part 4 of 6
+
+> The complete document, split only because a single fetch truncates. **Nothing is abridged**: the
+> parts below concatenate to the whole text, cut at section boundaries. Every part is served as plain
+> markdown.
+>
+> - **Part 1** — `/paper/1` — Abstract  |  At a Glance  |  Contents  |  1. Introduction  |  2. System Architecture  |  3. Design Principles
+> - **Part 2** — `/paper/2` — 4. Service Catalogue
+> - **Part 3** — `/paper/3` — 5. Methodology
+> - **Part 4** — `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures  |  9. Related Work and Positioning
+> - **Part 5** — `/paper/5` — 10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
+> - **Part 6** — `/paper/6` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
+>
+> Whole document in one response (237 kB, may truncate in your client): `/paper/full`
+> Typeset edition with figures: `/paper/human`
+> Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
+
+---
+
+## 6. Verification and Testing
+
+Two mechanisms keep the services honest: an automated test suite of model-free invariants, and a ground-truthing protocol that runs each service against live data and checks the result against an independent reference.
+
+
+### 6.1 The invariant test suite
+
+The financial mathematics is locked by 351 automated tests that run under the built-in Node test runner [54] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
+
+**Table 2 — representative invariants from the 333-test suite. All currently pass.**
+
+| Property asserted | Why it must hold |
+| --- | --- |
+| Put-call parity, `C − P = e^−rT(F − K)` | Model-free; a violation means the pricer is wrong. |
+| Delta parity, `Δ_c − Δ_p = e^−rT` | Follows from parity; guards the greeks. |
+| Vanna, volga equal analytic and finite-difference values | Certifies the closed forms of equation (3). |
+| Corrected probability (8) matches a numerical Breeden–Litzenberger derivative | Certifies the smile-slope correction. |
+| Risk-neutral density is non-negative and integrates to one | A proper density; negativity is butterfly arbitrage. |
+| Distribution mean equals the forward (martingale) | The risk-neutral consistency condition, equation (9). |
+| Total-variance interpolation is non-decreasing in maturity | Calendar no-arbitrage, equation (6). |
+| Every indicator is causal (no look-ahead) | A value at bar `i` must not change when future bars are added. |
+| Microstructure estimators recover known-answer synthetic tapes; dust does not explode Amihud | Guards the block estimators of Section 5.5. |
+| An internal Merkle node presented as a member leaf does *not* verify, and the served root reproduces under an independent byte-level implementation | Soundness and on-chain verifiability of `risk-attest`. The first of these can fail structurally; the earlier non-member check could not, and a reviewer walked through the gap (Section 11.5). |
+| Expected divergence lies in `(−100%, 0]`, on the inputs actually served | V2 divergence loss is bounded; a figure outside the range is not a large loss but a wrong answer. Checked on the served value, not on a fixed reference. |
+| Re-running `lp-risk` at its own reported break-even volatility nets zero | Forces the break-even and the headline expectation to be solutions to the same equation rather than two approximations that disagree. |
+| A position whose mark is past its liquidation price is labelled below-maintenance and excluded from the book's nearest-*future* ranking | Separates an event that has happened from one that has not; the arithmetic was already consistent when the semantics were wrong. |
+
+The no-look-ahead test deserves emphasis because it is the single most important property of anything computed on a time series and the easiest to get subtly wrong. It recomputes each indicator on a truncated prefix of the data and asserts that a settled past value is unchanged. An indicator that fails it is peeking into the future, and any backtest built on it is invalid.
+
+
+### 6.2 Ground-truthing protocol
+
+Passing synthetic tests is necessary but not sufficient, because a synthetic test only checks what its author thought to check. Every service was therefore run against live venues and its output checked against an independent method. This is where the real defects surfaced, and the value of the protocol is best shown by what it caught. Table 3 lists the corrections that ground-truthing forced; each was invisible to the synthetic tests and obvious the moment the service met live data.
+
+**Table 3 — defects caught by ground-truthing against live venues, and the fix each forced.**
+
+| Symptom on live data | Root cause | Fix |
+| --- | --- | --- |
+| Probability off by up to 5 points versus a numerical density on a BTC smile | `N(d₂)` omits the volatility-slope term of equation (8) | Replaced with the smile-corrected probability; correction size reported per level |
+| Amihud illiquidity of order 10^9 on a memecoin tape | Sub-cent dust trades drive the per-trade denominator to near zero; hot-token feed is sampled | Estimate on equal-count volume blocks; Amihud falls to 0.303 |
+| USD Coin reported as not a proxy | USDC predates EIP-1967 and stores its implementation in the legacy OpenZeppelin slot | Added the legacy slot to the proxy check; USDC now flagged upgradeable |
+| A variance premium that looked real | Overlapping windows inflate the sample and manufacture significance | Test at the effective independent sample; report p = 0.254, not significant |
+| Near-expiry volatility slices fitting badly | Sub-day smiles are jump-dominated; SVI is diffusive | Exclude those slices by design and disclose, rather than force-fit |
+
+The pattern in every row is the same: the code was internally consistent and wrong, and only contact with reality exposed it. The lesson is the protocol itself. Build, then point the thing at the market and believe the market over the code.
+
+
+### 6.3 Validation against the real market — population-scale, pre-registered, out-of-sample
+
+Tests and ground-truthing establish that the mathematics is implemented correctly. A harder question is whether the number the risk engine reports *means* anything — whether the accounts it would have flagged are, in fact, the accounts that die. That question was answered on the historical record, at population scale, using the venue's own data: daily snapshots of *every* open perpetual position on Hyperliquid (position, entry, leverage, margin mode, and the venue's own liquidation price), joined against the addresses actually liquidated in each crash, reconstructed from the raw fill stream so that every liquidation path is counted.
+
+The protocol matters as much as the result, because a replay can always be tuned until it flatters. Here it could not be: the hypotheses, thresholds, data definitions, and pass/fail bars were **fixed in published files before any validation number was computed**, with a hard temporal cutoff at the end of 2025 — betas measured only on 2025 stress episodes, tested only on 2026 events the calibration had never seen. Deviations from the registered plan, where they occurred, are disclosed in the study; none was in the model's favour.
+
+**Table 4 — the risk engine's flag versus reality. "Flagged" = the account's beta-scaled distance to liquidation, computed from the snapshot taken roughly a day earlier, was within the registered threshold. Victim sets for the 2026 events are censoring-free (full fill stream). **The October row's levels are not comparable to the 2026 rows.** Its victim set was assembled by tagging fills to a liquidator label and six known liquidator addresses — 4,426 distinct addresses from 10,120 tagged fills over the 24 hours around the trough — so any liquidation routed through a path we did not recognise is missing, and both the 7.07% and the 1.83% are biased downward by an unknown amount. The 2026 rows instead read the archive's own liquidation flag over the entire fill stream and need no such recognition. Undercounting removes victims from the flagged and cleared cohorts alike, so the ratio survives the bias far better than the levels do, but not perfectly: were liquidator coverage systematically better for accounts near liquidation than for accounts far from it, the ratio would be inflated too. October is also the calibration event and therefore carries no out-of-sample weight in the first place; it is shown for the dose-response shape and the censoring lesson, not as a third result.**
+
+| Event | Role | Accounts | Flagged & wiped | Cleared & wiped | Relative risk |
+| --- | --- | --- | --- | --- | --- |
+| Oct 10, 2025 (−17.7%, largest liquidation day on record) | replay (calibration event) | 79,386 | 7.07% | 1.83% | 3.9× |
+| **Feb 2026** (deepest event in the archive) | **out-of-sample** | 66,148 | **43.97%** | **3.30%** | **13.3×** |
+| **Jun 2026** (−17.2%) | **out-of-sample** | 100,034 | **25.37%** | **1.78%** | **14.3×** |
+
+Three properties of these numbers deserve emphasis. First, the two out-of-sample relative risks — 14.3× and 13.3× on independent events — are consistent with each other, and cross-event consistency is precisely what tuning-to-a-backtest cannot produce. Second, the dose-response is monotonic on both out-of-sample events: on the June crash, accounts within 5% of liquidation were wiped at 40.9%, those 5–10% out at 11.6%, those 10–13.6% out at 3.2%, and those beyond at 0.8% (the bands are cut on raw distance-to-liquidation and cover only accounts carrying a measurable down-risk leg, which is why the widest band reads 0.8% while the flag's cleared cohort in Tables 4 and 6, which also contains accounts with no down-risk leg at all, reads 1.78%) — the flag is not a binary lucky guess but a graded distance that reality respects. Third, the October replay also identified *which* cohort a correlated-stress warning uniquely protects: accounts sitting 10–17.7% from liquidation — safe under routine volatility, reachable only by a correlated crash — were wiped at 7.4× the rate of everyone further out. The per-asset crash betas met their pre-registered transportability criterion on the median while missing it on one episode (the registered bar was a median Spearman above 0.60; rank-correlation of 2025-calibrated betas against five 2026 episodes: 0.530, 0.650, 0.657, 0.670, 0.775, median 0.657, minimum 0.530 against a pre-registered floor of 0.60 — one of the five episodes fell below that floor), and ship in the service as severity tiers with this validation record attached to every response. What the betas do *not* do is carry the prediction, which the next paragraph establishes rather than assumes. The full study, its honesty ledgers, and the scripts that reproduce every number from public data (about $1 of requester-pays S3 access) are in the public repository, `github.com/Tristan-tech-ai/Quiver`, under `research/`.
+
+
+### 6.4 The same result at its least flattering
+
+Relative risk is the most flattering true framing of a classifier, because it divides by a cleared cohort that can be made arbitrarily clean. It is not the number an operator needs. Someone deciding whether to act on this flag is choosing what to do with the accounts it fires on, so what matters is how often firing is right and how much better than the base rate that is — the figures below. Every one is computed from the cells of Table 4 and Table 6 and can be recomputed by a reader from those tables alone.
+
+**Table 5 — the June and February out-of-sample events scored the way that is hardest on the flag. Every rate is computed over the accounts present in the pre-crash snapshot, which is the only population a flag computed a day early can speak about. The two recall rows exist because an earlier draft published the first one under the label "recall of all liquidations", which it is not: a quarter to a third of the addresses liquidated in each crash had opened their position after the snapshot was taken, so no flag could have scored them. The unconditional figure is the one to quote against a claim of catching liquidations; the conditional one is the one to quote about the classifier.**
+
+| Measure | Jun 2026 | Feb 2026 |
+| --- | --- | --- |
+| Accounts | 100,034 | 66,148 |
+| Flagged share of population | 43.79% | 41.63% |
+| Base rate (all accounts liquidated) | 12.11% | 20.23% |
+| Precision (flagged and liquidated) | 25.37% | 43.97% |
+| Recall among accounts the snapshot could see | 91.7% | 90.5% |
+| Recall against *every* liquidation in the fill stream | 67.4% | 62.0% |
+| **Lift over base rate** | **2.09×** | **2.17×** |
+| Relative risk (flagged vs cleared) | 14.25× | 13.32× |
+
+The two framings describe the same data and carry very different weight. **Lift over the base rate is 2.1×, not 14×**, and lift is the number an operator should use when deciding whether to act on the flag. The 14× is real arithmetic and it is also the largest available ratio, because the cleared cohort it divides by is unusually clean; a reader who sees only that number is being shown the classifier at its most impressive angle. What the flag buys, stated plainly: it catches about nine in ten of the accounts that will be liquidated, at the cost of flagging four in ten of all accounts, and an account it flags is about twice as likely to be liquidated as an account picked at random. That is a useful triage instrument and it is not a precision instrument, and no confidence intervals are reported here because the events are two, not a sample.
+
+
+### 6.5 An ablation the result did not survive intact
+
+A relative risk is only as meaningful as the baseline it is measured against, and the baseline here is not one. Inside a crash, accounts closer to liquidation get liquidated; a flag built on distance-to-liquidation will separate the population even if every refinement layered on top of it is worthless. The specific question this raises is whether the beta scaling — the part of the flag that required a separate calibration study and is presented above as the sophisticated component — contributes anything at all, or whether raw distance would do the same work. We had not tested that. An adversarial review of an earlier draft of this document pointed it out, and the test is cheap, so we ran it.
+
+The pipeline was run twice on each out-of-sample event, over the same snapshot and the same victim set, once with the pre-registered betas and once with every beta forced to 1. To keep the comparison fair, the raw threshold was set to the quantile that flags the *same number of accounts* as the beta-scaled threshold, so neither arm can win by flagging more or fewer.
+
+**Table 6 — beta-scaled flag against raw distance-to-liquidation, at matched flagged-population size.**
+
+| Event | Arm | Flagged | Flagged wiped | Cleared wiped | Relative risk |
+| --- | --- | --- | --- | --- | --- |
+| Jun 2026 (100,034 accounts) | beta-scaled | 43,807 | 25.37% | 1.78% | 14.25× |
+| raw distance | 43,807 | 25.32% | 1.83% | 13.85× |  |
+| Feb 2026 (66,148 accounts) | beta-scaled | 27,539 | 43.97% | 3.30% | 13.32× |
+| raw distance | 27,539 | 43.99% | 3.29% | 13.36× |  |
+
+**Beta scaling adds nothing measurable.** The unrounded ratios are 14.25× against 13.85× in June and 13.32× against 13.36× in February; the headline 14.3× and 13.3× elsewhere in this document are these same figures rounded. Beta scaling is marginally ahead on the June event and marginally behind on the February one, which is what noise looks like. Nor is the threshold more transportable after scaling: the February-to-June threshold ratio is 1.61 in beta units against 1.46 in raw units, so a single fixed cutoff travels slightly *worse* in the scaled measure. The honest reading is that the calibration study established the betas are stable enough to rank assets, and the ablation establishes that this stability is not what produces the 14.25×.
+
+What survives is worth stating precisely, because it is less than the earlier draft implied and more than nothing. The flag is not tautological: 74.6% of flagged accounts were *not* liquidated in June, while cleared accounts were wiped at 1.8%, so the separation is real rather than a restatement of the definition. What the crash study validates is that distance-to-liquidation predicts liquidation in a crash, and that this held on two events the thresholds had never seen. It is worth being exact about *whose* distance, because an earlier version of this passage was not. The flag reads the `liquidation_price` column of the venue's own position snapshot — literally `liquidation_price AS liq` in `h2.sql`, in `h2b.sql`, and in both arms of the ablation — and divides the resulting distance by a crash beta. It never calls `perp-gate`. No number this engine computed appears anywhere in the result. So the study establishes that *the quantity* predicts liquidation, and not that *our computation of it* does. The beta layer remains in the product as a severity tier, now shipping with a null result attached to it rather than an implication. The ablation script and its output are in the repository at `research/reservoir-data/ablation.sql` and `ablation-feb.sql`, with the recorded output in `ablation-result.json`, and reproduce in under a minute against the same public snapshots.
+
+Two things follow from that, and the first is a criticism this document should have made of itself before a reviewer did. **The naive arm a sceptic would ask for is already in the study, unlabelled.** An agent that can read the venue's position endpoint gets that liquidation price for free, so the "raw distance" arm of Table 6 is not a stripped-down version of our method — it *is* the method an agent could run without us, and it scores 13.85× against 14.25×. Presenting the beta scaling as the sophisticated component obscured that the unsophisticated component was already a baseline, and the ablation that retired the betas was therefore doing more work than it was credited with. **And the sentence this passage replaces claimed the validated thing was distance "computed correctly, across venues and margin regimes"**, which is exactly the part the study did not test, because the venue did the computing.
+
+The engine's own correctness therefore rests where it always did, on evidence of a different kind rather than on this study: the liquidation invariant asserted on every single call, which substitutes the solved price back into the venue's stated condition and fails loudly if it does not hold (Section 5.10); and `portfolio-gate`'s cross-check against the venue's *published* price on isolated legs, which fails beyond 2.5 points and is the one verifier in this system we do not control. Those establish that we compute the same number the venue does, wherever the venue publishes one. The case for computing it at all is the case where the venue does *not* — a second venue with a different margin regime, a cross-margin account whose legs offset, a position the agent is considering but has not opened — and none of those appear in this study either, because a historical position snapshot only contains positions that existed. A reader who wants the crash result and the product's value proposition to be a single argument is entitled to notice that they are two arguments, and that only the first one is measured here.
+
+Finally, the payment surface itself was field-tested the way a buyer would: every one of the twenty-two services was purchased end-to-end with real money on *both* rails — USDC on Base through the CDP facilitator, and USD₮0 on X Layer through the OKX facilitator, the latter signed by an OKX agentic wallet's TEE exactly as a marketplace buyer would sign — with every 402 challenge, on-chain settlement, and response envelope independently verified, and the ledger reconciling to the cent. Those test purchases are quality assurance, not traction, and are never counted as sales.
+
+
+### 6.6 Independent buyer verification, and a defect it found in the money path
+
+Everything above shares one weakness: the party that writes the code also grades it. To narrow that gap, a separate autonomous buyer agent was commissioned to operate as a paying customer for four days (21–25 July 2026) from its own wallet (`0xba3a…1f9b` on X Layer), on a different machine and network egress, with no access to the server, its logs, or any internal credential. Its mandate was to buy services inside genuine decision contexts, verify every envelope independently against a clone of the public repository, and report defects; it was told explicitly that finding nothing would count as a failure of the exercise. One disclosure belongs at the front: that buyer was commissioned by the author, so this is an *arm's-length audit, not a third-party endorsement*. What makes it worth reading is that every figure it reports is reproducible from public data using the commands it published — and that it retracted its own headline finding when the finding turned out to be wrong.
+
+Across 1,089 paid calls the buyer recorded **983 independent envelope verifications, the gap to 1,089 being calls whose answers were refusals or unavailable-data responses and so carried no envelope to verify, with zero failures**: content hashes recomputed, self-checks re-evaluated, signers recovered, code hashes compared against a fresh clone, and deterministic engines re-run for byte-identical output. That chain held across a mid-audit deploy, when a `git pull` on the clone immediately reproduced the new code hash. No response was ever found to disagree with its own proof.
+
+The buyer wrote that report on 25 July, and its desk kept running for another day — stopping at 02:00 UTC on 26 July because its own spending envelope ran out, not because it had finished. The figures above are the ones the buyer published and stood behind. The figures that follow are *our* recomputation from the buyer's own ledger, carried to the point the desk stopped, and they are labelled that way because the buyer never certified them. The recomputation does not ask to be taken on trust either. The ledger is published at `research/BUYER_LEDGER.csv` and the script that reads it at `research/buyer-ledger-recount.mjs`, so `node research/buyer-ledger-recount.mjs` reproduces every number in this paragraph and in Table 7 from a clone, with no network access and nothing to configure. That script starts by re-deriving the three figures the buyer *did* publish — 18, 43 and 27 settled rows with no transaction hash on 21, 22 and 23 July — and exits with an error instead of printing anything else if they fail to come out, so the method is pinned to numbers somebody else checked before it is pointed at numbers nobody has. Extended to the full record it finds **1,785 ledger rows, 1,721 of them settled, and 1,750 envelope verifications with zero failures**; the desk log contains exactly one distinct verification outcome, `verify=OK`, and no line recording any other, which is the check that the zero is a measurement rather than an artefact of what we searched for. What this mostly adds is post-fix volume, which is precisely where the earlier account was thinnest: **719 settled calls after the acceptance fix, of which zero lack a settlement transaction hash**, against the 87 the buyer had in hand when it wrote. What it does not add is coverage of the build this document publishes. The desk's last call was at 01:45 UTC on 26 July, against the build this document has since superseded, `q1-bce7e7bccb16ea1b`, so no part of this audit — neither the buyer's portion nor the extension — touched `q1-404d7ab899d32fef`.
+
+The audit's substantive finding was in the money path, not the mathematics. The buyer's ledger claimed more settled value than its wallet had actually paid out: a fraction of calls returned a delivered answer while the facilitator reported `success:true` with `status:"timeout"` and *no transaction hash*, and those settlements never landed on chain. Measured two independent ways — by ledger rows lacking a hash, and by a balance identity that touches neither the ledger's claims nor any history API — the shortfall converged on **8.78% by call count over the 1,002 calls that predate the fix, 8.08% over all 1,089 calls, and 6.84% by value** (balance identity: 6.51%). The 8.78% figure is the right one for the defect, since the 87 post-fix calls in the wider denominator could not carry it; the buyer report quoted 8.08%, and an adversarial reader was right to notice that a diluted denominator sits awkwardly beside a claim to have adopted the least favourable reading. The defect was in Quiver's acceptance rule, which treated the success flag rather than the presence of a transaction as proof of settlement. The fix gates settlement on the transaction hash, retries once idempotently (the EIP-3009 nonce makes a duplicate settle harmless), and otherwise returns a `402` that states the caller was *not* charged. Note the direction of the error: it cost the operator revenue and cost callers nothing, which is the failure mode a paid service should prefer, but it was a defect either way and it was invisible from the server's own logs until an outside ledger exposed it.
+
+**Table 7 — settlement shortfall before and after the acceptance fix, measured by the buyer from its own wallet. The three pre-fix rows are the buyer's published figures. The two post-fix rows are recomputed from the same ledger after the desk had run to a stop, and are larger than the buyer's own report because it was written mid-afternoon on 25 July with 87 calls in hand; the desk made 574 more that day and 58 the next before its spending envelope ran out. The recomputation reproduces the buyer's three pre-fix numbers exactly, which is why it is shown beside them rather than in place of them.**
+
+| Period | Settled rows | Rows with no transaction hash | Share |
+| --- | --- | --- | --- |
+| 2026-07-21 | 250 | 18 | 7.20% |
+| 2026-07-22 | 503 | 43 | 8.55% |
+| 2026-07-23 | 249 | 27 | 10.84% |
+| 2026-07-24 | *no rows: the buyer desk was halted for the day by an outage on the payment-rail provider's side, unrelated to this service, which is also the day carrying the eighteen-minute availability gap reported in Section 8* |  |  |
+| **2026-07-25 (after fix)** | **661** | **0** | **0.00%** |
+| **2026-07-26 (after fix, to 01:45 UTC)** | **58** | **0** | **0.00%** |
+
+The strongest post-fix evidence is a closed window rather than a percentage. Over twenty-five minutes in which no trading fill contaminated the balance (the wallet's OKB holding was identical at both ends), sixteen paid calls claimed 0.195000 USD₮0 and the on-chain balance fell by exactly 0.195000 USD₮0 — **a gap of 0.000000**. That test depends on neither a history API nor any field in a response, which is what makes it hard to fabricate. Twelve transaction hashes drawn at random from the post-fix day were additionally queried one at a time and all twelve confirmed as successful on chain. In the same pass the buyer verified, by wallet balance before and after rather than by trusting a response field, that an empty `loop-digest` read, three wrong-endpoint calls, and a transient upstream failure were all served for **exactly zero**.
+
+The episode that most deserves recording, however, is the buyer's correction of itself. Its first report put the shortfall near 11%, using the wallet's paginated aggregate history endpoint as on-chain truth. Challenged to establish that number independently, it queried eight of the supposedly missing transaction hashes individually — and all eight existed on chain, successful. The aggregate history endpoint was incomplete; a large part of what it had called a leak was a hole in an API. It withdrew the 11% figure, re-measured by two methods that avoid that endpoint entirely, published the arithmetic that separates a per-count from a per-value rate (a distinction its first draft and the operator's own first estimate had both blurred), adopted the reading least favourable to Quiver as its headline, and wrote a methodological warning for whoever measures next: never treat a paginated aggregate history as ground truth. A measurement discipline that corrects its own published number is the only kind whose surviving numbers mean anything, which is the same argument this document makes for proof-carrying answers.
+
+**Concurrency, which this document previously had nothing to say about.** The buyer's own limitation list, repeated below, records that its planned ten-identity test was cancelled and that consequently no figure described behaviour under simultaneous load. That gap is now partly closed. Eighty paid calls were fired at the live service in bursts of 2, 3, 6 and 12 *simultaneous* requests, on a deterministic service with fully explicit inputs so that nothing depended on an upstream venue having a good minute. The result separates cleanly into two findings that must not be merged. **The settlement accounting held exactly at every level tested.** Forty-nine calls were delivered and charged; the wallet's on-chain balance fell by exactly what the responses claimed, to the last decimal, in every burst — `0.490000` claimed against `0.490000` moved — with forty-nine distinct transaction hashes, no duplicate, and every one of the forty-nine confirmed individually on chain. Nothing was charged twice and nothing was charged without an answer. **Delivery, separately, degrades under simultaneity.** At two and three concurrent calls every request was served; at six, two independent runs delivered 8 and 9 of 12; at twelve, 24 of 48. The thirty-one calls that were not served were re-challenged with a `402` and cost **exactly zero** — the documented behaviour when settlement does not complete, and the direction of failure a paid service should prefer.
+
+Three qualifications belong with those numbers rather than after them. First, **the cause is not isolated**. Payment authorisations are signed by the wallet provider's own command-line client, which generates the authorisation nonce inside its backend rather than in our code, so the degradation could sit in that client under twelve simultaneous invocations, in the facilitator, or in this service — and this document is not entitled to say which. Reading it as "the service handles three concurrent callers" would be a claim the measurement does not support; what it supports is that the *end-to-end path*, including a payment rail this document elsewhere records as the fragile part, delivers less than it accepts as simultaneity rises. Second, **one payer identity**: the ten-identity design existed to test isolation *between* payers, and that remains untested — two wallets paying at once could still interfere in a way a single-wallet burst cannot see. Third, this is our own money moving to our own operator wallet, which makes it quality assurance and not revenue, and it is counted as neither a sale nor traction, consistent with every other figure in this section.
+
+The buyer's own limitations are stated in its report and are worth repeating here, because they bound what the section above establishes. The post-fix sample is 87 calls across roughly one day against 1,002 before the fix, so a zero-gap day is not yet a zero-gap guarantee at volume — the one item on this list that the extended ledger above partly retires, taking that sample to 719 calls across two days with the gap still at zero, while leaving it one desk, one payer identity, and no concurrency. A planned ten-identity concurrency test was cancelled by an infrastructure outage on the payment-rail provider's side, so *no* figure in the buyer's own audit describes behaviour under high concurrency — the gap the burst test above was run to close, and which it closes only for a single payer identity, leaving the between-payer isolation the ten-identity design existed to probe still untested. From outside the server, a settlement that was never attempted cannot be distinguished from one that failed silently. And the claim that all thirty-two probed protocol dossiers return complete — measured by the operator — could not be confirmed by the buyer, because one of its three spot checks met an upstream timeout; the service answered honestly and free of charge, but completeness depends on a third party's uptime at the moment of the call. The buyer's full report, including the exact commands to reproduce every figure, is in the public repository at `research/BUYER_VERIFICATION_REPORT.md`, with its defect journal beside it at `research/BUYER_BUG_REPORT.md`.
+
+
+## 7. Worked Walkthrough
+
+This section is the case-study companion to the specification: it runs services against live data and annotates what a caller actually receives and why each line can be trusted. The outputs below are real responses captured during validation, lightly trimmed for space; Appendix B gives the exact request that reproduces each. Two larger case studies live elsewhere in this document and are worth reading together with these: the population-scale crash validation of Section 6 (what the risk flag would have said the day before three real crashes, and what then happened), and the agent's-loop scenario at the end of Section 10 (how the services compose inside one trading decision).
+
+
+### 7.1 Options: the risk-neutral distribution of Bitcoin
+
+A single call to `options-desk` for BTC returns, among its layers, the full risk-neutral distribution of the terminal price for the front expiry. The block below is the live output for an expiry roughly two days out.
+
+```
+"distribution": {
+  "quantilesUsd":        { "p05": 61423, "p25": 63116, "p50": 64091, "p75": 65057, "p95": 66650 },
+  "expectedShortfallUsd":{ "left5": 60186, "right5": 67755 },
+  "rnVolPct": 2.6, "rnSkew": -0.204, "rnExcessKurtosis": 3.303,
+  "selfCheck": { "meanVsForwardPct": 0.001, "densityMass": 1.0 }
+}
+```
+
+The quantiles are monotone and centred near spot, as a two-day distribution should be. The negative skew of −0.20 is the downside-protection demand characteristic of a crypto smile, and the excess kurtosis of 3.3 is the fat tail. The line that matters most is `selfCheck.meanVsForwardPct: 0.001`: the mean of the recovered density reproduces the forward to a thousandth of a percent, so the distribution is not a plausible-looking artefact but a properly normalised risk-neutral density whose mean reproduces the forward, which is necessary for correctness without being sufficient for it. Every figure downstream, the probability ladder, the expected shortfall, the cross-market divergence, inherits that correctness.
+
+
+### 7.2 Safety: an unlimited approval to a wallet
+
+A call to `calldata-x` with an `approve` of unlimited USDC to an externally owned address returns a danger verdict, because an unlimited allowance to a personal wallet is the signature of an approval drainer.
+
+```
+"verdict": "REVIEW_HIGH_RISK",
+"alert": { "level": "DANGER" },
+"spenderReputation": {
+  "tier": "eoa",
+  "basis": "eth_getCode -> EIP-7702 delegated wallet",
+  "activity": { "outboundTxCount": 5932 }
+}
+```
+
+The same call structure with the spender set to a recognised router returns a routine note, not a danger, which is the false positive a naive rule would raise on every legitimate swap approval. Pointed at USD Coin, the target-proxy check now reports `isProxy: true` under the legacy OpenZeppelin standard, the correction that ground-truthing produced.
+
+
+### 7.3 Microstructure: price impact on a live tape
+
+A call to `tape-pulse` on a liquid token returns the three estimators of Section 5.5. On a dense tape such as PEPE, Kyle's lambda is estimated with a meaningful fit; on a sampled tape it honestly reports low confidence rather than a fabricated coefficient.
+
+```
+"microstructure": {
+  "kyleLambda": { "priceImpactBpsPer10kUsd": 13.9, "rSquared": 0.175, "confidence": "medium" },
+  "amihud":     { "pctMovePer1kUsd": 0.089 },
+  "vpin":       { "value": 0.66 },
+  "tape":       { "medianGapSeconds": 48, "spanHours": 22.2 }
+}
+```
+
+A net ten thousand dollars of one-sided flow is associated with about fourteen basis points of move, with a fit R-squared of 0.175, a moderate fit for a volume-block impact regression, which is why the service labels the confidence rather than presenting the coefficient alone. VPIN of 0.66 marks moderately one-sided flow. The tape-density line shows a forty-eight-second median gap, dense enough that the impact read stands on firm ground.
+
+
+### 7.4 Execution: the cost of size on a prediction market
+
+A call to `poly-fill` on a live Bitcoin-threshold market walks the book and fits the impact curve.
+
+```
+"marketImpact": {
+  "model": "cost ~= k * sqrt(notional) (square-root impact law) FITTED to the live book",
+  "coeffPctPerSqrtUsd": 0.176, "fitR2": 0.552, "visibleDepthUsd": 94167
+},
+"bookDepth": { "totalBidUsd": 18845, "totalAskUsd": 94167, "imbalance": 0.167 }
+```
+
+The fit R-squared of 0.55 is the honest signature of a discrete prediction-market book: it follows the square-root law moderately, not perfectly, and the service measures that rather than asserting a clean coefficient. The depth imbalance of 0.167 shows a book heavily weighted to the ask side.
+
+
+### 7.5 Charting: a rendered figure with numbers baked in
+
+A call to `chart-press` returns a PNG an agent can attach to a message, together with a facts block that states, field by field, whether each number came from the candle series that is drawn or from the live token quote. The figure below is a live render for wrapped Bitcoin on the four-hour interval with an exponential moving average, Bollinger bands, a relative-strength panel, and a volume panel, produced by the fast browserless tier.
+
+[FIGURE — chart-press render: WBTC 4H candles with EMA20, Bollinger bands, RSI and volume panels — rendered at /paper/human]
+
+```
+"facts": {
+  "symbol": "WBTC",  "interval": "4H",  "bars": 72,
+  "priceUsd": 64480.6,
+  "priceSource": "token-price-feed (live quote)",
+  "lastDrawnCandleClose": 64480.5865119,
+  "change24hPct": 0.57,  "change24hSource": "token-price-feed (live quote)",
+  "high": 68096.80909367,
+  "low": 61231.93735519,
+  "indicators": ["EMA20","BOLL","RSI","VOL"],  "width": 1200, "height": 675, "timezone": "UTC"
+}
+```
+
+Three of those are readable straight off the image: the right-edge label prints `64480.59`, and the annotated extremes print `68096.81` and `61231.94`, matching `lastDrawnCandleClose`, `high` and `low` exactly. `priceUsd` is a different measurement — the live token quote — which is why the response names its source. Here the two agree, because the final bar is still open and its close tracks the quote; in a capture forty-five minutes earlier they differed by 65.70, or ten basis points.
+
+That small gap is worth the paragraph, because until this document was revised the response asserted it could not exist. The provenance block claimed the facts "cannot drift from the picture", and named price and 24-hour change among the fields computed from the drawn series — which they were not. A reader following the response's own reconciliation instruction would have found a mismatch the response said was impossible, and would have been right to distrust everything around it. The fields `priceSource`, `change24hSource` and `lastDrawnCandleClose` exist so the comparison can be made rather than assumed, and the guarantee is now stated only over the two fields that earn it. Section 11.5 records this alongside the defects a reviewer found, because it is the same kind of error and it was ours.
+
+The property worth having here is narrower than "the numbers and the picture cannot diverge", which is what this document claimed until the paragraphs above were written. The candle series is drawn once and summarised once, so an agent that quotes `high`, `low` or `lastDrawnCandleClose` back to a user cannot contradict the image it attaches. Where a second source is genuinely better — a live quote is fresher than a closed bar — the service uses it and says so, rather than degrading the number to preserve a tidier guarantee. The anti-hallucination property is that every field names its own origin, not that every field has the same one.
+
+
+## 8. Limitations and Honest Disclosures
+
+A service is only as trustworthy as its account of what it cannot do. The following limitations are real, and each is disclosed in the relevant output rather than buried here. They are of two different kinds, and conflating them would be its own small dishonesty, so each is labelled: **[structural]** marks a limit imposed by available data, market microstructure, or statistics, which no amount of engineering on our side removes; **[scheduled]** marks an approximation that is shipping today because the better treatment is not built yet, with the commitment and its definition of done in Section 11.4. Nothing is moved out of this section for being merely unbuilt — a reader who discovers an undisclosed weakness is right to distrust everything else — but neither is unfinished work allowed to pose as a law of nature.
+
+1. **[structural] The envelope is signed by our own server, so for live data a signature establishes that we spoke, not that we were honest about what we fetched.** This is the largest trust limitation in the document and it belongs first. It does *not* touch the deterministic services: there the caller clones the repository, checks the code identity, re-runs the engine on the echoed inputs and re-derives the number, so our honesty is not in the loop at all. It applies to every answer that reads a live venue, where the caller must take our word that the bytes we fed the engine are the bytes the venue returned. What a signature adds there is accountability, not correctness, which Section 3.1 already says; what this entry adds is that the gap is not uniform across the catalogue, and pretending it is would understate the good cases and hide the real one. Measured across 1,785 responses the buyer desk actually received, the live surface separates into three kinds. **Pinned on-chain state** needs no trust today: `calldata-x` publishes the block number and block hash its simulation ran against, so any reader re-queries any node at that block and gets the same state or catches us. **Immutable public history** — a settled candle series, a past trade tape, a replayed swap sequence — is re-fetchable after the fact and therefore checkable with a delay rather than in the moment; the weakness there is ours, not the data's, because `lp-desk` replays real on-chain swaps and reports the window in days and swap count without naming the block range that would let a reader reproduce it exactly. **Ephemeral live state** is the irreducible case: an order book, a mid, a live volatility surface at an instant that will never recur. Nothing in the response can make that re-derivable, which is why those services ship an observation envelope that says so rather than a proof. The honest size of the remaining problem is therefore the third kind, not the whole live surface. The remedies are real and named rather than gestured at: a zkTLS proof (TLSNotary and its successors) attests that a particular TLS session with a particular host returned particular bytes, which is exactly the missing link, since the computation on those bytes is already re-derivable; a hardware enclave attests the execution instead. Neither is trustless in the way the word is usually sold — zkTLS moves the trust to a notary that can still collude with a prover, and an enclave moves it to a hardware vendor's root of trust — but both move it to a named party with published assumptions, which is strictly better than moving it nowhere. That work is not done here for two reasons, and the second is the more useful one to a reader. Running an enclave means different hosting, and the endpoint is a registry entry (item 10 below), so it is not a change to make days before a deadline. And on the day this was written we went to check the best-known public notary and found it down at the origin — not blocked by our network, since the same host failed from a second, unrelated network as well. A remedy whose public infrastructure is unavailable on the morning you reach for it is worth reporting as such. Two limits on the paragraphs above. The tier map was measured over the fourteen services the buyer desk exercised; the remaining eight were classified from their source, which is a weaker basis and is why `calldata-x`, one of the strongest cases, appears here on the strength of its code rather than a captured response. And an absent marker in that sweep means the desk never called the service, not that the service lacks the field — the distinction that separates a measurement from its own blind spot.
+2. **[scheduled] The per-leg liquidation model is isolated margin, and on a cross-margined account that is the wrong model by orders of magnitude.** This belongs near the top because it is the largest realistic-harm surface in the catalogue and an earlier draft presented it as an insight rather than a limitation. Every per-leg liquidation price this service computes solves the isolated condition; a cross-margined account pools equity across legs, so each leg survives far past its isolated price. Section 5.18 reports the size of that gap on a real five-leg book: the isolated view read *3% away* while the venue's own cross-margin prices sat between 240% and 62,000% away. Two consequences were understated. The venue cross-check — the only verifier in this system we do not control — is enforced for isolated legs and, correctly but inconveniently, cannot be enforced for cross legs, because the venue's number and ours model different things; so the check is off exactly where the model is furthest from the truth. And an autonomous caller polling this endpoint takes the default, which is what an agent does. What has changed is the disclosure, not the model: the nearest-liquidation headline now names the margin model it solved under, says outright that its number is *not* the book's distance when any leg is declared cross, points at the account-level figure that is comparable, and treats silence about margin mode as an assumption rather than as isolated. *Done means*: a per-leg liquidation under the venue's published cross-margin formula, cross-checked against the venue's own price with the same 2.5-point gate the isolated path already uses.
+3. **[structural] Dealer positioning in GEX is an assumption, not a measurement.** The gamma-exposure sign convention assumes dealers are long call gamma and short put gamma. It cannot be replaced by a flow-inferred position because Deribit's public feed reports block-trade direction from the maker side and carries no block tag, so a flow-based sign would be invertible for much of the volume. GEX is a positioning map under a stated convention, not measured dealer inventory.
+4. **[structural] The variance risk premium is not statistically significant on current data.** At the honest effective sample the p-value is 0.254. The real-world-calibrated probabilities that depend on it are marked indicative, and the raw risk-neutral figures, which do not depend on it, are the ones to trust.
+5. **[scheduled] One-touch barrier prices use a single volatility.** A path-dependent barrier is not smile-consistent under any single volatility. What ships today is the honest width of that approximation: the service reports the model-uncertainty span between the barrier and at-the-money volatilities, so the caller sees how much the answer could move. An earlier version of this document argued that the rigorous treatments — a local-volatility model or a vanna-volga overhedge correction [13] — could not run per call. That is true of local volatility and *not* true of vanna-volga, which is a closed-form correction from three vanilla quotes the service already has, since it fits the whole smile to price these barriers in the first place. The barrier is therefore our unbuilt work rather than a property of the market, and it is committed in Section 11.4 on those terms.
+6. **[scheduled] Transaction simulation is single-transaction and single-block.** It does not model multi-transaction bundles, sandwich or other MEV exposure, or custom state overrides, which require a bundle simulator. Spender reputation uses reachable on-chain signals; a verified-source check and an approval-graph would need an indexer that is not wired.
+7. **[structural] The exchange tape can be a sampled feed.** For a hot token the DEX trade endpoint returns a large-trade subset rather than the full tape, which weakens tick-level impact estimates. The service surfaces the tape-density diagnostic so this is visible, and reports Kyle's lambda with a confidence label.
+8. **[scheduled] The macro calendar is curated and will age.** Events are a hardcoded table transcribed from published Federal Reserve, BLS, and BEA release schedules, which makes the service deterministic and free of an upstream dependency that can fail mid-call — a deliberate trade, but a trade. Its coverage ends with the last transcribed 2026 release. Past that date the service does not report a clear window: it returns `CALENDAR_EXHAUSTED`, a third verdict distinct from both `CLEAR` and `EVENTS_AHEAD`, alongside `certified: false` and a note saying that absence of events beyond the horizon is unknown rather than clear. A caller can therefore tell "nothing is scheduled" from "I cannot see that far" — the distinction that matters to anything trading around a release. A live primary-source fetch, with the curated table retained as the fallback when that fetch fails, is committed in Section 11.4.
+9. **[structural] None of the services is financial advice.** They report what markets price and what data shows. Every output that touches a decision carries a not-advice disclosure, and the short-window up/down service refuses to output a directional edge at all.
+10. **[scheduled] Hosting is single-region with no redundancy, and the record is published rather than promised.** Quiver runs as one container in one region on a trial-tier host. An externally hosted prober, on infrastructure separate from the service but our own rather than a third party's, has called the two free endpoints every two minutes. Over the window 21 July 13:49 UTC to 26 July 11:07 UTC — 4.89 days, in which the schedule fired 3,521 times against 3,519 expected at that cadence, so it did not miss a beat — 13 cycles saw at least one endpoint fail, giving **99.63% of cycles clean (3,508 of 3,521)** with a specific shape: four isolated single-cycle blips that cleared on the next cycle, and nine consecutive failures spanning one genuine outage of about eighteen minutes on 24 July 2026, during which the platform edge accepted TLS but returned no bytes — the container was gone and the edge held connections open instead of failing fast. Two consequences are worth stating plainly. First, during such an outage Quiver cannot explain itself: the component that would apologise is the one that is unreachable, so a caller sees a timeout with no reason. That is why the availability record and current status are served from separate infrastructure, at `cgn9npwmm0.execute-api.us-east-1.amazonaws.com` (machine-readable at `?format=json`), which stays reachable when the service is not. Second, a watchdog on that same external infrastructure now probes twice a minute and, on two consecutive failures, restarts the deployment to force a fresh container; the restart was measured to be graceful, showing no observable downtime across eighty seconds of one-second polling, and its heal path was deliberately exercised end to end rather than assumed. This shortens the failure mode we have actually seen, but it cannot help when the platform's edge or region is itself broken. Redundancy across regions requires a custom domain, and the endpoint currently registered on chain is the platform subdomain; changing it is a registry update, so that work is sequenced in the roadmap rather than rushed. A caller that times out should retry after a short delay: in the measured record, every outage cleared without intervention.
+
+
+## 9. Related Work and Positioning
+
+Quiver sits at the intersection of three bodies of work: the agent-economy infrastructure that makes priced machine-to-machine services possible, the quantitative-finance methods the services implement, and the security tooling for on-chain transactions.
+
+On infrastructure, x402 [39] supplies the payment rail, ERC-8004 [38] the identity and reputation layer, and the A2A and MCP conventions [40],[41] the calling and tool-exposure patterns. These standards define how agents pay and discover; they are deliberately silent on what is worth buying, which is the space Quiver occupies. Existing agent-registry services skew toward general assistants and simple data relays; a survey of the registry at build time found no service offering arbitrage-free options analytics, and the closest options-adjacent listings were not agent-callable.
+
+On methods, the options stack rests on Black-76 [1], the Breeden–Litzenberger density [4], and the SVI surface of Gatheral with the no-arbitrage conditions of Gatheral and Jacquier [5],[6] and the wing bound of Lee [8]; the risk-neutral density literature [61] [62] [63] and its practitioner treatments inform the distribution layer. The microstructure estimators are Kyle [15], Amihud [16], and the VPIN of Easley, López de Prado, and O'Hara [17], with the square-root impact law [21] of Almgren and collaborators [18],[21] behind the fill service. The variance risk premium follows Bakshi and Kapadia and Carr and Wu [22],[23]. None of this is novel mathematics; the contribution is implementing it correctly, arbitrage-free, tested, and behind a priced agent interface, which is precisely what has not existed for agents before.
+
+On security, the transaction path is a conventional simulation-and-decode pattern; the distinguishing element is the EIP-712 signature analysis [32],[33],[37], which addresses a vector that transaction-only tools cannot observe and that accounts for a large share of modern wallet losses [60].
+
+---
+
+**Continues in part 5 of 6: `/paper/5` — 10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion**

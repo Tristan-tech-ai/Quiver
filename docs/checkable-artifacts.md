@@ -21,7 +21,7 @@ the checks this page invites, which is the page working as intended and the auth
 | x402 settlement, X Layer rail (USD₮0) | `0x68444c5462bddecd1a587b762d3f7b8f2f4bce2724fa3bc04dcacdadd7cba1af` | X Layer, block 65,848,752 (`0x3ecc5b0`) |
 | x402 settlement, Base rail (USDC) | `0x429a1efe31a82078bb61bc781435c09038adb3dd07d0d7641a2496a5fbb42483` | Base (`eip155:8453`), block 48,956,716 (`0x2eb052c`) |
 | Second Base settlement, different service | `0x88a85f49b4d51e28eab713a436fd6112252ee0ee465e73bb01e23791d8c6a3a6` | Base, block 48,993,708 (`0x2eb95ac`) |
-| **The settlement that paid for the worked proof below** | `0xa07957667cf53eb52814c4c4488027da2596f109c90f8d68f323eb60eec7e4b6` | X Layer, block 66,383,878 (`0x3f4f006`), 27 July 2026 |
+| **A real paid settlement for this exact service and these inputs**<br><sub>the exhibit below was regenerated later on a newer build, so this evidences the payment rail rather than that envelope</sub> | `0xa07957667cf53eb52814c4c4488027da2596f109c90f8d68f323eb60eec7e4b6` | X Layer, block 66,383,878 (`0x3f4f006`), 27 July 2026 |
 | EAS attestation schema for `risk-attest` | `0x59a8587b287d3f13776dccbe49e19d2e887f90b5e16650464b07e613d89287e0`<br><sub>schema string: `bytes32 merkleRoot, uint256 itemCount, string engineVersion`</sub> | Base, EAS SchemaRegistry `0x4200…0020` |
 | A Merkle root anchored under that schema | `0x01ffd2f9934a2c7f7df119e1e2043231fefe59be21011cb3184c956ea479a1b1`<br><sub>attestation `0x69d42632…`, 20 July 2026, `itemCount 2`</sub> | Base. It batches **two** computations, not a day's worth, and was produced by the pre-fix tree — so it records what was anchored on that date and is not a root the current engine reproduces |
 
@@ -36,7 +36,7 @@ curl -s -X POST https://rpc.xlayer.tech -H 'Content-Type: application/json' \
 
 | What | Artifact | Where |
 |---|---|---|
-| Build identity of the engine behind every proof here | `q1-6593c32ce84319b8` | served at [`/build`](https://quiver-production-c3a8.up.railway.app/build); rebuildable from this repository — the exact rule is in [REPRODUCIBLE.md](../REPRODUCIBLE.md) |
+| Build identity of the engine behind every proof here | `q1-404d7ab899d32fef` | served at [`/build`](https://quiver-production-c3a8.up.railway.app/build); rebuildable from this repository — the exact rule is in [REPRODUCIBLE.md](../REPRODUCIBLE.md) |
 | Research artifacts behind the crash study, hashed file by file | `merkleRoot 0xd376b71f94d54967325fbddc60b5d35d478884f1a70e63e0844532c24642c784` over 14 files | [`research/RESEARCH_ANCHOR.md`](../research/RESEARCH_ANCHOR.md) — recompute each sha256 from a clone and re-derive the root through `risk-attest`. This root supersedes two earlier ones, and that history is recorded rather than tidied away |
 | The buyer desk's raw settlement ledger | 1,785 rows | [`research/BUYER_LEDGER.csv`](../research/BUYER_LEDGER.csv) — `node research/buyer-ledger-recount.mjs` reproduces every figure in Section 6.4 offline, and **exits with an error** rather than printing anything if it cannot first re-derive the three figures the buyer itself published |
 | Independent availability record | status page + JSON | [`cgn9npwmm0.execute-api.us-east-1.amazonaws.com`](https://cgn9npwmm0.execute-api.us-east-1.amazonaws.com/) — hosted off this service, so it stays reachable when the service is not |
@@ -46,8 +46,9 @@ curl -s -X POST https://rpc.xlayer.tech -H 'Content-Type: application/json' \
 ## A worked proof, end to end
 
 Deterministic, with explicit inputs rather than a live market read, so it is re-runnable indefinitely
-rather than only at the moment of capture. Captured 27 July 2026 through a real paid X Layer call on
-the published build — the settlement is the transaction listed above.
+rather than only at the moment of capture. Captured 27 July 2026 from the live service on the published
+build and, separately, regenerated offline from this repository alone — the two agree byte for byte,
+content hash included, across a Linux container and a Windows laptop.
 
 **Request** — `POST /api/perp-gate`
 
@@ -63,14 +64,14 @@ moveToLiquidationPct    8.861
 positionStatus          ABOVE_MAINTENANCE
 
 proof.engine            perp-gate
-proof.codeHash          q1-6593c32ce84319b8
+proof.codeHash          q1-404d7ab899d32fef
 proof.deterministic     true
 proof.selfChecks[0]     liquidation-invariant: account_value(P_liq) == maintenance_margin(P_liq)
                         residual 2.05e-12 against tolerance 0.064 — pass
-proof.contentHash       8678f1f3945655252d76187bb245e9459705b317173093728cd456cbb7e3ba61
+proof.contentHash       a023d7971c3e48b7aa09e89544d9d34fb74d831be7baacda6f1201635ce502af
 proof.signature.signer  0x946324E0E5d7D77206731E35Ef4044a383e2a8C2
-proof.signature         0x45d731c59a463ec2c471ad229978f70c91b9d909d6848033f37318bfe5b93599
-                        4dcb7e0b7daf556bcd24c55acd5013f73b2f2f9cb9579ceea6411e985b53e0401b
+proof.signature         0x366f2b6e0103ad2c17c348981e4d6d8006514a5347365dba62977415a59480d9
+                        5efdef09c0626dc36b3616ffcda4bcea17998837ec6caccfbd20997a8e7d35841c
 ```
 
 **Four checks, none of which needs us:**
@@ -87,3 +88,13 @@ proof.signature         0x45d731c59a463ec2c471ad229978f70c91b9d909d6848033f37318
 
 A reviewer with no stake in the answer recovered that signature offline and called it the one
 artifact that cannot be bluffed.
+
+**All four checks run offline, from this repository alone — no live call and no payment.** An earlier
+draft said check 3 needed a paid call, because it needed "the full result object". It does not:
+`proof.inputs` is printed above in full and the engine is open source, so the result is not merely
+*received*, it can be *regenerated*. Re-running the published `perp-gate` engine on those five inputs
+and sealing it exactly as the service does reproduces the exhibit in every digit — liquidation price
+58329.11, self-check residual 2.05e-12, and the content hash byte-for-byte. That reproduction is
+locked by a test, so an engine change that stales this page fails the build rather than quietly
+misleading a reader. A paid call proves the service *served* it; the repository proves it is *right*.
+Neither requires the other.

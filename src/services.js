@@ -9,7 +9,7 @@ import { looksLikeCexSymbol } from './adapters/okx-market.js';
 import { polyFill } from './engine/polyFill.js';
 import { polyDesk } from './engine/polyDesk.js';
 import { optionsDesk } from './engine/optionsDesk.js';
-import { pawCheck } from './engine/pawCheck.js';
+
 import { protocolPulse } from './engine/protocolPulse.js';
 import { calldataX } from './engine/calldataX.js';
 import { signatureX } from './engine/signatureX.js';
@@ -204,13 +204,12 @@ export const SERVICES = [
     validate: (b) => (b?.protocol ? { protocol: String(b.protocol) } : { error: 'require { protocol }' }),
     run: async (i) => observationEnvelope('protocol-pulse', i, await protocolPulse(i.protocol), config.version),
   },
-  {
-    name: 'paw-check', path: '/api/paw-check', price: config.prices.pawCheck, register: false, // built + live but off-theme for Quiver; excluded from the ASP listing
-    blurb: 'Is this food safe for a dog or cat? Deterministic vet-grounded safety verdict',
-    inputSchema: { type: 'object', required: ['food'], properties: { food: { type: 'string' }, species: { type: 'string', description: 'dog | cat' } } },
-    validate: (b) => (b?.food ? { food: String(b.food), species: b.species } : { error: 'require { food }' }),
-    run: async (i) => observationEnvelope('paw-check', i, await pawCheck(i), config.version),
-  },
+  // `paw-check` (pet-food safety) was built here and served live, off-theme and deliberately left out
+  // of the ASP listing. It is now unmounted as well: an undocumented twenty-third priced route on a
+  // service whose whole claim is "twenty-two, catalogued in Table 1" is a contradiction a reader is
+  // entitled to hold against the count, and it was never worth defending. Unlisted means no registry
+  // change is involved. The engine file stays in src/engine/ until the next batch that moves the build
+  // hash for other reasons, so removing it costs no documentation sweep of its own.
   {
     name: 'macro-sentry', path: '/api/macro-sentry', price: config.prices.macroSentry,
     blurb: 'High-impact US macro events (FOMC/CPI/NFP) ahead + the options-implied expected move to the next one — the market\'s priced-in magnitude, not just a date',

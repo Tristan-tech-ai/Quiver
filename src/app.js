@@ -9,13 +9,25 @@ import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
-import { _internal } from './engine/proof.js';
+import { _internal, engineSourceFiles } from './engine/proof.js';
+
+// The same directory buildId() hashes, resolved the same way, so /build cannot describe a rule over
+// one tree while the hash was taken over another.
+const ENGINE_DIR = join(dirname(fileURLToPath(import.meta.url)), 'engine');
 
 // Technical documentation, served as a plain HTML page so it is readable by both humans and automated
 // (LLM) reviewers — a Drive PDF link is not fetchable by an AI screener; this URL is.
 const __dir = dirname(fileURLToPath(import.meta.url));
 let WHITEPAPER = '';
 try { WHITEPAPER = readFileSync(join(__dir, '../assets/whitepaper.html'), 'utf8'); } catch { WHITEPAPER = ''; }
+// The machine-readable edition served at /paper — see the route below for why it is the default, and
+// why it is served in parts rather than whole.
+let PAPER_MD = '';
+try { PAPER_MD = readFileSync(join(__dir, '../assets/whitepaper.md'), 'utf8'); } catch { PAPER_MD = ''; }
+const PAPER_PARTS = [];
+for (let i = 1; i <= 40; i++) {
+  try { PAPER_PARTS.push(readFileSync(join(__dir, `../assets/whitepaper.part${i}.md`), 'utf8')); } catch { break; }
+}
 
 const app = express();
 app.disable('x-powered-by');
@@ -51,6 +63,7 @@ app.get('/', (_req, res) => res.json({
   payment: PAYMENT(),
   mcp: 'POST /mcp — Streamable HTTP MCP endpoint; add this URL to any MCP client (Claude/Cursor/LangChain) to call the verifiable risk brain (free, fair-use daily quota)',
   docs: '/paper',
+  docsHuman: '/paper/human',
   build: '/build',
   agentCard: '/.well-known/agent-card.json',
   llms: '/llms.txt',
@@ -63,7 +76,7 @@ app.get(['/.well-known/agent-card.json', '/agent.json'], (_req, res) => res.json
   name: 'Quiver',
   description: 'The verifiable risk brain for autonomous agents — deterministic, proof-carrying risk computation over x402 + MCP.',
   identity: IDENTITY(),
-  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', build: '/build' },
+  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', docsHuman: '/paper/human', build: '/build' },
   payment: PAYMENT(),
   repo: 'https://github.com/Tristan-tech-ai/Quiver',
   version: config.version,
@@ -81,7 +94,7 @@ engine on the inputs to reproduce the result byte-for-byte: correctness you re-d
 Identity: ERC-8004 agent #5152 on X Layer (eip155:196), owner 0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b
 Payment: x402 v2 exact — USD₮0 on X Layer (eip155:196) and USDC on Base (eip155:8453); unpaid requests get the 402 challenge with both rails
 Free tier: POST /mcp (Streamable HTTP MCP, 9 risk tools, fair-use daily quota)
-Docs: /paper (technical documentation) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
+Docs: /paper (technical documentation, machine-readable and unabridged) · /paper/human (typeset, with figures) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
 
 ## Paid services (x402)
 ${svc}
@@ -94,13 +107,34 @@ app.get('/healthz', (_req, res) => res.json({ ok: true, version: config.version,
 // get the identical codeHash, then re-run any engine on `proof.inputs` on the SAME Node/V8 (shown here) to
 // reproduce the result bit-for-bit. (Basic IEEE-754 ops are deterministic across platforms; transcendentals
 // are stable within a V8 version — pin to this runtime for an exact re-run.)
-app.get('/build', (_req, res) => res.json({
-  codeHash: _internal.buildId(),
-  node: process.version,
-  version: config.version,
-  repo: 'https://github.com/Tristan-tech-ai/Quiver',
-  reproduce: 'Rebuild from source → identical codeHash. Then re-run the open engine on proof.inputs (on this Node version) → identical result & contentHash. Correctness is re-derived, not trusted.',
-}));
+// Publishing the hash without the RULE that produced it is a trap we walked into ourselves: the walk
+// over the engine sources changed from flat to recursive, and every verifier holding its own copy of
+// the old rule — our release gate, our published REPRODUCIBLE.md — silently went stale and began
+// accusing a correct build. A reader cannot tell "the code changed" from "my recipe is out of date"
+// unless the rule travels with the hash. So it does now: the exact walk, the key format, the join, the
+// digest, and the file count and manifest the current hash was taken over. A verifier that reproduces
+// `files` but not `codeHash` knows the sources moved; one that reproduces neither knows its rule is old.
+app.get('/build', (_req, res) => {
+  const files = engineSourceFiles(ENGINE_DIR);
+  res.json({
+    codeHash: _internal.buildId(),
+    node: process.version,
+    version: config.version,
+    repo: 'https://github.com/Tristan-tech-ai/Quiver',
+    hashRule: {
+      root: 'src/engine',
+      select: 'every *.js under the root, RECURSIVELY (subdirectories included)',
+      key: 'path relative to the root, forward slashes, sorted ascending by that key',
+      entry: '`${relativePath}:${utf8FileContents}`',
+      join: '"\\n"',
+      digest: "'q1-' + sha256(joined).hex.slice(0, 16)",
+      fileCount: files.length,
+      files,
+      note: 'If your recomputation matches this file list but not the codeHash, the sources changed. If it does not match the file list, your recipe is out of date — this object is the current one.',
+    },
+    reproduce: 'Rebuild from source → identical codeHash. Then re-run the open engine on proof.inputs (on this Node version) → identical result & contentHash. Correctness is re-derived, not trusted.',
+  });
+});
 
 // ── Remote MCP endpoint (Streamable HTTP transport) ─────────────────────────────────────────────────────
 // The Phase-1 distribution unlock: any MCP-compatible agent (Claude, Cursor, LangChain/CrewAI/OpenAI via an
@@ -143,12 +177,64 @@ app.post('/mcp', async (req, res) => {
   }
 });
 
-// Public technical documentation (HTML — LLM- and human-readable). Also aliased at /whitepaper and /docs.
-app.get(['/paper', '/whitepaper', '/docs'], (_req, res) => {
+// Public technical documentation, in two editions.
+//
+// `/paper` serves the MACHINE-READABLE edition, because the styled one does not survive the trip. An
+// AI reader fetching a URL has a bounded character budget, and more than half of the HTML edition is
+// markup — span wrappers, table scaffolding, inline SVG path geometry — so the fetch truncated partway
+// through and the reader formed its view of Quiver from the opening third of the argument. Measured,
+// not assumed: a reviewer hit exactly that. The failure is the same shape as a stale hash — the
+// artifact is correct and the consumer is still misinformed — so it is fixed the same way, by serving
+// the form the consumer can actually finish. Nothing is abridged: same sections, tables, code blocks
+// and all 73 references, generated from the HTML by tools/paper-to-text.mjs.
+//
+// The typeset edition keeps its figures and moves to `/paper/human`.
+app.get(['/paper/human', '/whitepaper', '/docs'], (_req, res) => {
   if (!WHITEPAPER) return res.status(404).json({ error: 'paper_unavailable' });
   res.set('content-type', 'text/html; charset=utf-8');
   res.set('cache-control', 'public, max-age=3600');
   res.send(WHITEPAPER);
+});
+
+// Dropping the markup was necessary and not sufficient. Fetched live, an AI reader still stopped
+// mid-sentence in 5.19 — about 40% in — and reported the References and all three appendices as
+// missing. The budget belongs to the reader, so the document has to ARRIVE in pieces that fit.
+// `/paper` is therefore part 1 of 6, and every part opens with the map of all six, which means a
+// reader whose fetch truncates anywhere already holds the URLs for the rest.
+const md = (res, body, extra = {}) => {
+  res.set('content-type', 'text/markdown; charset=utf-8');
+  res.set('cache-control', 'public, max-age=3600');
+  res.set({ 'x-paper-human-edition': '/paper/human', 'x-paper-parts': String(PAPER_PARTS.length), ...extra });
+  res.send(body);
+};
+
+app.get(['/paper/full', '/paper.md'], (_req, res) => {
+  if (!PAPER_MD) {
+    if (WHITEPAPER) return res.set('content-type', 'text/html; charset=utf-8').send(WHITEPAPER);
+    return res.status(404).json({ error: 'paper_unavailable' });
+  }
+  md(res, PAPER_MD);
+});
+
+app.get('/paper', (_req, res) => {
+  if (PAPER_PARTS.length) return md(res, PAPER_PARTS[0], { 'x-paper-part': '1' });
+  // Never 404 the canonical documentation URL over a missing build artifact: fall back to whatever
+  // edition does exist rather than telling a reader the paper is unavailable when it is not.
+  if (PAPER_MD) return md(res, PAPER_MD);
+  if (WHITEPAPER) return res.set('content-type', 'text/html; charset=utf-8').send(WHITEPAPER);
+  return res.status(404).json({ error: 'paper_unavailable' });
+});
+
+app.get('/paper/:n', (req, res) => {
+  const n = Number(req.params.n);
+  if (!Number.isInteger(n) || n < 1 || n > PAPER_PARTS.length) {
+    return res.status(404).json({
+      error: 'no_such_part',
+      note: `the documentation is served in ${PAPER_PARTS.length} parts, /paper/1 … /paper/${PAPER_PARTS.length}`,
+      whole: '/paper/full', typeset: '/paper/human',
+    });
+  }
+  md(res, PAPER_PARTS[n - 1], { 'x-paper-part': String(n) });
 });
 
 // Public artifact serving for rendered cards (already paid for at generation time).

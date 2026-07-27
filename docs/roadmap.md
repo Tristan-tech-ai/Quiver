@@ -98,9 +98,18 @@ shipping in the version described here, and each is disclosed in the relevant se
 6. **Cross-region redundancy behind a custom domain.** *Done:* the registered endpoint resolves
    through a domain we control, a second region can serve it, and the published availability record
    shows the improvement rather than asserting it.
-7. **Reproducible builds across runtimes.** A rebuild from a clean checkout reproduces the code hash
-   byte-for-byte today on the same runtime. *Done:* reproducible from a locked toolchain, so a
-   verifier a year from now reaches the same value.
+7. **Reproducible builds across runtimes.** Two different hashes sit behind this heading, and only
+   one of them has a runtime question. The *code* hash is `sha256` over the engine's source bytes and
+   performs no arithmetic at all, so it is runtime-independent by construction rather than by promise
+   — and that is checkable: feeding the same file list through coreutils `sha256sum`, outside
+   JavaScript entirely, returns `q1-404d7ab899d32fef`, the identical string the service serves.
+   `/build` publishes the selection and ordering rule alongside the hash so the recomputation can be
+   done in any language. The residual risk is the *content* hash, over computed floating-point
+   results: basic IEEE-754 arithmetic is bit-identical across platforms, transcendentals
+   (`exp`/`log`/`pow`/`erf`) are stable within a V8 version, and `size-gate`'s content hash is
+   byte-identical on Windows and Linux on the same Node major. *Done:* a locked toolchain and a
+   published OS×runtime matrix, so the transcendental case is a table rather than a mechanism
+   argument.
 
 ## What three review rounds found, and the pattern that matters more than any of them
 

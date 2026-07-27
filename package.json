@@ -13,7 +13,8 @@
     "dev": "set DEV_MODE=1&& node src/server.js",
     "test:local": "node test/run-local.mjs",
     "postinstall": "node tools/fetch-cli.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "fetch-cli": "node tools/fetch-cli.mjs"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

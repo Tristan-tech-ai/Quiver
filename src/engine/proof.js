@@ -62,8 +62,19 @@ function canonical(o) {
 // form and the received form identical by construction.
 function jsonClean(x) { return x === undefined ? null : JSON.parse(JSON.stringify(x)); }
 
-const hashRecipe = (envelopeKey, fields) =>
-  `Recompute from the response you received: contentHash = sha256(canonical({${fields}})) where result = this response WITHOUT its \`${envelopeKey}\` key, the other fields are echoed inside \`${envelopeKey}\`, and canonical(x) = recursive key-sorted JSON ('{"a":1,"b":[2]}' form). A mismatch means the response was altered.`;
+// The recipe used to say only "recompute from the response you received", for both envelope kinds.
+// For an observation that is exactly right — a live venue read cannot be re-derived from source. For
+// a deterministic proof it under-sold the guarantee: `inputs` is echoed in the envelope and the engine
+// is public, so `result` can be REGENERATED rather than merely received, and the whole exhibit
+// reproduces offline from the repository with no response and no payment. That was measured against
+// Appendix C before this text was changed. Tamper-evidence and re-runnability are different claims,
+// and only one of them survives without the server; saying so is the difference between "trust this
+// response" and "you do not need this response".
+const hashRecipe = (envelopeKey, fields, regenerable) =>
+  `Recompute from the response you received: contentHash = sha256(canonical({${fields}})) where result = this response WITHOUT its \`${envelopeKey}\` key, the other fields are echoed inside \`${envelopeKey}\`, and canonical(x) = recursive key-sorted JSON ('{"a":1,"b":[2]}' form). A mismatch means the response was altered.`
+  + (regenerable
+    ? ` You do not need this response to do it: the engine is open source and \`${envelopeKey}.inputs\` is echoed above, so re-running the published engine on those inputs regenerates \`result\` and therefore this exact hash. The repository alone is sufficient — offline, unpaid, and without contacting the service.`
+    : ` This hash cannot be regenerated from source, because it commits a live upstream read at observedAtUtc that no re-run reproduces — see \`semantics\`. Recomputing it detects tampering; it does not re-derive the number.`);
 
 // BUILD_ID — hash of all engine sources, computed once. Identifies the exact deterministic code that ran,
 // so "re-run the engine on these inputs" is unambiguous.
@@ -160,7 +171,7 @@ export function proofEnvelope(engine, inputs, result, version = '0') {
       allSelfChecksPass: allChecksPass,
       reproduce: `Deterministic: re-run the open-source '${engine}' engine (build ${codeHash}) on proof.inputs to reproduce this result exactly. Verify contentHash to detect tampering. No trust in Quiver required.`,
       contentHash,
-      verifyContentHash: hashRecipe('proof', 'engine, codeHash, inputs, result'),
+      verifyContentHash: hashRecipe('proof', 'engine, codeHash, inputs, result', true),
       ...(signature ? { signature } : {}),
       // "self-checked" is claimed only when a check actually ran and passed. Printing it beside a
       // response whose every check was skipped is the same overstatement allSelfChecksPass used to make.
@@ -229,7 +240,7 @@ export function observationEnvelope(engine, inputs, result, version = '0') {
       selfChecks: checks,
       allSelfChecksPass: allChecksPass,
       contentHash,
-      verifyContentHash: hashRecipe('observation', 'engine, codeHash, observedAtUtc, inputs, result'),
+      verifyContentHash: hashRecipe('observation', 'engine, codeHash, observedAtUtc, inputs, result', false),
       ...(signature ? { signature } : {}),
       semantics: `A COMMITTED OBSERVATION of live upstreams at observedAtUtc — NOT re-runnable to the identical result, because the market has moved since (that claim is reserved for deterministic Quiver services, which ship a 'proof' envelope instead; the distinction is deliberate). Tamper-evident: recompute contentHash per verifyContentHash. ${signature ? 'Attributable: the secp256k1 signature binds this hash to the Quiver signer.' : 'A secp256k1 signature is added when QUIVER_SIGNING_KEY is configured.'} Anchor contentHash on-chain (e.g. an EAS attestation) to timestamp what was served.`,
     },

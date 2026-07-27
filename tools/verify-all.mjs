@@ -12,7 +12,6 @@ const CASES = [
   ['poly-desk', { wallet: '0x0000000000000000000000000000000000000001' }, (d) => d.verdict + ' ' + (d.summary ? JSON.stringify(d.summary) : (d.note || ''))],
   ['protocol-pulse', { protocol: 'aave' }, (d) => (d.grade ? d.protocol + ' grade=' + d.grade + ' tvl=' + (d.tvl?.currentUsd) + ' 30d=' + d.tvl?.change30dPct + '% hacks=' + d.incidents?.count : d.verdict)],
   ['protocol-pulse-lido', { protocol: 'lido', svc: 'protocol-pulse' }, (d) => (d.grade ? 'lido grade=' + d.grade + ' tvl=' + d.tvl?.currentUsd : d.verdict)],
-  ['paw-check', { food: 'grapes', species: 'dog' }, (d) => d.verdict + ' (' + (d.severity || '') + ')'],
   ['macro-sentry', { hours: 240 }, (d) => d.verdict + ' events=' + (d.events?.length) + ' next=' + (d.nextEvent?.kind)],
   ['updown-pulse', { coin: 'BTC' }, (d) => d.verdict + ' ' + (d.window ? 'left=' + d.window.secondsLeft + 's implied=' + JSON.stringify(d.marketImplied) + ' edge=' + d.model?.edgeUpPoints : (d.note || ''))],
   ['calldata-x', { data: '0x095ea7b3000000000000000000000000e592427a0aece92de3edee1f18e0157c05861564ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff' }, (d) => d.verdict + ' | ' + (d.plainEnglish || d.note || '').slice(0, 60)],

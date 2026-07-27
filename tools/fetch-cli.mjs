@@ -38,6 +38,22 @@ try {
   fs.chmodSync(outBin, 0o755);
   console.log(`[fetch-cli] installed ${ASSET} (${bin.length} bytes, sha256 ok) -> ${outBin}`);
 } catch (e) {
-  console.error('[fetch-cli] FAILED:', e.message);
-  process.exit(1);
+  // Exiting non-zero here failed `npm ci` itself, and `npm ci` is step one of the reproduction recipe
+  // this project publishes — so a reader on Linux with no route to GitHub releases, or hitting the
+  // known checksum drift between CLI releases, never reached `npm test` at all. That also made the
+  // claim "the suite requires no network access" false in practice: true of the tests, and not of the
+  // install that precedes them.
+  //
+  // The binary is needed only by the OKX-backed LIVE adapters. Without it the deterministic engines,
+  // the whole test suite, and every proof in the documentation still work, and the live services
+  // degrade to the DATA_UNAVAILABLE they already disclose and do not charge for — a visible, honest
+  // failure rather than a broken build. So this warns loudly and lets the install finish.
+  console.error('');
+  console.error('  [fetch-cli] could not fetch the onchainos CLI:', e.message);
+  console.error('  [fetch-cli] INSTALL CONTINUES. This binary is used only by the OKX-backed live');
+  console.error('  [fetch-cli] adapters. Unaffected: `npm test`, every deterministic engine, and every');
+  console.error('  [fetch-cli] proof in the documentation — none of which touch the network.');
+  console.error('  [fetch-cli] Affected: live OKX reads, which will answer DATA_UNAVAILABLE (and free).');
+  console.error('  [fetch-cli] To retry: npm run fetch-cli');
+  console.error('');
 }

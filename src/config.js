@@ -79,7 +79,6 @@ export const config = {
     optionsDesk: env('PRICE_OPTIONS_DESK', '0.01'),
     lpDesk: env('PRICE_LP_DESK', '0.01'),
     calldata: env('PRICE_CALLDATA', '0.005'),
-    pawCheck: env('PRICE_PAW_CHECK', '0.01'),
     protocolPulse: env('PRICE_PROTOCOL_PULSE', '0.01'),
     upDownPulse: env('PRICE_UPDOWN_PULSE', '0.01'),
     loopDigest: env('PRICE_LOOP_DIGEST', '0.01'),

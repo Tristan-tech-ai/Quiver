@@ -108,7 +108,8 @@ marker in that sweep means the desk never called the service, not that the servi
 ## Verify one yourself
 
 ```bash
-# 1. the build identity — see REPRODUCIBLE.md for the exact hashing rule
+# 1. the build identity. The response carries its own hashing rule and the exact file list, so a
+#    verifier can never hold a stale recipe and accuse a correct build (REPRODUCIBLE.md once did).
 curl -s https://quiver-production-c3a8.up.railway.app/build
 
 # 2. a real deterministic answer, free

@@ -46,7 +46,13 @@ export function portfolioGate(input = {}) {
       if (g.ok && g.liquidationPrice != null) {
         liquidation = { price: g.liquidationPrice, moveToLiqPct: g.moveToLiquidationPct, mmrPct: g.maintenanceMarginRatePct, invariantOk: g.checks?.[0]?.pass === true, positionStatus: g.positionStatus, ...(g.statusNote ? { statusNote: g.statusNote } : {}) };
       } else if (g.ok && g.liquidatable_at_entry) {
-        liquidation = { price: mark, moveToLiqPct: 0, liquidatableAtEntry: true, invariantOk: true };
+        // Carry the status through. Without it this leg looked like a live position sitting exactly
+        // at 0% from liquidation, won the nearest-liquidation ranking, and was described as the
+        // book's distance to first blood. invariantOk is no longer asserted true here: nothing was
+        // solved on this branch, so claiming a satisfied invariant counted an unchecked leg as
+        // checked in the aggregate self-check below.
+        liquidation = { price: mark, moveToLiqPct: 0, liquidatableAtEntry: true, invariantOk: null,
+          positionStatus: g.positionStatus || 'BELOW_MAINTENANCE', statusNote: g.statusNote };
       } else if (!g.ok) {
         errors.push(`position ${i} (${asset}): ${(g.errors || ['could not compute liquidation']).join('; ')}`);
       }
@@ -133,7 +139,12 @@ export function portfolioGate(input = {}) {
   // dollars, not by the cent-scale rounding budget, so the check still catches real defects.
   const netRecon = Math.abs(exposures.reduce((s, e) => s + e.netNotional, 0) - round(totalNet, 2));
   const netReconTol = Math.max(0.01, 0.005 * (exposures.length + 1));
-  const allInvariants = withLiq.every((p) => p.liquidation.invariantOk === true);
+  // Only legs that actually solved a liquidation price have an invariant to satisfy. Counting the
+  // others as checked overstated coverage (positionsChecked read 2 when one leg carried no checks at
+  // all); counting them as failures would be just as wrong. Both counts are reported.
+  const invariantLegs = withLiq.filter((p) => p.liquidation.invariantOk === true || p.liquidation.invariantOk === false);
+  const noInvariantLegs = withLiq.length - invariantLegs.length;
+  const allInvariants = invariantLegs.every((p) => p.liquidation.invariantOk === true);
   const nearestIsMin = nearest == null || live.every((p) => p.liquidation.moveToLiqPct >= nearest.liquidation.moveToLiqPct - 1e-9);
   const downMonotone = stress.every((s, i) => i === 0 || s.onDownMove.legsLiquidated >= stress[i - 1].onDownMove.legsLiquidated);
   const betaDownMonotone = betaStress.every((s, i) => i === 0 || s.onDownMove.legsLiquidated >= betaStress[i - 1].onDownMove.legsLiquidated);
@@ -194,7 +205,7 @@ export function portfolioGate(input = {}) {
     model: 'Cross-venue perp portfolio. Net exposure = Σ signed notional per underlying; per-leg liquidation via the perp-gate condition + its invariant; nearest = min distance-to-liq. THREE stress views: (1) correlatedShockStress = the ρ=1 UPPER BOUND (every asset moves the full market %); (2) betaScaledStress = the realistic count with per-asset betas MEASURED from the Oct-10-2025 crash; (3) crossMarginLiquidation = ACCOUNT-level liquidation for a shared-equity book (hedges/offsets buffer each other — far more forgiving than the isolated per-leg view, which overstates risk on a hedged book). Isolated fields assume per-leg margin; cross-margin uses the pooled equity (accountEquityUsd or Σ per-leg margin).',
     checks: [
       { name: 'exposure reconciliation: Σ per-asset netNotional == totalNetNotional (within the 2dp rounding budget)', residual: Number(netRecon.toExponential(2)), tolerance: netReconTol, pass: netRecon <= netReconTol },
-      { name: 'every per-leg liquidation satisfies its own invariant (account_value == maint at P_liq)', positionsChecked: withLiq.length, pass: allInvariants },
+      { name: 'every per-leg liquidation satisfies its own invariant (account_value == maint at P_liq)', positionsChecked: invariantLegs.length, ...(noInvariantLegs ? { positionsWithNoInvariantToCheck: noInvariantLegs, note: 'Legs already liquidatable at entry solve no liquidation price, so there is no invariant to assert for them. They are excluded from this count rather than silently counted as checked.' } : {}), pass: allInvariants },
       { name: 'nearestLiquidation is the true minimum distance-to-liq across the LIVE legs (legs already past liquidation are reported separately, not ranked)', pass: nearestIsMin },
       { name: 'correlated down-crash breach count is monotone non-decreasing in shock size', pass: downMonotone },
       { name: 'factor-beta down-crash breach count is monotone non-decreasing in shock size', pass: betaDownMonotone },

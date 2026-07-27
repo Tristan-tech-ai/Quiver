@@ -300,7 +300,19 @@ export const SERVICES = [
       const e = await enrichPerpInputs(i);
       const { live, ...compute } = e;                 // provenance is metadata, not a computation input
       const r = perpGate(compute);
-      if (live) r.live = live;                         // surface which fields came from live data
+      if (live) {
+        // A symbol was resolved against a venue, so this answer is an OBSERVATION, not a re-runnable
+        // proof, and it must say so. It previously attached `live` to the result and then sealed it
+        // in a deterministic proof envelope — which put a key inside the content hash that re-running
+        // the engine on proof.inputs can never produce. A caller following proof.reproduce got a
+        // mismatch, and the same envelope told them a mismatch means tampering: the verification
+        // instruction at the centre of this service accused an honest response. portfolio-gate two
+        // handlers below already branched this way; perp-gate now matches it.
+        r.live = live;
+        r.mathReproducibility = 'The liquidation MATH is deterministic and re-runnable: run the open perp-gate engine on observation.inputs (the venue values frozen at observedAtUtc) and every number reproduces exactly. What is NOT re-runnable is the venue read itself — mark price, funding and margin tiers move — so this ships as a committed observation rather than as a proof that claims to reproduce from scratch.';
+        return observationEnvelope('perp-gate', compute, r, config.version);
+      }
+      // Caller supplied every input: nothing was fetched, so the answer really is re-runnable.
       return proofEnvelope('perp-gate', compute, r, config.version);
     },
   },

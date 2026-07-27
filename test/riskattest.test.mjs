@@ -5,11 +5,23 @@ import { riskAttest, verifyInclusion } from '../src/engine/riskAttest.js';
 
 const mk = (n) => Array.from({ length: n }, (_, i) => createHash('sha256').update('item' + i).digest('hex'));
 
-test('risk-attest: completeness + soundness self-checks pass for 1..8 leaves', () => {
+test('risk-attest: no self-check fails for 1..8 leaves, and a check that cannot run says so', () => {
   for (const n of [1, 2, 3, 4, 5, 8]) {
     const r = riskAttest({ contentHashes: mk(n) });
     assert.equal(r.leafCount, n);
-    assert.ok(r.checks.every((c) => c.pass), `n=${n} checks`);
+    // Same semantics the proof envelope uses: a check that did not run is not a failure. Asserting
+    // `every(c => c.pass)` instead would have forced the internal-node check to claim a pass at
+    // n<=2, where there is no internal node to present — which is how it came to certify nothing.
+    assert.ok(r.checks.every((c) => c.pass !== false), `n=${n}: a check FAILED`);
+    const node = r.checks.find((c) => /INTERNAL NODE/.test(c.name));
+    if (n <= 2) {
+      assert.equal(node.skipped, true, `n=${n}: no internal node exists, so the check must be marked skipped, not passed`);
+      assert.equal(node.pass, null);
+      assert.match(node.reason, /no internal node/);
+    } else {
+      assert.equal(node.pass, true, `n=${n}: the check must actually run`);
+      assert.ok(!node.skipped);
+    }
   }
 });
 
@@ -30,7 +42,7 @@ test('risk-attest: a fabricated non-member leaf does NOT verify (soundness)', ()
 test('risk-attest: accepts proof envelopes and extracts contentHash', () => {
   const r = riskAttest({ items: [{ proof: { contentHash: 'aa'.repeat(32) } }, { contentHash: 'bb'.repeat(32) }] });
   assert.equal(r.leafCount, 2);
-  assert.ok(r.checks.every((c) => c.pass));
+  assert.ok(r.checks.every((c) => c.pass !== false));
 });
 
 test('risk-attest: discloses duplicate leaves and rejects empty input', () => {

@@ -41,10 +41,14 @@ function buildTree(leafHashes) {
   return { root: layers[layers.length - 1][0], layers };
 }
 
-function proofFor(layers, index) {
+// Sibling path from an arbitrary starting layer up to the root. startLayer 0 is a leaf's proof; a
+// higher startLayer gives the path for an INTERNAL node, which the soundness check below needs: a
+// one-element proof only reaches the root when the tree happens to be exactly three layers deep, so
+// a check built on one element silently proves nothing for every other batch size.
+function proofFrom(layers, startLayer, index) {
   const proof = [];
   let idx = index;
-  for (let l = 0; l < layers.length - 1; l++) {
+  for (let l = startLayer; l < layers.length - 1; l++) {
     const layer = layers[l];
     const sib = idx ^ 1;
     if (sib < layer.length) proof.push(layer[sib]); // no element when the node was promoted (no sibling)
@@ -52,6 +56,7 @@ function proofFor(layers, index) {
   }
   return proof;
 }
+const proofFor = (layers, index) => proofFrom(layers, 0, index);
 
 // `leaf` is the raw contentHash (hex, no 0x). It is tagged as a leaf before folding, which is what
 // makes an internal node fail here instead of verifying.
@@ -61,7 +66,17 @@ export function verifyInclusion(leaf, proof, root) {
   return h === String(root).replace(/^0x/, '').toLowerCase();
 }
 
-const normalizeHash = (h) => (typeof h === 'string' ? h.replace(/^0x/, '').toLowerCase() : null);
+// A leaf must be a full 32-byte hex word. Buffer.from(hex,'hex') SILENTLY TRUNCATES at the first
+// invalid or odd-length position, so 'abc' and 'abd' both became the single byte 0xab -- distinct
+// caller inputs collided into one leaf, a non-member verified against a real root using another
+// leaf's proof, and duplicateLeaves reported 0 because the strings differed. Membership proofs are
+// this service's only product, so a malformed leaf is refused rather than quietly reinterpreted.
+const HEX32 = /^[0-9a-f]{64}$/;
+const normalizeHash = (h) => {
+  if (typeof h !== 'string') return null;
+  const s = h.replace(/^0x/, '').toLowerCase();
+  return HEX32.test(s) ? s : null;
+};
 
 export function riskAttest(input = {}) {
   const items = Array.isArray(input.items) ? input.items
@@ -69,7 +84,14 @@ export function riskAttest(input = {}) {
   const leaves = items.map((it) => {
     if (typeof it === 'string') return normalizeHash(it);
     return normalizeHash(it?.proof?.contentHash || it?.contentHash);
-  }).filter(Boolean);
+  });
+  // Refuse the batch rather than silently dropping the malformed entries: an attestation over a
+  // SUBSET of what the caller submitted, reported as though it covered the batch, is the worst
+  // possible outcome for a membership proof.
+  const badIdx = leaves.map((l, i) => (l === null ? i : -1)).filter((i) => i >= 0);
+  if (badIdx.length) {
+    return { ok: false, errors: [`items at index ${badIdx.join(', ')} are not 32-byte hex content-hashes. Each leaf must be exactly 64 hex characters (optionally 0x-prefixed). Shorter or non-hex strings were previously truncated to their leading valid bytes, which collided distinct inputs into one leaf, so they are now refused.`] };
+  }
   if (!leaves.length) return { ok: false, errors: ['need items: an array of content-hashes (hex) or proof envelopes carrying proof.contentHash'] };
   // A duplicate leaf is almost always a mistake (two identical computations attested twice) — disclose it.
   const dupes = leaves.length - new Set(leaves).size;
@@ -80,15 +102,26 @@ export function riskAttest(input = {}) {
   const attestations = leaves.map((leaf, i) => ({ index: i, leaf, proof: proofFor(layers, i) }));
 
   // Self-checks: completeness, plus TWO soundness checks. The first (a random non-member) is the easy
-  // one and cannot catch a structural break. The second presents an INTERNAL NODE as a member leaf —
-  // the attack that actually worked against the pre-fix tree — so this check can fail in the direction
-  // that matters. A verifier that cannot fail is the failure mode this whole service exists to avoid.
+  // one and cannot catch a structural break.
   const allVerify = attestations.every((a) => verifyInclusion(a.leaf, a.proof, root));
   const nonMember = sha256(leaves[0] + '::not-a-member');
   const soundness = !verifyInclusion(nonMember, attestations[0].proof, root);
-  const internalNode = layers.length > 2 ? layers[1][0] : null; // a real node, one level above the leaves
-  const nodeSibling = layers.length > 2 && layers[1].length > 1 ? [layers[1][1]] : [];
-  const soundnessNode = internalNode === null ? true : !verifyInclusion(internalNode, nodeSibling, root);
+
+  // The second presents a real INTERNAL NODE as a member leaf. The FULL sibling path from that node's
+  // own layer up to the root is used, and that detail is the whole check: an earlier version passed a
+  // ONE-element proof, which can only reach the root when the tree is exactly three layers deep, so
+  // for a batch of 2, or of 5 or more, it compared a half-folded value against the root, got false for
+  // arithmetic reasons, and reported success. It returned false on a tree with NO domain separation
+  // too -- it could not detect the defect it was written to detect. Reviewed and rebuilt: with the
+  // full path, removing the leaf/node tags makes this check go RED, which is the only property that
+  // makes it a check at all. Verified by construction in the test suite for n = 2..16.
+  const nodeLayer = 1;
+  const internalNode = layers.length > nodeLayer + 1 ? layers[nodeLayer][0] : null;
+  const nodePath = internalNode === null ? [] : proofFrom(layers, nodeLayer, 0);
+  const soundnessNode = internalNode === null ? null : !verifyInclusion(internalNode, nodePath, root);
+  // A tree with only one layer above the leaves has no internal node to present; say so rather than
+  // reporting a pass for a check that did not run.
+  const soundnessNodeApplicable = internalNode !== null;
 
   // EIP-712 typed attestation over the root — EAS-ready (parseable NAMED fields, not an opaque hash). When a
   // signing key is configured this is a standards-based attestation any wallet/contract/EAS can read; the
@@ -125,7 +158,15 @@ export function riskAttest(input = {}) {
     checks: [
       { name: 'completeness: every leaf verifies against the root', pass: allVerify },
       { name: 'soundness: a fabricated non-member leaf does NOT verify', pass: soundness },
-      { name: 'soundness: an INTERNAL NODE presented as a member leaf does NOT verify (domain separation holds)', pass: soundnessNode },
+      ...(soundnessNodeApplicable
+        // pathElements and pathElementsRequired are published because the defect this check replaced
+        // was invisible from its verdict: a one-element proof reported pass while never reaching the
+        // root. Only when the two numbers agree has the node actually been folded all the way up, so
+        // the check's own scope is auditable instead of taken on trust.
+        ? [{ name: 'soundness: an INTERNAL NODE presented as a member leaf, with its FULL path to the root, does NOT verify (domain separation holds)',
+             pathElements: nodePath.length, pathElementsRequired: layers.length - 1 - nodeLayer, treeDepth: layers.length,
+             pass: soundnessNode === true && nodePath.length === layers.length - 1 - nodeLayer }]
+        : [{ name: 'soundness: an INTERNAL NODE presented as a member leaf', skipped: true, reason: `this batch (${leaves.length} leaf${leaves.length === 1 ? '' : 'es'}) has no internal node above the leaf layer, so there is nothing to present. Reported as not-run rather than as a pass.`, pass: null }]),
       ...(easAttestation ? [{ name: 'EIP-712 attestation signature recovers to the Quiver signer', pass: easVerifyOk === true }] : []),
     ],
   };

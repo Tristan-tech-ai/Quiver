@@ -87,11 +87,25 @@ export function perpGate(p = {}, { eps = 1e-6 } = {}) {
   const initialMarginRate = M / notionalEntry;             // = 1/effLeverage
   if (initialMarginRate <= mmr) {
     // Posted margin is at/below maintenance — position is already liquidatable at entry.
+    // This early return used to omit positionStatus and checks entirely, which quietly defeated the
+    // below-maintenance fix one layer up: portfolio-gate classifies a leg as breached by reading
+    // positionStatus, found none here, and so ranked an already-liquidatable position as the book's
+    // nearest FUTURE liquidation at a 0% move, narrating it as "still live". The status belongs on
+    // every path that can produce a dead position, not only the one an adversarial test happened to
+    // walk. The checks array is present for the same reason: a caller aggregating self-checks was
+    // counting this leg as checked when nothing had been checked.
     return {
       ok: true, liquidatable_at_entry: true,
+      positionStatus: 'BELOW_MAINTENANCE',
+      statusNote: `Posted margin is at or below the maintenance requirement, so this position is liquidatable at entry — the threshold has already been crossed rather than approached. Treat it as a position to reconcile, not one to protect.`,
       note: `Posted margin (${round(initialMarginRate * 100, 3)}% of notional) is at or below the maintenance requirement (${round(mmr * 100, 3)}%). Position is liquidatable immediately — reduce size or add margin.`,
       inputs: { side: s === 1 ? 'long' : 'short', entryPrice: P0, size: q, margin: M, mmr },
       effLeverage: round(effLeverage, 2),
+      checks: [{
+        name: 'maintenance comparison: posted initial margin rate <= maintenance margin rate (the condition for this branch)',
+        residual: Number((initialMarginRate - mmr).toExponential(2)),
+        pass: initialMarginRate <= mmr,
+      }],
     };
   }
 

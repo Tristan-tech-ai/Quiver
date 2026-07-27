@@ -83,12 +83,35 @@ export function sizeGate(p = {}, { eps = 1e-9 } = {}) {
 
   const betFraction = lambda * fullKelly;                // fraction of bankroll to allocate
   const bankroll = Number(p.bankroll) > 0 ? Number(p.bankroll) : null;
-  const levels = Array.isArray(p.drawdownLevels) && p.drawdownLevels.length ? p.drawdownLevels : [0.5, 0.25, 0.1];
+  // drawdownLevels is a caller input and was never validated. alpha is the fraction of bankroll the
+  // account falls TO, so it must lie in (0,1): outside that range alpha^((2-lambda)/lambda) is not a
+  // probability, and the engine served probEver of -0.00781, 17.09, 128 and 2187 with ok:true and
+  // allSelfChecksPass:true. A probability above one is not a severe risk, it is a wrong answer.
+  const levels = Array.isArray(p.drawdownLevels) && p.drawdownLevels.length ? p.drawdownLevels.map(Number) : [0.5, 0.25, 0.1];
+  const badLevels = levels.filter((a) => !(Number.isFinite(a) && a > 0 && a < 1));
+  if (badLevels.length) {
+    return { ok: false, errors: [`drawdownLevels must each lie strictly in (0,1) — each is the fraction of bankroll the account falls TO (0.5 = a 50% drawdown). Received: ${badLevels.join(', ')}. Outside that range the ruin formula does not return a probability.`] };
+  }
 
-  // RoR anchor self-check: at lambda=1, RoR(alpha) must equal alpha exactly.
+  // RoR anchor self-checks. The lambda=1 anchor ALONE is degenerate: at lambda=1 the exponent
+  // (2-lambda)/lambda equals 1, and so does a mis-derived (2-lambda)/lambda^2, so both return alpha
+  // and the check passes either way. A reviewer pointed this out, and it is the same pathology this
+  // codebase fixed in risk-attest: a self-check that cannot fail in the direction that matters.
+  // The second anchor is at lambda=0.25, where the correct exponent gives alpha^7 while that same
+  // mis-derivation gives alpha^28 -- a factor of 10^6 apart at alpha=0.5, so a wrong exponent now
+  // fails loudly. alpha^7 at quarter Kelly is also the figure this engine's published curve uses.
   const anchorAlpha = 0.5;
   const anchorErr = Math.abs(riskOfRuin(anchorAlpha, 1) - anchorAlpha);
   checks.push({ name: 'risk-of-ruin anchor: RoR(alpha, lambda=1) == alpha (full-Kelly classic result)', residual: Number(anchorErr.toExponential(2)), pass: anchorErr <= 1e-12 });
+  const quarterErr = Math.abs(riskOfRuin(anchorAlpha, 0.25) - Math.pow(anchorAlpha, 7));
+  checks.push({ name: 'risk-of-ruin anchor: RoR(alpha, lambda=0.25) == alpha^7 (discriminating anchor -- lambda=1 alone passes for a wrong exponent)', residual: Number(quarterErr.toExponential(2)), pass: quarterErr <= 1e-12 });
+
+  // Range check on the SERVED figures. RoR is a probability; with lambda in (0,1] the exponent
+  // (2-lambda)/lambda is >= 1 so alpha^exponent can never leave [0,1], and the input guard above
+  // enforces that lambda. This asserts the conclusion on the values actually returned rather than
+  // trusting the guard, because a probability above 1 is not a large risk, it is a wrong answer.
+  const ruinRangeOk = levels.every((a) => { const v = riskOfRuin(a, lambda); return v >= 0 && v <= 1; });
+  checks.push({ name: 'risk-of-ruin range: every reported ruin probability lies in [0,1]', pass: ruinRangeOk });
 
   const ruin = levels.map((a) => ({
     drawdownToFraction: a,

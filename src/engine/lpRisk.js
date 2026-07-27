@@ -58,11 +58,28 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
   // 1) Realized IL for a given price ratio.
   if (Number(input.priceRatio) > 0) {
     const r = Number(input.priceRatio);
-    const il = ilOfRatio(r) * conc;
+    const ilFull = ilOfRatio(r);              // exact, bounded in (-1, 0]
+    const ilAmplifiedRaw = ilFull * conc;     // a LINEARISATION, unbounded below
+    // Multiplying the full-range loss by a capital-efficiency factor is a small-move linearisation.
+    // It has no upper bound, while a liquidity position cannot lose more than the capital in it, so
+    // past -100% the linearisation has not found a bigger loss -- it has stopped describing anything.
+    // It used to be served as the headline anyway (conc 5 at a 9x move returned -200%, and -$200,000
+    // against $100,000 of capital) with the boundedness check hard-coded to pass whenever conc > 1.
+    // The headline is now the exact full-range loss whenever the amplification leaves its range, the
+    // raw linear figure is still reported beside it, and the caller is told which regime they are in.
+    const outOfRange = ilAmplifiedRaw <= -1;
+    const il = outOfRange ? ilFull : ilAmplifiedRaw;
     out.realizedIL = {
       priceRatio: r,
       impermanentLossPct: round(il * 100, 4),
-      note: conc > 1 ? `Full-range IL ${round(ilOfRatio(r) * 100, 4)}% amplified ×${conc} for the concentrated range.` : undefined,
+      ...(conc > 1 ? {
+        fullRangeIlPct: round(ilFull * 100, 4),
+        linearAmplificationPct: round(ilAmplifiedRaw * 100, 4),
+        concentratedModelInRange: !outOfRange,
+        note: outOfRange
+          ? `Full-range IL is ${round(ilFull * 100, 4)}%; multiplying it by ${conc} gives ${round(ilAmplifiedRaw * 100, 4)}%, which is past -100% and therefore not a loss a position can realise. The linear amplification is a small-move approximation and this move is not small: at a price ratio of ${r} a concentrated range is fully converted to one asset and its loss is bounded by the position, not by the multiplier. The headline is the exact full-range figure; use lp-desk to measure the realised concentrated case on actual swaps.`
+          : `Full-range IL ${round(ilFull * 100, 4)}% amplified x${conc} for the concentrated range. Valid while the amplified figure stays inside (-100%, 0].`,
+      } : {}),
       usd: capital != null ? round(il * capital, 2) : null,
     };
   }
@@ -79,7 +96,12 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
     // EXACT lognormal expectation, which is bounded by construction; the expansion is reported beside
     // it, and the gap between them is stated so the caller can see where the approximation left its
     // valid range instead of being told a number that cannot exist.
-    const eIlExact = expectedIlNumerical(v) * conc;
+    // Same linearisation caveat as realizedIL: conc multiplies a bounded expectation into an
+    // unbounded one. conc 3 at sigma^2*T = 5 served -139.42% and -$139,421 on $100,000 of capital.
+    const eIlExactFull = expectedIlNumerical(v);
+    const eIlAmplifiedRaw = eIlExactFull * conc;
+    const ampOutOfRange = eIlAmplifiedRaw <= -1;
+    const eIlExact = ampOutOfRange ? eIlExactFull : eIlAmplifiedRaw;
     const divergentPct = Math.abs(eIlLeading - eIlExact) * 100;
     out.expectedDivergence = {
       volatility: sigma, horizonPeriods: T, totalVariance: round(v, 6),
@@ -87,6 +109,12 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
       expectedIlLeadingOrderPct: round(eIlLeading * 100, 4),
       approximationGapPct: round(divergentPct, 4),
       basis: 'exact lognormal expectation of 2√r/(1+r) − 1 under ln r ~ N(−v/2, v)',
+      ...(conc > 1 ? {
+        fullRangeExpectedIlPct: round(eIlExactFull * 100, 4),
+        linearAmplificationPct: round(eIlAmplifiedRaw * 100, 4),
+        concentratedModelInRange: !ampOutOfRange,
+        ...(ampOutOfRange ? { concentrationNote: `Multiplying the expectation by ${conc} gives ${round(eIlAmplifiedRaw * 100, 4)}%, past the -100% bound and so not an expectation a position can realise. The headline reverts to the exact full-range expectation; the amplified figure is reported only as the raw linearisation.` } : {}),
+      } : {}),
       note: v <= 0.25
         ? 'Small-variance regime: the leading-order rate −σ²T/8 and the exact expectation agree closely; either may be used.'
         : `Outside the small-variance regime (σ²T = ${round(v, 4)}): the leading-order rate −σ²T/8 OVERSTATES the loss and is unbounded, so the exact expectation is the headline. V2 divergence loss can never exceed −100%.`,
@@ -164,7 +192,14 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
   }
   if (out.realizedIL) {
     const rl = out.realizedIL.impermanentLossPct;
-    checks.push({ name: 'boundedness: realized IL lies in (-100%, 0] for a full-range position', residual: rl, pass: conc > 1 ? true : (rl <= 0 && rl > -100) });
+    // NO ESCAPE HATCH. This check previously read `pass: conc > 1 ? true : ...`, which disabled the
+    // verifier in exactly the regime where the number breaks: at conc 5 and a 9x move it served
+    // -200%, and -$200,000 against $100,000 of capital, with the check green. A position cannot lose
+    // more than the capital in it, so that is not a large loss, it is a wrong answer -- the same class
+    // this engine's own note calls impossible two lines above. The check now ranges over the served
+    // value whatever the concentration factor, and the amplified branch is bounded below instead of
+    // excused (see the note on realizedIL for why the linear amplification stops being valid).
+    checks.push({ name: 'boundedness: reported realized IL lies in (-100%, 0], amplified or not', residual: rl, pass: rl <= 0 && rl > -100 });
   }
   if (out._breakevenCheck) { checks.push(out._breakevenCheck); delete out._breakevenCheck; }
   out.checks = checks;

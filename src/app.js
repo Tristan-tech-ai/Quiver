@@ -26,6 +26,11 @@ try { WHITEPAPER = readFileSync(join(__dir, '../assets/whitepaper.html'), 'utf8'
 let PAPER_MD = '';
 try { PAPER_MD = readFileSync(join(__dir, '../assets/whitepaper.md'), 'utf8'); } catch { PAPER_MD = ''; }
 // Human landing page for `/`, served only when the caller asks for HTML — see the index route.
+// Dated record of what changed since the submission was written. Judging runs after the deadline,
+// so a reviewer needs to be able to tell an improvement from a discrepancy without taking our word
+// for which is which.
+let CHANGELOG = '';
+try { CHANGELOG = readFileSync(join(__dir, '../assets/changelog.md'), 'utf8'); } catch { CHANGELOG = ''; }
 let LANDING = '';
 try { LANDING = readFileSync(join(__dir, '../assets/landing.html'), 'utf8'); } catch { LANDING = ''; }
 const PAPER_PARTS = [];
@@ -77,6 +82,7 @@ const INDEX_JSON = () => ({
   docs: '/paper',
   docsMachineReadable: ['/paper/1', '/paper/2', '/paper/3', '/paper/4', '/paper/5', '/paper/6', '/paper/full'],
   build: '/build',
+  changelog: '/changelog — dated record of what changed since the hackathon submission was written; the endpoint URL and the engine build hash do not move while judging runs',
   agentCard: '/.well-known/agent-card.json',
   llms: '/llms.txt',
   repo: 'https://github.com/Tristan-tech-ai/Quiver',
@@ -118,12 +124,18 @@ engine on the inputs to reproduce the result byte-for-byte: correctness you re-d
 Identity: ERC-8004 agent #5152 on X Layer (eip155:196), owner 0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b
 Payment: x402 v2 exact — USD₮0 on X Layer (eip155:196) and USDC on Base (eip155:8453); unpaid requests get the 402 challenge with both rails
 Free tier: POST /mcp (Streamable HTTP MCP, 9 risk tools, fair-use daily quota)
+Changes since submission: /changelog
 Docs: /paper (technical documentation, typeset) · /paper/1../paper/6 (same text, plain markdown, AI-readable) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
 
 ## Paid services (x402)
 ${svc}
 `);
 });
+app.get(['/changelog', '/changes'], (_req, res) => {
+  if (!CHANGELOG) return res.status(404).json({ error: 'no_changelog' });
+  res.set('content-type', 'text/markdown; charset=utf-8').send(CHANGELOG);
+});
+
 app.get('/healthz', (_req, res) => res.json({ ok: true, version: config.version, services: SERVICES.filter((s) => s.register !== false).length }));
 
 // Build provenance — makes "re-run bit-for-bit" CHECKABLE, not a promise. `codeHash` is the sha256 of the

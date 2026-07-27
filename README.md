@@ -5,7 +5,7 @@ agent calls over HTTP, pays for in-band with [x402](https://github.com/coinbase/
 through the [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) trustless-agent registry. No chat, no
 human in the loop. Every deterministic answer arrives with a proof you can re-derive yourself.
 
-- **Live endpoint:** https://quiver-production-c3a8.up.railway.app — [`/build`](https://quiver-production-c3a8.up.railway.app/build), [`/paper`](https://quiver-production-c3a8.up.railway.app/paper) (machine-readable) and [`/paper/human`](https://quiver-production-c3a8.up.railway.app/paper/human) (typeset) are free
+- **Live endpoint:** https://quiver-production-c3a8.up.railway.app — [`/build`](https://quiver-production-c3a8.up.railway.app/build) and [`/paper`](https://quiver-production-c3a8.up.railway.app/paper) are free; the paper is also served as plain markdown in six AI-readable parts at `/paper/1` … `/paper/6`
 - **Free MCP:** `https://quiver-production-c3a8.up.railway.app/mcp` — Streamable HTTP, the nine risk-brain tools, fair-use daily quota; on the [official MCP registry](https://registry.modelcontextprotocol.io) as `quiver-risk-brain`
 - **On-chain identity:** ERC-8004 agent `#5152` on X Layer (`eip155:196`) · **Build:** `q1-404d7ab899d32fef`
 - **Payment (dual rail):** x402 v2 `exact` — USD₮0 on X Layer (OKX facilitator) **and** USDC on Base (Coinbase CDP facilitator); 0.005–0.05 per call
@@ -26,31 +26,37 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 | **Strongest evidence** | A population-scale replay of the October 2025 crash and two out-of-sample 2026 crashes: flagged accounts were liquidated at 14.3× and 13.3× the rate of cleared ones. → [verification](docs/verification.md) |
 | **Strongest counter-evidence, ours** | Our own ablation reduces that result to raw distance-to-liquidation — and that distance is the *venue's* published number, not one this engine computed, so the study validates the quantity rather than our arithmetic on it. The flag also fires on 42–44% of accounts. Both sit beside the headline, not in a footnote. |
 | **Traction, honestly** | Near zero. Three external wallets have paid for one or two calls each; none has returned. Everything else is our own disclosed quality-assurance traffic and is never counted as sales. |
-| **Tests** | **356** model-free tests, 351 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
+| **Tests** | **355** model-free tests, 350 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
 | **What it refuses to do** | Output a directional edge. Infer dealer positioning it cannot measure. Call a variance premium significant when it is not. Guess when the data is missing — it answers `DATA_UNAVAILABLE`, for free. |
 
 ---
 
 ## Documentation
 
-The full technical documentation is one continuous document, served in **two editions of the same
-text** — nothing is abridged in either:
+The full technical documentation is one continuous document, served as
+[`/paper`](https://quiver-production-c3a8.up.railway.app/paper) — typeset, with figures, mirrored at
+[`assets/whitepaper.html`](assets/whitepaper.html)
+([PDF](https://drive.google.com/file/d/1K44jmBBLyFed1qF6Ib62YRh8J-jMQ-xW/view?usp=sharing)).
 
-- [`/paper`](https://quiver-production-c3a8.up.railway.app/paper) — **machine-readable markdown**, and
-  the default. Served as **part 1 of 6**, each part inside what a single fetch delivers, with the map
-  of all six in the opening lines of every part — so a reader whose fetch is cut off still holds the
-  URLs for the rest. `/paper/1` … `/paper/6`, or [`/paper/full`](https://quiver-production-c3a8.up.railway.app/paper/full)
-  for the whole thing in one response.
+**Reading it with an AI?** That page is 400 kB of styled HTML and will not arrive whole in one fetch.
+The identical text is served as plain markdown in six parts, each small enough to read in a single
+request. **Nothing is abridged** — the parts concatenate to the whole document, cut only at section
+boundaries, and [a test](test/paperMachineReadable.test.mjs) asserts exactly that.
 
-  This was measured, not guessed. The styled edition is 395 kB, most of it markup. Stripping the
-  markup gave 241 kB of clean markdown — and a real fetch of that **still** truncated at about 40%,
-  mid-sentence in §5.19, reporting the References and all three appendices as missing. The budget
-  belongs to the reader, so the document had to arrive in pieces. **Nothing is abridged:** the parts
-  concatenate to the whole text, cut only at section boundaries, and a test asserts exactly that.
-  Generated from the HTML by [`tools/paper-to-text.mjs`](tools/paper-to-text.mjs).
-- [`/paper/human`](https://quiver-production-c3a8.up.railway.app/paper/human) — the **typeset
-  edition** with figures, mirrored at [`assets/whitepaper.html`](assets/whitepaper.html)
-  ([PDF](https://drive.google.com/file/d/1K44jmBBLyFed1qF6Ib62YRh8J-jMQ-xW/view?usp=sharing)).
+| | |
+|---|---|
+| [`/paper/1`](https://quiver-production-c3a8.up.railway.app/paper/1) | Abstract · At a Glance · Contents · 1 Introduction · 2 System Architecture · 3 Design Principles |
+| [`/paper/2`](https://quiver-production-c3a8.up.railway.app/paper/2) | 4 Service Catalogue |
+| [`/paper/3`](https://quiver-production-c3a8.up.railway.app/paper/3) | 5 Methodology |
+| [`/paper/4`](https://quiver-production-c3a8.up.railway.app/paper/4) | 6 Verification and Testing · 7 Worked Walkthrough · 8 Limitations · 9 Related Work |
+| [`/paper/5`](https://quiver-production-c3a8.up.railway.app/paper/5) | 10 The Build · 11 Roadmap · 12 Conclusion |
+| [`/paper/6`](https://quiver-production-c3a8.up.railway.app/paper/6) | Appendix A API · Appendix B Reproducibility · Appendix C Checkable Artifacts · References |
+| [`/paper/full`](https://quiver-production-c3a8.up.railway.app/paper/full) | the whole document in one response (237 kB — may truncate in your client) |
+
+The split was measured, not guessed. Stripping the markup gave 237 kB of clean markdown, and a real
+fetch of *that* still stopped at about 40%, mid-sentence in §5.19, reporting the References and all
+three appendices as missing. The budget belongs to the reader, so the document had to arrive in
+pieces. Generated by [`tools/paper-to-text.mjs`](tools/paper-to-text.mjs).
 
 The same material is also split by topic below. Each file is short enough to read in one pass and
 points at the artifact that settles its claims.
@@ -120,7 +126,7 @@ you keep your money.
 
 ```bash
 npm ci
-npm test      # 356 model-free tests — no network access required
+npm test      # 355 model-free tests — no network access required
 npm start     # serves on the configured port
 ```
 

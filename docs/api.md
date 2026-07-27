@@ -42,9 +42,9 @@ HTTP JSON-RPC) at a fair-use quota of three hundred tool calls per day per IP. `
 | `POST /api/risk-attest` | `items[]` (envelopes) or `contentHashes[]` | `merkleRoot`, `inclusionProofs`, `anchorCalldata`, `proof` |
 
 Free, unmetered: `GET /build` (code identity, the Node version it runs on, and the hashing rule that
-produced the identity), `GET /paper` (machine-readable documentation, part 1 of 6), `GET /paper/{1..6}`
-(the remaining parts), `GET /paper/full` (the whole document in one response), `GET /paper/human`
-(typeset, with figures), `GET /`.
+produced the identity), `GET /paper` (the technical documentation, typeset), `GET /paper/{1..6}` (the
+same text as plain markdown, in six parts each small enough for one fetch), `GET /paper/full` (the
+whole document in one response), `GET /`.
 
 ---
 

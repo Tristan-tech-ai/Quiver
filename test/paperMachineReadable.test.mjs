@@ -6,9 +6,10 @@
 //      about 40%, mid-sentence in 5.19, and reported the References and all three appendices as
 //      missing. That was measured against the deployed service, not reasoned about.
 //
-// The budget belongs to the reader, so the fix is that the document arrives in parts that fit, each
-// one opening with the map of all parts. These tests fail against the HTML-only handler AND against
-// the whole-document markdown handler, because both let a reader silently receive a fraction.
+// The budget belongs to the reader, so the fix is that the document ARRIVES in parts that fit, each
+// opening with the map of all parts — served at /paper/1 … /paper/6, beside the typeset edition
+// rather than in place of it. These tests fail against the HTML-only service, which offered no
+// machine edition at all and let a reader silently receive a fraction of the argument.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import app from '../src/app.js';
@@ -41,15 +42,35 @@ function core(part) {
 }
 const norm = (s) => s.replace(/\r/g, '').replace(/\n{2,}/g, '\n').replace(/[ \t]+/g, ' ').trim();
 
-test('/paper serves markdown, not markup', async () => {
+test('/paper keeps its original meaning: the typeset edition, for a person', async () => {
+  // It was briefly the machine edition. That broke every consumer expecting the whole document from
+  // the canonical URL — this project's own release gate first among them, which is how the cost
+  // showed up. The machine edition lives beside it instead, and /paper announces it two ways so an
+  // automated reader that lands here blind can still find it before its budget runs out.
   const r = await get('/paper');
   assert.equal(r.status, 200);
-  assert.match(r.type, /text\/markdown/, '/paper must not answer with HTML');
-  assert.doesNotMatch(r.body.slice(0, 4000), /<(div|span|table|style|head)\b/);
+  assert.match(r.type, /text\/html/, '/paper is the human edition');
+  assert.match(r.body, /<html/i);
+  assert.equal(r.h.get('x-paper-machine-edition'), '/paper/1');
+  assert.equal(r.h.get('x-paper-parts'), String(PART_COUNT));
+
+  // Three carriers, asserted separately, because an earlier version of this test checked only that
+  // "/paper/6" appeared somewhere in the opening bytes — and it passed on the <meta> alone while the
+  // visible note had been deleted by a bad edit. A check that can be satisfied by any one of the
+  // things it is meant to guarantee does not guarantee any of them.
+  assert.match(r.body.slice(0, 600), /machine-readable-edition/,
+    'a <meta> in the head, which survives even a very short read');
+  assert.match(r.body, /Reading this with an automated tool/,
+    'a VISIBLE note — HTML comments and meta tags are routinely dropped by markdown-converting fetchers');
+  assert.match(r.body, /machine-note/, 'and the note must carry its class, which hides it in print');
+  for (let i = 1; i <= PART_COUNT; i++) {
+    assert.ok(r.body.includes(`/paper/${i}`), `the note must name /paper/${i}`);
+  }
+  assert.match(r.body, /<body>/, 'the document must actually have a body tag');
 });
 
-test('/paper is a part that fits, and says so in its first characters', async () => {
-  const r = await get('/paper');
+test('a part fits, and says so in its first characters', async () => {
+  const r = await get('/paper/1');
   // A reader whose fetch is cut off still receives the opening. The map must therefore be at the TOP,
   // not the bottom — putting it at the end would tell only the readers who did not need telling.
   const opening = r.body.slice(0, 1400);
@@ -106,19 +127,13 @@ test('the tail of the document is reachable in one fetch, which is what failed b
   assert.match(last, /End of the document/);
 });
 
-test('/paper/human still serves the typeset edition', async () => {
-  const r = await get('/paper/human');
-  assert.equal(r.status, 200);
-  assert.match(r.type, /text\/html/);
-  assert.match(r.body, /<html/i);
-});
-
 test('a bad part number teaches instead of merely refusing', async () => {
   const r = await get('/paper/99');
   assert.equal(r.status, 404);
   const j = JSON.parse(r.body);
   assert.match(j.note, /\/paper\/1/, 'the refusal must name the range that does exist');
   assert.equal(j.whole, '/paper/full');
+  assert.equal(j.typeset, '/paper');
 });
 
 test('the section numbers the prose depends on are reconstructed', async () => {

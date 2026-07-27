@@ -61,6 +61,10 @@ let body = html
   .replace(/<script[\s\S]*?<\/script>/g, '')
   .replace(/<head[\s\S]*?<\/head>/g, '');
 
+// The HTML edition carries a visible note telling automated readers that this machine edition exists.
+// Repeating it inside the machine edition is noise: every part already opens with the full part map.
+body = body.replace(/<div class="machine-note">[\s\S]*?<\/div>/, '');
+
 // Figures are vector charts. Their argument is in the caption; their bytes are not readable prose.
 body = body.replace(/<figure\b[\s\S]*?<\/figure>/g, (fig) => {
   const cap = (fig.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/) || [, ''])[1];

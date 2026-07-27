@@ -177,34 +177,25 @@ app.post('/mcp', async (req, res) => {
   }
 });
 
-// Public technical documentation, in two editions.
+// Public technical documentation. One document, two shapes, and `/paper` keeps its original meaning:
+// the typeset edition, for a person.
 //
-// `/paper` serves the MACHINE-READABLE edition, because the styled one does not survive the trip. An
-// AI reader fetching a URL has a bounded character budget, and more than half of the HTML edition is
-// markup — span wrappers, table scaffolding, inline SVG path geometry — so the fetch truncated partway
-// through and the reader formed its view of Quiver from the opening third of the argument. Measured,
-// not assumed: a reviewer hit exactly that. The failure is the same shape as a stale hash — the
-// artifact is correct and the consumer is still misinformed — so it is fixed the same way, by serving
-// the form the consumer can actually finish. Nothing is abridged: same sections, tables, code blocks
-// and all 73 references, generated from the HTML by tools/paper-to-text.mjs.
+// The machine-readable edition lives beside it at `/paper/1` … `/paper/6`. It exists because the
+// styled document does not survive the trip to an AI reader: 395 kB, most of it markup, against a
+// bounded fetch budget. Stripping the markup to 236 kB of clean markdown was NOT enough — measured,
+// not assumed: a real fetch of that still stopped mid-sentence in §5.19 and reported the References
+// and all three appendices as missing. The budget belongs to the reader, so the document has to
+// ARRIVE in pieces that fit. Each part opens with the map of all six, so a fetch truncated anywhere
+// has already delivered the URLs for the rest. Nothing is abridged; a test asserts the parts
+// concatenate to the whole.
 //
-// The typeset edition keeps its figures and moves to `/paper/human`.
-app.get(['/paper/human', '/whitepaper', '/docs'], (_req, res) => {
-  if (!WHITEPAPER) return res.status(404).json({ error: 'paper_unavailable' });
-  res.set('content-type', 'text/html; charset=utf-8');
-  res.set('cache-control', 'public, max-age=3600');
-  res.send(WHITEPAPER);
-});
-
-// Dropping the markup was necessary and not sufficient. Fetched live, an AI reader still stopped
-// mid-sentence in 5.19 — about 40% in — and reported the References and all three appendices as
-// missing. The budget belongs to the reader, so the document has to ARRIVE in pieces that fit.
-// `/paper` is therefore part 1 of 6, and every part opens with the map of all six, which means a
-// reader whose fetch truncates anywhere already holds the URLs for the rest.
+// `/paper` was briefly the machine edition. That broke every consumer expecting the whole document
+// from the canonical URL — including this project's own release gate, which is how the cost showed
+// up. Discovery is handled inside the HTML instead, by a banner naming the parts.
 const md = (res, body, extra = {}) => {
   res.set('content-type', 'text/markdown; charset=utf-8');
   res.set('cache-control', 'public, max-age=3600');
-  res.set({ 'x-paper-human-edition': '/paper/human', 'x-paper-parts': String(PAPER_PARTS.length), ...extra });
+  res.set({ 'x-paper-parts': String(PAPER_PARTS.length), 'x-paper-machine-edition': '/paper/1', ...extra });
   res.send(body);
 };
 
@@ -216,25 +207,30 @@ app.get(['/paper/full', '/paper.md'], (_req, res) => {
   md(res, PAPER_MD);
 });
 
-app.get('/paper', (_req, res) => {
-  if (PAPER_PARTS.length) return md(res, PAPER_PARTS[0], { 'x-paper-part': '1' });
-  // Never 404 the canonical documentation URL over a missing build artifact: fall back to whatever
-  // edition does exist rather than telling a reader the paper is unavailable when it is not.
-  if (PAPER_MD) return md(res, PAPER_MD);
-  if (WHITEPAPER) return res.set('content-type', 'text/html; charset=utf-8').send(WHITEPAPER);
-  return res.status(404).json({ error: 'paper_unavailable' });
-});
-
 app.get('/paper/:n', (req, res) => {
   const n = Number(req.params.n);
   if (!Number.isInteger(n) || n < 1 || n > PAPER_PARTS.length) {
     return res.status(404).json({
       error: 'no_such_part',
-      note: `the documentation is served in ${PAPER_PARTS.length} parts, /paper/1 … /paper/${PAPER_PARTS.length}`,
-      whole: '/paper/full', typeset: '/paper/human',
+      note: `the machine-readable documentation is served in ${PAPER_PARTS.length} parts, /paper/1 … /paper/${PAPER_PARTS.length}`,
+      whole: '/paper/full', typeset: '/paper',
     });
   }
   md(res, PAPER_PARTS[n - 1], { 'x-paper-part': String(n) });
+});
+
+app.get(['/paper', '/whitepaper', '/docs'], (_req, res) => {
+  if (!WHITEPAPER) {
+    // Never 404 the canonical documentation URL over a missing build artifact.
+    if (PAPER_MD) return md(res, PAPER_MD);
+    return res.status(404).json({ error: 'paper_unavailable' });
+  }
+  res.set('content-type', 'text/html; charset=utf-8');
+  res.set('cache-control', 'public, max-age=3600');
+  // An automated reader that lands here blind cannot know the machine edition exists, and it will
+  // truncate before finding out. Say so in a header, which costs it nothing to read.
+  res.set({ 'x-paper-machine-edition': '/paper/1', 'x-paper-parts': String(PAPER_PARTS.length) });
+  res.send(WHITEPAPER);
 });
 
 // Public artifact serving for rendered cards (already paid for at generation time).

@@ -11,7 +11,7 @@
 > - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 6** — `/paper/6` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (238 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (239 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 

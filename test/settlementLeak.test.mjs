@@ -12,11 +12,19 @@ test('Q-12 settleDecision: success without a transaction is retry, never settled
   assert.equal(settleDecision({ success: 'true', status: 'unknown' }), 'retry');
 });
 
-test('Q-12 settleDecision: a transaction hash or a confirmed status settles', () => {
+test('Q-12 settleDecision: a transaction hash settles — a confident status alone does not', () => {
   assert.equal(settleDecision({ success: true, status: 'timeout', transaction: '0xabc' }), 'settled');
-  assert.equal(settleDecision({ success: true, status: 'settled' }), 'settled');
   assert.equal(settleDecision({ status: 'confirmed', txHash: '0xdef' }), 'settled');
-  assert.equal(settleDecision({ status: 'confirmed' }), 'settled', 'an explicit confirmed status is the facilitator asserting finality');
+
+  // These two lines used to assert 'settled', on the reasoning that "an explicit confirmed status is
+  // the facilitator asserting finality". That was a belief, and this test was holding it in place as
+  // a specification. It was refuted on 27 July 2026: an external address made seven calls that all
+  // logged `decision="settled" success=true tx=null`, and an exhaustive scan of the X Layer USD₮0
+  // transfer log over the exact block window found zero transfers arriving at the payTo. The
+  // facilitator's confidence was worth nothing; the transaction field is the only discriminator, as
+  // the comment above settleDecision had said all along. See settleRequiresTransaction.test.mjs.
+  assert.equal(settleDecision({ success: true, status: 'settled' }), 'retry');
+  assert.equal(settleDecision({ status: 'confirmed' }), 'retry');
 });
 
 test('Q-12 settleDecision: an outright failure is failed (existing 402 path)', () => {

@@ -26,8 +26,8 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 | **Checkable in thirty seconds** | The agent listing on X Layer, one settlement on each payment rail, an EAS schema on Base, the build hash at `/build`, and a worked proof whose content hash and signature you can reproduce — none of it needing our cooperation. → [checkable artifacts](docs/checkable-artifacts.md) |
 | **Strongest evidence** | A population-scale replay of the October 2025 crash and two out-of-sample 2026 crashes: flagged accounts were liquidated at 14.3× and 13.3× the rate of cleared ones — on a flag that fires on 41.6% and 43.8% of accounts, which belongs beside the ratio and not after it. → [verification](docs/verification.md) |
 | **Strongest counter-evidence, ours** | Our own ablation reduces that result to raw distance-to-liquidation — and that distance is the *venue's* published number, not one this engine computed, so the study validates the quantity rather than our arithmetic on it. The flag also fires on 42–44% of accounts. Both sit beside the headline, not in a footnote. |
-| **Traction, honestly** | Near zero. Three external wallets have paid for one or two calls each; none has returned. Everything else is our own disclosed quality-assurance traffic and is never counted as sales. |
-| **Tests** | **367** model-free tests, 362 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
+| **Traction, honestly** | Near zero, and stated against our own definition rather than a flattering one. Three external wallets have paid, for one or two calls each; at least one returned for a second, none went further. Everything else is our own disclosed quality-assurance traffic and is never counted as sales. |
+| **Tests** | **372** model-free tests, 367 passing, 5 skipped for want of an archive node, 0 failing. Many provably fail on the pre-fix code — verified by reverting each fix and watching them go red. |
 | **What it refuses to do** | Output a directional edge. Infer dealer positioning it cannot measure. Call a variance premium significant when it is not. Guess when the data is missing — it answers `DATA_UNAVAILABLE`, for free. |
 
 ---
@@ -127,7 +127,7 @@ you keep your money.
 
 ```bash
 npm ci
-npm test      # 367 model-free tests — no network access required
+npm test      # 372 model-free tests — no network access required
 npm start     # serves on the configured port
 ```
 

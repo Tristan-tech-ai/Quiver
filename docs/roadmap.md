@@ -24,8 +24,11 @@ worth its price in a real loop. Usage without recurrence measures curiosity; rev
 recurrence measures novelty.
 
 Since the metric governs the plan it is reported rather than described. Three wallets that are not
-ours have paid, for one or two calls each. None has returned. **External recurrence is zero**, against
-568 calls from our own audit desk over the same window. That is the number, and by the standard set
+ours have paid, for one or two calls each, and none has gone beyond a second. An earlier draft called
+that **zero**, which was wrong against our own definition rather than conservative with it: the metric
+above is calling *more than once*, and the conclusion was counting only a *third* call. Measured as
+defined, **external recurrence is a small non-zero that has not compounded** — at least one caller
+returned, none went further — against 568 calls from our own audit desk over the same window. That is the number, and by the standard set
 two sentences earlier it is the only one that would justify building anything further.
 
 ## Sequence

@@ -54,13 +54,24 @@ export function settledStatus(sdata) {
 // flag — is the discriminator. success-without-transaction earns ONE idempotent retry (EIP-3009
 // nonces make a duplicate /settle harmless: if the first actually landed, the second cannot
 // double-spend); still nothing => NOT settled, and the caller (who keeps their funds) gets a 402.
+// SECOND LEAK, measured 27 July 2026. The rule above was applied to `status:"timeout"` and not to the
+// branch beneath it: `if (confirmed) return 'settled'` accepted `status:"success"` with NO transaction
+// hash. An external address then made seven calls across five services in one session; all seven were
+// logged `decision="settled" success=true tx=null`, and an exhaustive scan of the X Layer USD₮0
+// transfer log over the exact block window (66,399,800–66,401,300, full coverage, no gaps) found
+// **zero** transfers arriving at our payTo. Seven answers were served for nothing, and the recurrence
+// instrumentation counted them as paid calls — so the defect was about to be reported as traction.
+//
+// The stated principle was right and the code contradicted it one line later, which is the same
+// branch-next-door shape this project keeps finding. A response without a transaction hash now earns
+// the same single idempotent retry regardless of how confident its status string is, and then fails
+// closed: the caller keeps their funds and gets a 402 rather than a free answer.
 export function settleDecision(sdata) {
   const hasTx = !!(sdata.transaction || sdata.txHash);
   const confirmed = ['settled', 'success', 'confirmed'].includes(sdata.status);
   const success = sdata.success === true || sdata.success === 'true';
   if (hasTx && (success || confirmed)) return 'settled';
-  if (confirmed) return 'settled';
-  if (success) return 'retry';
+  if (success || confirmed) return 'retry';
   return 'failed';
 }
 

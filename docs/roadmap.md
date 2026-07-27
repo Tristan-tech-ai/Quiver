@@ -23,13 +23,23 @@ external agents calling more than once, because a second call is the only signal
 worth its price in a real loop. Usage without recurrence measures curiosity; revenue without
 recurrence measures novelty.
 
-Since the metric governs the plan it is reported rather than described. Three wallets that are not
-ours have paid, for one or two calls each, and none has gone beyond a second. An earlier draft called
-that **zero**, which was wrong against our own definition rather than conservative with it: the metric
-above is calling *more than once*, and the conclusion was counting only a *third* call. Measured as
-defined, **external recurrence is a small non-zero that has not compounded** — at least one caller
-returned, none went further — against 568 calls from our own audit desk over the same window. That is the number, and by the standard set
-two sentences earlier it is the only one that would justify building anything further.
+Since the metric governs the plan it is reported rather than described — and measured **on chain**,
+not from our own counter. Over the eight days to 27 July 2026, **six payer addresses that are not
+ours** sent **44 payments totalling 0.575 USD₮0** to the `payTo` advertised in every 402 challenge,
+at per-call amounts inside the published price band. **Four of the six paid more than once**, which is
+this metric. One returned across 2.55 days; another made twelve calls on 20 July and came back a week
+later. Half a dollar is not a business, and it is stated plainly because a governing metric that is
+flattered governs nothing.
+
+An earlier draft said *three* wallets and external recurrence *zero*. Wrong twice: the conclusion
+tested for a *third* call while the definition above says *more than once*, and the count came from an
+in-memory instrument that resets on every deploy — this service deployed eight times on 27 July alone.
+The chain does not forget; our instrumentation did. Addresses: `0x1b010a9c…` (22), `0xbc59eb75…` (12),
+`0xc385e2df…` (5), `0xcab2b9e3…` (3), `0x8d295ff5…` (1), `0x86f10e00…` (1) — recomputable from the
+USD₮0 transfer log on X Layer over blocks 65,711,861–66,403,061. One of ~70 scan windows failed, so 44
+is a floor. That is against 568 calls from our own audit desk over the same window — and by the
+standard this section sets, those 44 external payments are the only number here that would justify
+building anything further.
 
 ## Sequence
 

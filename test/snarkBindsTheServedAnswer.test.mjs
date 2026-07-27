@@ -125,3 +125,41 @@ test('the verification key on disk is the one the circuit was compiled to', () =
   const onDisk = JSON.parse(readFileSync(new URL('../assets/zk/vk_plonk.json', import.meta.url), 'utf8'));
   assert.deepEqual(vk, onDisk);
 });
+
+test('the free MCP path strips the proof flag and builds the proof too', async () => {
+  // The MCP handler is a second implementation of perp-gate, and it is the one a builder reaches
+  // first because it is free. It has already leaked a non-input into a content hash once — the
+  // comment in that handler records it — so the opt-in flag gets the same test rather than the same
+  // assumption. Both halves matter: the hash must not move, AND asking must actually produce a proof.
+  const { handleRpc } = await import('../src/mcp.js');
+  const call = async (args) => {
+    const res = await handleRpc({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'perp_gate', arguments: args } });
+    return JSON.parse(res.result.content[0].text);
+  };
+  // A position no other test in this file proves. The first version of this test used the Appendix C
+  // position, and the store had already been filled with its proof by an earlier test — so the
+  // "a proof gets built" half passed with the build call deleted. It was checking the cache.
+  const base = { side: 'short', entryPrice: 2500, size: 3, leverage: 5, maintMarginRate: 0.01 };
+  const plain = await call(base);
+  const asked = await call({ ...base, snark: true });
+
+  assert.equal(asked.proof.contentHash, plain.proof.contentHash,
+    'asking for a proof over MCP must not change the answer it is a proof of');
+  assert.equal('snark' in asked.proof.inputs, false);
+
+  // And the published appendix must still come back from this path byte-identical when asked with
+  // the flag — that is the constant a reader of the paper would check against.
+  const appendixC = await call({ side: 'long', entryPrice: 64000, size: 1, leverage: 10, maintMarginRate: 0.0125, snark: true });
+  assert.equal(appendixC.proof.contentHash, '8575ce5ae5bfae9cdfdfc604250f8032e4ba85fb33560386586b7538d0ab0960');
+  assert.equal(plain.snark, undefined);
+  assert.ok(asked.snark, 'the MCP response must carry the retrieval pointer');
+  assert.equal(asked.snark.retrieveAt, `/proof/${asked.proof.contentHash}`);
+
+  const deadline = Date.now() + 90_000;
+  for (;;) {
+    const rec = getProof(asked.proof.contentHash);
+    if (rec && rec.status === 'ready') break;
+    assert.ok(Date.now() < deadline, 'MCP asked for a proof and none was ever built');
+    await new Promise((r) => setTimeout(r, 250));
+  }
+});

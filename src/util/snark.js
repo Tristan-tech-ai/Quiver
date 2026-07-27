@@ -109,6 +109,15 @@ export function witnessFor(echoedInputs, liquidationPrice) {
   return { witness: scale.toWitnessInput(full), encoded: full, gapToServed: gap };
 }
 
+// Proving costs ~700ms of one core, and the MCP endpoint that can now ask for it is FREE. At the
+// standing 60 requests/minute rate limit a single caller could otherwise demand 42 seconds of CPU
+// per minute — enough to starve the paid endpoints that share the process. So proofs are built one
+// at a time behind a short queue, and callers past the backlog are told no rather than silently
+// stacking up work. One core in, one core out, whatever arrives.
+const MAX_QUEUED = 8;
+let queue = Promise.resolve();
+let queued = 0;
+
 /** Build a proof in the background and record it under the response's content hash. */
 export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
   if (store.has(contentHash)) return;
@@ -123,8 +132,13 @@ export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
     put(contentHash, { status: 'unavailable', error: `witness diverges from the served price by ${w.gapToServed} — refusing to certify a different position` });
     return;
   }
+  if (queued >= MAX_QUEUED) {
+    put(contentHash, { status: 'unavailable', error: `prover busy — ${queued} proofs already queued; retry shortly` });
+    return;
+  }
   put(contentHash, { status: 'building' });
-  (async () => {
+  queued++;
+  queue = queue.then(async () => {
     const sj = await warmProver();
     const calc = await artifacts();
     const wtns = await calc.calculateWTNSBin(w.witness, 0);
@@ -142,7 +156,11 @@ export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
       gapToServedPrice: w.gapToServed,
       verify: 'snarkjs plonk verify vk_plonk.json publicSignals proof — the verification key is published at /proof/vk',
     });
-  })().catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }));
+  })
+    .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
+    // The counter has to come down whether the proof succeeded or not, and the chain has to be left
+    // in a resolved state — a rejected `queue` would poison every proof that came after it.
+    .finally(() => { queued--; });
 }
 
 export function verificationKey() {

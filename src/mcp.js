@@ -26,6 +26,7 @@ import { portfolioGate } from './engine/portfolioGate.js';
 import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 import { enrichPerpInputs, enrichPortfolioLegs } from './adapters/hyperliquid.js';
 import { config } from './config.js';
+import { buildInBackground } from './util/snark.js';
 
 // ── Capability metadata (MCP 2025-06-18: title / annotations / outputSchema) ────────────────────────────
 // outputSchema property sets mirror the REAL top-level keys each engine returns (captured by running the
@@ -94,7 +95,13 @@ const TOOLS = [
     }),
     run: async (a) => {
       const e = await enrichPerpInputs(a);
-      const { live, ...compute } = e;
+      // `snark` is a delivery option, not an input to the maths, so it is stripped before anything is
+      // computed or hashed. This handler is the third place that lesson has had to be applied: the
+      // comment below records `live` leaking into a content hash on this same path, and shipping the
+      // opt-in proof flag without stripping it here would have done the identical thing — a caller
+      // asking for a proof would have received a DIFFERENT content hash for the same position, and
+      // the published appendix would have stopped matching the free endpoint a builder tries first.
+      const { live, snark: wantSnark, ...compute } = e;
       // A venue this service cannot resolve is a caller error, not an answer. Serving the maths with
       // the complaint embedded produced a signed result carrying an error string, which is neither a
       // refusal nor a usable answer. Refuse, name what is supported, and say how to get the number
@@ -115,7 +122,17 @@ const TOOLS = [
         return observationEnvelope('perp-gate', compute, r, config.version);
       }
       // Caller supplied every input: nothing was fetched, so the answer really is re-runnable.
-      return proofEnvelope('perp-gate', compute, r, config.version);
+      const env = proofEnvelope('perp-gate', compute, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        buildInBackground(env.proof.contentHash, env.proof.inputs, r.liquidationPrice);
+        env.snark = {
+          protocol: 'plonk', status: 'building',
+          retrieveAt: `/proof/${env.proof.contentHash}`,
+          verificationKey: '/proof/vk',
+          note: 'A PLONK proof of the liquidation identity is being built off this request path — the answer above did not wait for it. Poll retrieveAt; 202 means still building. The proof is over the SAME inputs echoed in proof.inputs, and QuiverProofRegistry.submit() will check it on chain.',
+        };
+      }
+      return env;
     },
   },
   {

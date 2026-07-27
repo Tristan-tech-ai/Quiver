@@ -322,6 +322,24 @@ for (const s of SERVICES) {
 // Unknown path -> JSON 404 (never the Express HTML page), so machine callers always get a parseable error.
 app.use((req, res) => res.status(404).json({ error: 'not_found', note: `no route ${req.method} ${req.path}`, index: '/', docs: '/paper' }));
 
+// A body the parser cannot read is the CALLER's error, not ours. It used to fall through to the 500
+// below and echo the raw V8 parser message, so an unparseable request was reported as a fault inside
+// the service — outside the documented status taxonomy, and contradicting the guarantee that an
+// unauthenticated route answers with the 402 challenge rather than an error. Express marks these with
+// `type: 'entity.parse.failed'`; the oversized-body case gets its own status for the same reason.
+app.use((err, _req, res, next) => {
+  if (err?.type === 'entity.parse.failed') {
+    return res.status(400).json({
+      error: 'bad_input',
+      note: 'Request body is not valid JSON. Send a JSON object with content-type: application/json. Nothing was computed and no payment was attempted.',
+      parserDetail: String(err.message || '').slice(0, 160),
+    });
+  }
+  if (err?.type === 'entity.too.large') {
+    return res.status(413).json({ error: 'bad_input', note: 'Request body exceeds the 16kb limit. Nothing was computed and no payment was attempted.' });
+  }
+  return next(err);
+});
 app.use((err, _req, res, _next) => res.status(500).json({ error: 'internal', note: String(err?.message || err).slice(0, 200) }));
 
 export default app;

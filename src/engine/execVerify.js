@@ -52,7 +52,20 @@ export function execVerify(p = {}, { eps = 1e-6 } = {}) {
     // constant-product invariant self-check
     const kBefore = x * y, kAfter = (x + inEff) * (y - honestOut);
     const residual = Math.abs(kAfter - kBefore);
-    const invariantOk = residual <= eps * Math.max(1, kBefore);
+    // The tolerance must not scale with k. k is QUADRATIC in reserve size while honestOut — the
+    // number this check exists to certify — is linear, so an absolute budget of eps*k let the
+    // invariant drift by more than the entire honest output on any realistic pool: at reserves of
+    // 1e6 and 2e9 it permitted a residual worth ~1.0e6 bps of honestOut, against the 5 bps threshold
+    // this same engine uses to call a fill a sandwich. A check looser than the effect it is paired
+    // with certifies nothing. Two scale-free forms replace it: a RELATIVE error on k, and a
+    // reconstruction of honestOut measured in output units against honestOut itself.
+    const relResidual = kBefore > 0 ? residual / kBefore : residual;
+    const invariantOk = relResidual <= 1e-12;
+    // Independent reconstruction: solve the invariant for the output and compare in output units.
+    const outFromInvariant = y - kBefore / (x + inEff);
+    const outResidual = Math.abs(outFromInvariant - honestOut);
+    const outRelResidual = honestOut > 0 ? outResidual / honestOut : outResidual;
+    const outputOk = outRelResidual <= 1e-12;
 
     const mid = y / x;                                   // pre-trade spot (out per in)
     const honestPrice = honestOut / dx;                  // fill the pool honestly implies for YOUR size (incl fee)
@@ -77,7 +90,14 @@ export function execVerify(p = {}, { eps = 1e-6 } = {}) {
           ? `Fill was ${round(-adverseBps, 1)} bps BETTER than the honest pool price (favorable — you received more than the pre-trade pool implied, e.g. positive-slippage routing or a quote stale in your favor).`
           : `Fill is within ${round(Math.abs(adverseBps), 1)} bps of the honest pool price — no material adverse execution detected.`,
       note: "Benchmark uses the SUPPLIED pre-trade reserves. To detect a full sandwich, pass the pool state at the START of your trade's block (before any attacker front-run); passing the state immediately before your own tx under-detects, because the front-run's impact is already baked into those reserves.",
-      checks: [{ name: 'constant-product invariant: (x+dx(1-f))(y-honestOut) == xy', residual: Number(residual.toExponential(2)), tolerance: Number((eps * Math.max(1, kBefore)).toExponential(2)), pass: invariantOk }],
+      checks: [
+        { name: 'constant-product invariant: (x+dx(1-f))(y-honestOut) == xy, as a RELATIVE error on k',
+          residual: Number(relResidual.toExponential(2)), tolerance: 1e-12, pass: invariantOk,
+          note: 'Relative, not absolute: an absolute budget scaled with k, which is quadratic in reserve size, so it grew far looser than the output it certifies as pools get larger.' },
+        { name: 'benchmark reconstruction: honestOut solved from the invariant matches the served honestOut, relative to honestOut',
+          residual: Number(outRelResidual.toExponential(2)), tolerance: 1e-12, pass: outputOk,
+          note: 'Measured in output units against the output itself, so the check is as tight as the 5 bps threshold this engine uses to call a fill adverse.' },
+      ],
     };
   } else {
     const fair = Number(p.fairPrice);
@@ -90,7 +110,12 @@ export function execVerify(p = {}, { eps = 1e-6 } = {}) {
       verdict: adverseBps > 5
         ? `Realized ${round(adverseBps, 1)} bps worse than the fair reference — adverse execution your slippage tolerance did not prevent.`
         : `Within ${round(Math.abs(adverseBps), 1)} bps of the fair reference.`,
-      checks: [{ name: 'reference-mode: no pool model asserted (fairPrice supplied by caller)', pass: true }],
+      // Reported as NOT RUN rather than as a pass. In this mode the benchmark is a number the caller
+      // supplied, so there is no pool state and no invariant to assert against — and a check that
+      // asserts nothing while reporting `pass: true` inflates the self-check count with a guarantee
+      // that was never made. The verdict below is only as good as the fairPrice handed in.
+      checks: [{ name: 'constant-product invariant', skipped: true, pass: null,
+        reason: 'reference mode: the benchmark is the caller-supplied fairPrice, so no pool model is asserted and there is no invariant to check. Pass reserveIn/reserveOut/feeTier to get the invariant-backed benchmark instead.' }],
       note: 'Reference mode compares realized vs a caller-supplied fair price; it does not model the pool. For an exact, self-verified benchmark pass pool reserves + feeTier.',
     };
   }

@@ -6,8 +6,12 @@
 //
 // Transport: newline-delimited JSON-RPC 2.0 over stdio (the MCP stdio transport). Zero new dependencies —
 // in keeping with the codebase. Every tool returns the engine result + the T0 proof envelope (re-runnable,
-// self-checked, content-hashed). Compute is deterministic and local: instant, no upstream data, and the
-// self-checks mean the caller never has to trust us. stdout carries ONLY JSON-RPC; logs go to stderr.
+// self-checked, content-hashed). The MATHEMATICS is deterministic and local in every tool, and the
+// self-checks mean the caller never has to trust us. Two tools are NOT purely local: perp_gate and
+// portfolio_gate read a venue when they are given a `symbol` or an `account`, which is why their
+// annotations set openWorldHint (see `annotate` below). This header previously said "no upstream
+// data" flatly, contradicting the annotation twenty lines down and the tool descriptions themselves.
+// stdout carries ONLY JSON-RPC; logs go to stderr.
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 import { perpGate } from './engine/perpGate.js';

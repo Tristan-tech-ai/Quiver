@@ -98,14 +98,37 @@ export function optionsRisk(input = {}, { eps = 1e-6 } = {}) {
   const priceScen = [-1, -2 / 3, -1 / 3, 0, 1 / 3, 2 / 3, 1].map((x) => x * scanPct);
   const volScen = [dVol, 0, -dVol];
   const scenarios = [];
-  let worst = 0, worstScen = null;
+  let coarseWorst = 0, coarseScen = null;
   for (const ps of priceScen) {
     for (const vs of volScen) {
       const pnl = priceAt(positions, ps, vs, 0, r) - V0;
       scenarios.push({ underlyingMovePct: round(ps * 100, 2), volShiftPts: round(vs * 100, 1), pnl: round(pnl, 2) });
-      if (pnl < worst) { worst = pnl; worstScen = { underlyingMovePct: round(ps * 100, 2), volShiftPts: round(vs * 100, 1) }; }
+      if (pnl < coarseWorst) { coarseWorst = pnl; coarseScen = { underlyingMovePct: round(ps * 100, 2), volShiftPts: round(vs * 100, 1) }; }
     }
   }
+
+  // The seven-point grid is the SPAN convention, and for a portfolio whose P&L is monotone in price
+  // it finds the worst corner. It does NOT for a position with interior curvature — a butterfly or a
+  // condor can lose most BETWEEN two grid points, and the coarse scan then understates the very
+  // number the caller is told to hold capital against. A reviewer reported a short butterfly whose
+  // true worst loss inside the same box was 18.9% larger than the requirement; our own reconstructions
+  // reach only ~0.2% (a short condor), so the size of the gap is position-specific and we could not
+  // reproduce theirs — but the mechanism is real and the fix costs a few hundred evaluations. The
+  // requirement is
+  // therefore taken over a fine sweep of the SAME box; the seven-point grid is still returned, because
+  // it is what a SPAN-literate reader expects to see, and the gap between them is disclosed.
+  const FINE = 121;
+  // Seeded from the coarse result so the sweep is the worst over the UNION of both grids: the SPAN
+  // seven do not all land on a 121-step lattice, so a fine sweep alone could miss one of them.
+  let worst = coarseWorst, worstScen = coarseScen;
+  for (let i = 0; i <= FINE; i++) {
+    const ps = -scanPct + (2 * scanPct * i) / FINE;
+    for (const vs of volScen) {
+      const pnl = priceAt(positions, ps, vs, 0, r) - V0;
+      if (pnl < worst) { worst = pnl; worstScen = { underlyingMovePct: round(ps * 100, 3), volShiftPts: round(vs * 100, 1) }; }
+    }
+  }
+  const gridUnderstatementPct = worst < 0 ? ((coarseWorst - worst) / -worst) * 100 : 0;
 
   return {
     ok: true,
@@ -120,7 +143,9 @@ export function optionsRisk(input = {}, { eps = 1e-6 } = {}) {
       requirement: round(-worst, 2),
       worstScenario: worstScen,
       scanRangePct: scanPct, volShiftVolPts: volPts,
-      note: 'Worst portfolio P&L over a 7×3 price/vol scenario grid (SPAN-style). Requirement is the loss to hold against.',
+      sevenPointGridRequirement: round(-coarseWorst, 2),
+      gridUnderstatementPct: round(gridUnderstatementPct, 2),
+      note: `Worst portfolio P&L over the ±${round(scanPct * 100, 1)}% price box and ±${volPts} vol points, swept at ${FINE + 1} price points rather than the SPAN seven. A portfolio with interior curvature (butterfly, condor) can lose most BETWEEN grid points, so the seven-point convention can understate the box.${gridUnderstatementPct > 0.01 ? ` It does here: the seven-point figure is ${round(-coarseWorst, 2)}, understating this requirement by ${round(gridUnderstatementPct, 2)}%.` : ` It does not here — both grids find the same worst case, so the conventional figure and this one agree.`} The scenarios array below is the conventional 7×3 grid. This is the loss to hold against INSIDE the box; it is not a claim about moves outside it.`,
       scenarios,
     },
     positions: perPos,

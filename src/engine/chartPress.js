@@ -8,6 +8,16 @@ import * as data from '../adapters/data.js';
 import { config } from '../config.js';
 import { putCard } from '../util/cardstore.js';
 import { round } from './stats.js';
+
+// Prices need SIGNIFICANT figures, not fixed decimals. round(x,8) is toFixed(8), which returns 0 for
+// anything below 5e-9 — so on a sub-nano memecoin the three fields added to make the picture and the
+// facts comparable (lastDrawnCandleClose, high, low) all read 0.00000000 while priceUsd survived via
+// toPrecision. The comparison the response invites was impossible for exactly the tokens this service
+// is most often pointed at. Below 1e-4 keep 8 significant digits; above it the fixed form is fine and
+// keeps the familiar look for normal prices.
+const px = (v) => (v === null || v === undefined || Number.isNaN(v) ? null
+  : Math.abs(v) > 0 && Math.abs(v) < 1e-4 ? Number(Number(v).toPrecision(8)) : round(v, 8));
+
 import { renderEChart } from './chart/echartsRender.js';
 import { SSR_SUPPORTED } from './chart/indicators.js';
 import * as cexMarket from '../adapters/okx-market.js';
@@ -126,13 +136,13 @@ export async function chartPress(chain, address, opts = {}, deps = data) {
   const facts = {
     symbol, priceUsd: spot ? Number(spot.toPrecision(6)) : null,
     priceSource, change24hSource,
-    lastDrawnCandleClose: round(bars[bars.length - 1].c, 8),
+    lastDrawnCandleClose: px(bars[bars.length - 1].c),
     change24hPct: round(change24h, 2),
     volume24hUsd: round(num(price.volume24H)), liquidityUsd: round(num(price.liquidity)), holders: num(price.holders),
     interval, bars: bars.length, chartType, logScale,
     format: isSvg ? 'svg' : 'png', width, height, scale: isSvg ? 1 : scale,
     timezone: timezone || 'UTC', timezoneRequested: opts.timezone || null,
-    high: round(Math.max(...bars.map((b) => b.h)), 8), low: round(Math.min(...bars.map((b) => b.l)), 8),
+    high: px(Math.max(...bars.map((b) => b.h))), low: px(Math.min(...bars.map((b) => b.l))),
     indicators: indicators.map((i) => i.type + (i.period ? i.period : '')),
   };
   const ext = isSvg ? 'svg' : 'png';

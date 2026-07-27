@@ -19,6 +19,11 @@
 # `text=auto` sniffing, and one query file sat in the worktree with a stray CRLF while git stored LF —
 # invisible to `git status`, which compares post-normalisation, and fatal to a published sha256.
 *.sql   text eol=lf
+# .csv joins it for the same reason: research/BUYER_LEDGER.csv is now a published artifact and
+# Section 6.4 tells a reader to recompute its figures from a clone. It was normalising only through
+# the `text=auto` catch-all above — which is exactly what .sql was relying on when a stray CRLF made
+# a published hash unreproducible. Explicit is the whole lesson.
+*.csv   text eol=lf
 
 # Binary assets — never normalize.
 *.png  binary

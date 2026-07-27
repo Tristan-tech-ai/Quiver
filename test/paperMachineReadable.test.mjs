@@ -106,7 +106,12 @@ test('THE PARTS CONCATENATE TO THE WHOLE — nothing is abridged', async () => {
 
 test('the whole document is still complete and still served', async () => {
   const md = (await get('/paper/full')).body;
-  assert.match(md, /^73\. /m, 'the last reference must be present');
+  // Derive the last reference number instead of pasting it. The bibliography was compacted from 73 to
+  // 44 when the uncited entries were cut, and a hardcoded 73 then failed for the wrong reason — it
+  // reported the machine edition incomplete when the edition was fine and the literal was stale.
+  const refs = [...md.matchAll(/^(\d+)\. [A-Z"]/gm)].map((m) => Number(m[1]));
+  assert.ok(refs.length >= 20, 'the bibliography must be present');
+  assert.ok(md.includes(`${Math.max(...refs)}. `), 'the last reference must be present');
   assert.match(md, /## References/);
   assert.match(md, /## 12\. Conclusion/);
   assert.match(md, /## Appendix C/);
@@ -123,7 +128,17 @@ test('the tail of the document is reachable in one fetch, which is what failed b
   // The measured failure was that References and the appendices never arrived. Whatever the split,
   // the END of the document must be fetchable on its own.
   const last = (await get(`/paper/${PART_COUNT}`)).body;
-  assert.match(last, /^73\. /m, 'the final part must carry the bibliography');
+  // Scope to the References section: this part also carries Appendix C's numbered checks ("1. Does
+  // the arithmetic hold?"), and counting those alongside the bibliography made the gap test nonsense.
+  const refsAt = last.indexOf('## References');
+  assert.ok(refsAt > 0, 'the final part must carry the bibliography');
+  // Inside the References block every numbered line IS a reference, so do not also demand a capital
+  // first letter: entry 41 begins "x402 first-year totals", and requiring [A-Z"] silently dropped it
+  // and turned a correct bibliography into a reported gap.
+  const nums = [...last.slice(refsAt).matchAll(/^(\d+)\. \S/gm)].map((m) => Number(m[1]));
+  assert.ok(nums.length >= 20, `the bibliography looks truncated (${nums.length} entries)`);
+  assert.equal(Math.max(...nums), nums.length,
+    'it must be numbered from 1 without gaps — a compacted list with a hole means a citation points at nothing');
   assert.match(last, /End of the document/);
 });
 

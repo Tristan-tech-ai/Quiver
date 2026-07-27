@@ -7,7 +7,7 @@
 // That is a documentation defect with the same shape as a stale hash: the artifact is correct and the
 // consumer still ends up misinformed.
 //
-// So `/paper` serves THIS, and the styled edition moves to `/paper/human`. Nothing is summarised or
+// So `/paper` serves THIS, and the styled edition stays at `/paper`. Nothing is summarised or
 // dropped: every section, table, code block and reference survives, in document order. The four
 // figures are vector charts whose meaning lives in their captions, so each becomes a labelled
 // placeholder pointing at the human edition rather than thousands of characters of path geometry.
@@ -68,9 +68,9 @@ body = body.replace(/<div class="machine-note">[\s\S]*?<\/div>/, '');
 // Figures are vector charts. Their argument is in the caption; their bytes are not readable prose.
 body = body.replace(/<figure\b[\s\S]*?<\/figure>/g, (fig) => {
   const cap = (fig.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/) || [, ''])[1];
-  return `\n<p>[FIGURE — rendered in the human edition at /paper/human] ${cap}</p>\n`;
+  return `\n<p>[FIGURE — rendered in the typeset edition at /paper] ${cap}</p>\n`;
 });
-body = body.replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '\n<p>[FIGURE — $1 — rendered at /paper/human]</p>\n');
+body = body.replace(/<img\b[^>]*alt="([^"]*)"[^>]*>/g, '\n<p>[FIGURE — $1 — rendered at /paper]</p>\n');
 body = body.replace(/<svg[\s\S]*?<\/svg>/g, '');
 
 function renderTable(tbl) {
@@ -157,7 +157,7 @@ while ((m = BLOCK.exec(body)) !== null) {
 const HEADER = `# Quiver — Technical Documentation
 
 > **This is the machine-readable edition, served complete and unabridged at \`/paper\`.**
-> The typeset edition with figures is at \`/paper/human\`; the PDF is linked from the repository.
+> The typeset edition with figures is at \`/paper\`; the PDF is linked from the repository.
 > Nothing here is summarised: every section, table, code block and reference of the full document is
 > present, in order. The four figures are vector charts and appear as labelled placeholders, because
 > their argument is carried by their captions and their geometry is not readable prose.
@@ -225,7 +225,7 @@ parts.forEach((p, i) => {
 ${map.split('\n').map((l) => '> ' + l).join('\n')}
 >
 > Whole document in one response (${Math.round(Buffer.byteLength(md, 'utf8') / 1024)} kB, may truncate in your client): \`/paper/full\`
-> Typeset edition with figures: \`/paper/human\`
+> Typeset edition with figures: \`/paper\`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
 ---

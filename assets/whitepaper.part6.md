@@ -11,8 +11,8 @@
 > - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 6** — `/paper/6` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (240 kB, may truncate in your client): `/paper/full`
-> Typeset edition with figures: `/paper/human`
+> Whole document in one response (237 kB, may truncate in your client): `/paper/full`
+> Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
 ---
@@ -179,7 +179,7 @@ What this appendix does not do is make the unverifiable parts verifiable. The po
 
 ## References
 
-Entries carrying an inline marker in the text are the ones the argument rests on. The remainder are the standard sources for the methods used — local-volatility models, variance-swap replication, coherent risk measures, prediction-market scoring, exchange and library documentation — retained as background for a reader who wants the surrounding literature. They are listed rather than cited because nothing in this document depends on them, and a reader auditing our claims should ignore them.
+Every entry below is cited in the text and carries part of the argument. An earlier draft listed a further twenty-nine background sources that nothing in the document depended on, under a note telling the reader to ignore them — a bibliography a third of which its own author disclaims is decoration, so it was removed rather than defended. Three entries also carried citation markers inside their own titles, an artefact of an earlier edit; a reference cannot cite itself, and those are gone too.
 
 1. F. Black, "The pricing of commodity contracts," *Journal of Financial Economics*, vol. 3, no. 1–2, pp. 167–179, 1976.
 2. F. Black and M. Scholes, "The pricing of options and corporate liabilities," *Journal of Political Economy*, vol. 81, no. 3, pp. 637–654, 1973.
@@ -189,71 +189,42 @@ Entries carrying an inline marker in the text are the ones the argument rests on
 6. J. Gatheral and A. Jacquier, "Arbitrage-free SVI volatility surfaces," *Quantitative Finance*, vol. 14, no. 1, pp. 59–71, 2014. arXiv:1204.0646.
 7. J. Gatheral, *The Volatility Surface: A Practitioner's Guide*. Hoboken, NJ: Wiley, 2006.
 8. R. W. Lee, "The moment formula for implied volatility at extreme strikes," *Mathematical Finance*, vol. 14, no. 3, pp. 469–480, 2004.
-9. P. Carr and D. Madan, "Towards a theory of volatility trading," in *Volatility: New Estimation Techniques for Pricing Derivatives*, R. Jarrow, Ed. London: Risk Books, 1998, pp. 417–427.
-10. B. Dupire, "Pricing with a smile," *Risk*, vol. 7, no. 1, pp. 18–20, 1994.
-11. E. Derman and I. Kani, "Riding on a smile," *Risk*, vol. 7, no. 2, pp. 32–39, 1994.
-12. S. Hendriks and C. Martini, "The extended SSVI volatility surface," *Journal of Computational Finance*, vol. 22, no. 5, pp. 25–39, 2019.
-13. A. Castagna and F. Mercurio, "The vanna-volga method for implied volatilities," *Risk*, vol. 20, no. 1, pp. 106–111, 2007.
-14. E. G. Haug, *The Complete Guide to Option Pricing Formulas*, 2nd ed. New York: McGraw-Hill, 2007.
-15. A. S. Kyle, "Continuous auctions and insider trading," *Econometrica*, vol. 53, no. 6, pp. 1315–1335, 1985.
-16. Y. Amihud, "Illiquidity and stock returns: cross-section and time-series effects," *Journal of Financial Markets*, vol. 5, no. 1, pp. 31–56, 2002.
-17. D. Easley, M. M. López de Prado, and M. O'Hara, "Flow toxicity and liquidity in a high-frequency world," *The Review of Financial Studies*, vol. 25, no. 5, pp. 1457–1493, 2012.
-18. R. Almgren and N. Chriss, "Optimal execution of portfolio transactions," *Journal of Risk*, vol. 3, no. 2, pp. 5–39, 2000.
-19. C. M. C. Lee and M. J. Ready, "Inferring trade direction from intraday data," *The Journal of Finance*, vol. 46, no. 2, pp. 733–746, 1991.
-20. J. Hasbrouck, "Measuring the information content of stock trades," *The Journal of Finance*, vol. 46, no. 1, pp. 179–207, 1991.
-21. R. Almgren, C. Thum, E. Hauptmann, and H. Li, "Direct estimation of equity market impact," *Risk*, vol. 18, no. 7, pp. 58–62, 2005.
-22. G. Bakshi and N. Kapadia, "Delta-hedged gains and the negative market volatility risk premium," *The Review of Financial Studies*, vol. 16, no. 2, pp. 527–566, 2003.
-23. P. Carr and L. Wu, "Variance risk premiums," *The Review of Financial Studies*, vol. 22, no. 3, pp. 1311–1341, 2009.
-24. T. Bollerslev, G. Tauchen, and H. Zhou, "Expected stock returns and variance risk premia," *The Review of Financial Studies*, vol. 22, no. 11, pp. 4463–4492, 2009.
-25. K. Demeterfi, E. Derman, M. Kamal, and J. Zou, "More than you ever wanted to know about volatility swaps," Goldman Sachs Quantitative Strategies Research Notes, 1999.
-26. J.P. Morgan and Reuters, "RiskMetrics — Technical Document," 4th ed. New York, 1996.
-27. P. Jorion, *Value at Risk: The New Benchmark for Managing Financial Risk*, 3rd ed. New York: McGraw-Hill, 2006.
-28. C. Acerbi and D. Tasche, "On the coherence of expected shortfall," *Journal of Banking & Finance*, vol. 26, no. 7, pp. 1487–1503, 2002.
-29. P. Artzner, F. Delbaen, J.-M. Eber, and D. Heath, "Coherent measures of risk," *Mathematical Finance*, vol. 9, no. 3, pp. 203–228, 1999.
-30. E. F. Fama, "Efficient capital markets: a review of theory and empirical work," *The Journal of Finance*, vol. 25, no. 2, pp. 383–417, 1970.
-31. "ERC-20: Token Standard," Ethereum Improvement Proposals, no. 20, 2015. [Online]. Available: https://eips.ethereum.org/EIPS/eip-20
-32. "EIP-712: Typed structured data hashing and signing," Ethereum Improvement Proposals, no. 712, 2017. [Online]. Available: https://eips.ethereum.org/EIPS/eip-712
-33. "EIP-2612: Permit — 712-signed approvals," Ethereum Improvement Proposals, no. 2612, 2020. [Online]. Available: https://eips.ethereum.org/EIPS/eip-2612
-34. "EIP-1967: Proxy Storage Slots," Ethereum Improvement Proposals, no. 1967, 2019. [Online]. Available: https://eips.ethereum.org/EIPS/eip-1967
-35. "EIP-7702: Set EOA account code," Ethereum Improvement Proposals, no. 7702, 2024. [Online]. Available: https://eips.ethereum.org/EIPS/eip-7702
-36. "EIP-3009: Transfer With Authorization," Ethereum Improvement Proposals, no. 3009, 2020. [Online]. Available: https://eips.ethereum.org/EIPS/eip-3009
-37. Uniswap Labs, "Permit2," 2022. [Online]. Available: https://github.com/Uniswap/permit2
-38. M. De Rossi, D. Crapis, J. Ellis, and E. Reppel, "ERC-8004: Trustless Agents," Ethereum Improvement Proposals, no. 8004, 2025. [Online]. Available: https://eips.ethereum.org/EIPS/eip-8004
-39. Coinbase, "x402: A payments protocol for the internet — Specification v2," 2025. [Online]. Available: https://github.com/coinbase/x402
-40. Google, "Agent2Agent (A2A) Protocol Specification," 2025. [Online]. Available: https://a2a-protocol.org
-41. Anthropic, "Model Context Protocol (MCP) Specification," 2024. [Online]. Available: https://modelcontextprotocol.io
-42. OKX, "Onchain OS and the A2MCP agent framework," documentation, 2026. [Online]. Available: https://www.okx.com
-43. OKX, "DEX Market API v6," developer documentation, 2026.
-44. Deribit, "Deribit API v2," documentation. [Online]. Available: https://docs.deribit.com
-45. Polymarket, "Gamma API and CLOB documentation." [Online]. Available: https://docs.polymarket.com
-46. DefiLlama, "API and hacks registry." [Online]. Available: https://defillama.com/docs/api
-47. J. A. Nelder and R. Mead, "A simplex method for function minimization," *The Computer Journal*, vol. 7, no. 4, pp. 308–313, 1965.
-48. M. Abramowitz and I. A. Stegun, *Handbook of Mathematical Functions*, formula 7.1.26. Washington, DC: National Bureau of Standards, 1964.
-49. Apache Software Foundation, "Apache ECharts." [Online]. Available: https://echarts.apache.org
-50. R. Moore et al., "ethers.js: A complete Ethereum library." [Online]. Available: https://docs.ethers.org
-51. "technicalindicators (npm package), v3.1.0." [Online]. Available: https://www.npmjs.com/package/technicalindicators
-52. "@resvg [52]/resvg-js: SVG rasterization for Node.js." [Online]. Available: https://github.com/yisibl/resvg-js
-53. Microsoft, "Playwright [53]: Browser automation library." [Online]. Available: https://playwright.dev
-54. OpenJS Foundation, "node:test — the built-in Node.js test runner." [Online]. Available: https://nodejs.org/api/test.html
-55. "KLineChart [55]: Financial charting library." [Online]. Available: https://klinecharts.com
-56. R. Hanson, "Logarithmic market scoring rules for modular combinatorial information aggregation," *The Journal of Prediction Markets*, vol. 1, no. 1, pp. 3–15, 2007.
-57. J. Wolfers and E. Zitzewitz, "Prediction markets," *Journal of Economic Perspectives*, vol. 18, no. 2, pp. 107–126, 2004.
-58. L. W. Cong, X. Li, K. Tang, and Y. Yang, "Crypto wash trading," *Management Science*, vol. 69, no. 11, pp. 6427–6454, 2023.
-59. Chainalysis, "The 2024 Crypto Crime Report," 2024. [Online]. Available: https://www.chainalysis.com
-60. ScamSniffer, "Web3 Scam Report: Wallet Drainers," 2024. [Online]. Available: https://scamsniffer.io
-61. S. Figlewski, "Estimating the implied risk-neutral density for the U.S. market portfolio," in *Volatility and Time Series Econometrics*, T. Bollerslev, J. Russell, and M. Watson, Eds. Oxford: Oxford University Press, 2010.
-62. A. M. Malz, "Estimating the probability distribution of the future exchange rate from option prices," *The Journal of Derivatives*, vol. 5, no. 2, pp. 18–36, 1997.
-63. G. J. Jiang and Y. S. Tian, "The model-free implied volatility and its information content," *The Review of Financial Studies*, vol. 18, no. 4, pp. 1305–1342, 2005.
-64. Cboe Global Markets, "The Cboe Volatility Index — VIX," white paper, 2019. [Online]. Available: https://www.cboe.com
-65. L. Bergomi, *Stochastic Volatility Modeling*. Boca Raton, FL: Chapman & Hall/CRC, 2016.
-66. P. Christoffersen, K. Jacobs, and B. Y. Chang, "Forecasting with option-implied information," in *Handbook of Economic Forecasting*, vol. 2A, G. Elliott and A. Timmermann, Eds. Amsterdam: Elsevier, 2013, pp. 581–656.
-67. M. Beiglböck, P. Henry-Labordère and F. Penkner, "Model-independent bounds for option prices — a mass transport approach," *Finance and Stochastics*, vol. 17, no. 3, pp. 477–501, 2013.
-68. Chainalysis, "Inside x402: 100M agentic payments on Base," 2026. [Online]. Available: https://www.chainalysis.com
-69. Coinbase, x402 adoption reporting, April 2026: 69,000 active agents and 165M transactions.
-70. x402 first-year totals: 169M+ payments across 590,000 buyers and 100,000 sellers, reported at the protocol's one-year mark, 2026.
-71. M. Zhang et al., "FAITH: a framework for assessing intrinsic tabular hallucinations in finance," arXiv:2508.05201, 2025.
-72. Nof1, "Alpha Arena" season 1, 18 October – 3 November 2025: six frontier models each trading $10,000 of perpetuals autonomously on Hyperliquid. Final standings: Qwen3-Max +22.3%, DeepSeek V3.1 +4.9%, Claude Sonnet 4.5 and Gemini 2.5 Pro each down more than 40%, Grok 4 about −58%, GPT-5 last at −62.66%. Four of six ended in the red; one passed −60%.
-73. J. Milionis, C. C. Moallemi, T. Roughgarden and A. L. Zhang, "Automated market making and loss-versus-rebalancing," arXiv:2208.06046, 2022.
+9. A. Castagna and F. Mercurio, "The vanna-volga method for implied volatilities," *Risk*, vol. 20, no. 1, pp. 106–111, 2007.
+10. A. S. Kyle, "Continuous auctions and insider trading," *Econometrica*, vol. 53, no. 6, pp. 1315–1335, 1985.
+11. Y. Amihud, "Illiquidity and stock returns: cross-section and time-series effects," *Journal of Financial Markets*, vol. 5, no. 1, pp. 31–56, 2002.
+12. D. Easley, M. M. López de Prado, and M. O'Hara, "Flow toxicity and liquidity in a high-frequency world," *The Review of Financial Studies*, vol. 25, no. 5, pp. 1457–1493, 2012.
+13. R. Almgren and N. Chriss, "Optimal execution of portfolio transactions," *Journal of Risk*, vol. 3, no. 2, pp. 5–39, 2000.
+14. C. M. C. Lee and M. J. Ready, "Inferring trade direction from intraday data," *The Journal of Finance*, vol. 46, no. 2, pp. 733–746, 1991.
+15. R. Almgren, C. Thum, E. Hauptmann, and H. Li, "Direct estimation of equity market impact," *Risk*, vol. 18, no. 7, pp. 58–62, 2005.
+16. G. Bakshi and N. Kapadia, "Delta-hedged gains and the negative market volatility risk premium," *The Review of Financial Studies*, vol. 16, no. 2, pp. 527–566, 2003.
+17. P. Carr and L. Wu, "Variance risk premiums," *The Review of Financial Studies*, vol. 22, no. 3, pp. 1311–1341, 2009.
+18. T. Bollerslev, G. Tauchen, and H. Zhou, "Expected stock returns and variance risk premia," *The Review of Financial Studies*, vol. 22, no. 11, pp. 4463–4492, 2009.
+19. C. Acerbi and D. Tasche, "On the coherence of expected shortfall," *Journal of Banking & Finance*, vol. 26, no. 7, pp. 1487–1503, 2002.
+20. "EIP-712: Typed structured data hashing and signing," Ethereum Improvement Proposals, no. 712, 2017. [Online]. Available: https://eips.ethereum.org/EIPS/eip-712
+21. "EIP-2612: Permit — 712-signed approvals," Ethereum Improvement Proposals, no. 2612, 2020. [Online]. Available: https://eips.ethereum.org/EIPS/eip-2612
+22. "EIP-1967: Proxy Storage Slots," Ethereum Improvement Proposals, no. 1967, 2019. [Online]. Available: https://eips.ethereum.org/EIPS/eip-1967
+23. "EIP-7702: Set EOA account code," Ethereum Improvement Proposals, no. 7702, 2024. [Online]. Available: https://eips.ethereum.org/EIPS/eip-7702
+24. "EIP-3009: Transfer With Authorization," Ethereum Improvement Proposals, no. 3009, 2020. [Online]. Available: https://eips.ethereum.org/EIPS/eip-3009
+25. Uniswap Labs, "Permit2," 2022. [Online]. Available: https://github.com/Uniswap/permit2
+26. M. De Rossi, D. Crapis, J. Ellis, and E. Reppel, "ERC-8004: Trustless Agents," Ethereum Improvement Proposals, no. 8004, 2025. [Online]. Available: https://eips.ethereum.org/EIPS/eip-8004
+27. Coinbase, "x402: A payments protocol for the internet — Specification v2," 2025. [Online]. Available: https://github.com/coinbase/x402
+28. Google, "Agent2Agent (A2A) Protocol Specification," 2025. [Online]. Available: https://a2a-protocol.org
+29. Anthropic, "Model Context Protocol (MCP) Specification," 2024. [Online]. Available: https://modelcontextprotocol.io
+30. J. A. Nelder and R. Mead, "A simplex method for function minimization," *The Computer Journal*, vol. 7, no. 4, pp. 308–313, 1965.
+31. M. Abramowitz and I. A. Stegun, *Handbook of Mathematical Functions*, formula 7.1.26. Washington, DC: National Bureau of Standards, 1964.
+32. Apache Software Foundation, "Apache ECharts." [Online]. Available: https://echarts.apache.org
+33. "technicalindicators (npm package), v3.1.0." [Online]. Available: https://www.npmjs.com/package/technicalindicators
+34. OpenJS Foundation, "node:test — the built-in Node.js test runner." [Online]. Available: https://nodejs.org/api/test.html
+35. ScamSniffer, "Web3 Scam Report: Wallet Drainers," 2024. [Online]. Available: https://scamsniffer.io
+36. S. Figlewski, "Estimating the implied risk-neutral density for the U.S. market portfolio," in *Volatility and Time Series Econometrics*, T. Bollerslev, J. Russell, and M. Watson, Eds. Oxford: Oxford University Press, 2010.
+37. A. M. Malz, "Estimating the probability distribution of the future exchange rate from option prices," *The Journal of Derivatives*, vol. 5, no. 2, pp. 18–36, 1997.
+38. G. J. Jiang and Y. S. Tian, "The model-free implied volatility and its information content," *The Review of Financial Studies*, vol. 18, no. 4, pp. 1305–1342, 2005.
+39. M. Beiglböck, P. Henry-Labordère and F. Penkner, "Model-independent bounds for option prices — a mass transport approach," *Finance and Stochastics*, vol. 17, no. 3, pp. 477–501, 2013.
+40. Coinbase, x402 adoption reporting, April 2026: 69,000 active agents and 165M transactions.
+41. x402 first-year totals: 169M+ payments across 590,000 buyers and 100,000 sellers, reported at the protocol's one-year mark, 2026.
+42. M. Zhang et al., "FAITH: a framework for assessing intrinsic tabular hallucinations in finance," arXiv:2508.05201, 2025.
+43. Nof1, "Alpha Arena" season 1, 18 October – 3 November 2025: six frontier models each trading $10,000 of perpetuals autonomously on Hyperliquid. Final standings: Qwen3-Max +22.3%, DeepSeek V3.1 +4.9%, Claude Sonnet 4.5 and Gemini 2.5 Pro each down more than 40%, Grok 4 about −58%, GPT-5 last at −62.66%. Four of six ended in the red; one passed −60%.
+44. J. Milionis, C. C. Moallemi, T. Roughgarden and A. L. Zhang, "Automated market making and loss-versus-rebalancing," arXiv:2208.06046, 2022.
 
 Quiver technical documentation, version 1.0, July 2026. Prepared for the OKX AI Genesis Hackathon. All quantitative figures were captured from live venues during validation and are representative of the methods described; live values vary with market state. This document is technical documentation and not financial advice.
 

@@ -11,8 +11,8 @@
 > - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 6** — `/paper/6` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (240 kB, may truncate in your client): `/paper/full`
-> Typeset edition with figures: `/paper/human`
+> Whole document in one response (237 kB, may truncate in your client): `/paper/full`
+> Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
 ---
@@ -21,11 +21,11 @@
 
 Quiver sits at the intersection of three bodies of work: the agent-economy infrastructure that makes priced machine-to-machine services possible, the quantitative-finance methods the services implement, and the security tooling for on-chain transactions.
 
-On infrastructure, x402 [39] supplies the payment rail, ERC-8004 [38] the identity and reputation layer, and the A2A and MCP conventions [40],[41] the calling and tool-exposure patterns. These standards define how agents pay and discover; they are deliberately silent on what is worth buying, which is the space Quiver occupies. Existing agent-registry services skew toward general assistants and simple data relays; a survey of the registry at build time found no service offering arbitrage-free options analytics, and the closest options-adjacent listings were not agent-callable.
+On infrastructure, x402 [27] supplies the payment rail, ERC-8004 [26] the identity and reputation layer, and the A2A and MCP conventions [28],[29] the calling and tool-exposure patterns. These standards define how agents pay and discover; they are deliberately silent on what is worth buying, which is the space Quiver occupies. Existing agent-registry services skew toward general assistants and simple data relays; a survey of the registry at build time found no service offering arbitrage-free options analytics, and the closest options-adjacent listings were not agent-callable.
 
-On methods, the options stack rests on Black-76 [1], the Breeden–Litzenberger density [4], and the SVI surface of Gatheral with the no-arbitrage conditions of Gatheral and Jacquier [5],[6] and the wing bound of Lee [8]; the risk-neutral density literature [61] [62] [63] and its practitioner treatments inform the distribution layer. The microstructure estimators are Kyle [15], Amihud [16], and the VPIN of Easley, López de Prado, and O'Hara [17], with the square-root impact law [21] of Almgren and collaborators [18],[21] behind the fill service. The variance risk premium follows Bakshi and Kapadia and Carr and Wu [22],[23]. None of this is novel mathematics; the contribution is implementing it correctly, arbitrage-free, tested, and behind a priced agent interface, which is precisely what has not existed for agents before.
+On methods, the options stack rests on Black-76 [1], the Breeden–Litzenberger density [4], and the SVI surface of Gatheral with the no-arbitrage conditions of Gatheral and Jacquier [5],[6] and the wing bound of Lee [8]; the risk-neutral density literature [36] [37] [38] and its practitioner treatments inform the distribution layer. The microstructure estimators are Kyle [10], Amihud [11], and the VPIN of Easley, López de Prado, and O'Hara [12], with the square-root impact law [15] of Almgren and collaborators [13],[15] behind the fill service. The variance risk premium follows Bakshi and Kapadia and Carr and Wu [16],[17]. None of this is novel mathematics; the contribution is implementing it correctly, arbitrage-free, tested, and behind a priced agent interface, which is precisely what has not existed for agents before.
 
-On security, the transaction path is a conventional simulation-and-decode pattern; the distinguishing element is the EIP-712 signature analysis [32],[33],[37], which addresses a vector that transaction-only tools cannot observe and that accounts for a large share of modern wallet losses [60].
+On security, the transaction path is a conventional simulation-and-decode pattern; the distinguishing element is the EIP-712 signature analysis [20],[21],[25], which addresses a vector that transaction-only tools cannot observe and that accounts for a large share of modern wallet losses [35].
 
 
 ## 10. The Build: Story, Process, and a User Scenario

@@ -88,7 +88,7 @@ commissioned by us, so this is an arm's-length audit, not a third-party endorsem
 makes it worth reading is that every figure reproduces from public data, and that it retracted its
 own headline finding when the finding turned out to be wrong.
 
-- **1,721 settled calls; 1,750 envelope verifications; zero failures.** Content hashes recomputed,
+- **1,721 settled calls; 1,750 envelope verifications; zero failures.** Read that for what it is: the 1,785 rows touch fourteen of the twenty-two services and `perp-gate` alone is 1,102 of them (62%), so it establishes stability under heavy repetition and no observed mismatch where the desk went — not breadth. Eight services never appeared in its traffic. Content hashes recomputed,
   self-checks re-evaluated, signers recovered, code hashes compared against a fresh clone,
   deterministic engines re-run for byte-identical output. The desk log contains exactly one distinct
   verification outcome, `verify=OK`, and no line recording any other.

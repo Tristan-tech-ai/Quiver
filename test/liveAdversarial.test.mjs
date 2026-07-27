@@ -170,7 +170,14 @@ test('D portfolio-gate: nearest ranks only LIVE legs; the dead leg is reported s
 test('D portfolio-gate: with no breached leg, breachedLegs is absent and the note is unchanged', () => {
   const r = portfolioGate({ positions: [liveLeg] });
   assert.equal(r.breachedLegs, undefined);
-  assert.match(r.nearestLiquidation.note, /whole book's real distance to first blood/);
+  // This used to assert the note said "whole book's real distance to first blood". That was the
+  // convenient way to express "the note carries no breach language", but it pinned an unconditional
+  // claim onto a fixture that never declares a margin mode — so the test was locking in the
+  // overclaim a later review found, rather than the property named in its own title. The intent is
+  // preserved and the sentence is not: what must hold here is that nothing about breached legs
+  // leaks into the note when there are none.
+  assert.doesNotMatch(r.nearestLiquidation.note, /breachedLegs|already PAST/);
+  assert.match(r.nearestLiquidation.note, /binding constraint/);
 });
 
 test('D portfolio-gate: the nearest-is-min self-check is evaluated over live legs and passes', () => {

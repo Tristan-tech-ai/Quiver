@@ -6,7 +6,7 @@ import { config } from './config.js';
 import { paid } from './x402.js';
 import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
-import { SERVICES, byName, refusalDetail } from './services.js';
+import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { _internal } from './engine/proof.js';
@@ -327,11 +327,22 @@ app.use((req, res) => res.status(404).json({ error: 'not_found', note: `no route
 // the service — outside the documented status taxonomy, and contradicting the guarantee that an
 // unauthenticated route answers with the 402 challenge rather than an error. Express marks these with
 // `type: 'entity.parse.failed'`; the oversized-body case gets its own status for the same reason.
-app.use((err, _req, res, next) => {
+app.use((err, req, res, next) => {
   if (err?.type === 'entity.parse.failed') {
+    // The refusal on the SCHEMA path teaches the caller what the service is and what it needs. The
+    // parse path used to stop at "that was not JSON", which is the less useful half of the same
+    // sentence: a caller whose body is malformed usually also does not know the shape it should have
+    // had. The route is known here even though the body is not, so the same hint is available and is
+    // now given. Documented in Table 9 of the paper, which previously described the self-teaching
+    // note as covering both paths when it covered only one.
+    const svc = SERVICES.find((s) => s.path === req.path);
     return res.status(400).json({
       error: 'bad_input',
-      note: 'Request body is not valid JSON. Send a JSON object with content-type: application/json. Nothing was computed and no payment was attempted.',
+      note: 'Request body is not valid JSON. Send a JSON object with content-type: application/json. Nothing was computed and no payment was attempted.'
+        + (svc ? ` ${svc.name}: ${svc.blurb}. It ${inputHint(svc)}` : ''),
+      // The raw parser message names the JSON position that failed, which is the one thing the caller
+      // cannot work out from its own request. It is kept deliberately, and it is a V8 string: it
+      // discloses the runtime's parser, nothing about this service's state or data.
       parserDetail: String(err.message || '').slice(0, 160),
     });
   }

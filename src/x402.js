@@ -17,8 +17,26 @@ const unb64 = (s) => JSON.parse(Buffer.from(s, 'base64').toString('utf8'));
 // validation-throw path (which already fails before settlement). This closes the inconsistency where
 // input that slipped past `validate()` but was rejected inside the engine got settled while a thrown
 // validation error did not. Pure + exported so the rule is unit-locked without a live facilitator.
+// A second, narrower condition was added after a payment-surface audit: an answer whose own
+// ground-truth self-check FAILED is not a delivered result either. Overflow inputs made two engines
+// return `ok:true` alongside `allSelfChecksPass:false` — the engine sanitized the arithmetic to null
+// and its self-check correctly caught the violation, but billing keyed off `ok` alone, so a caller
+// paid for a number the engine itself had already flagged as unproven.
+//
+// This gates BILLING, not delivery. The answer is still served with the failed check disclosed in its
+// envelope — that disclosure is deliberate, and converting every failed check into a refusal would
+// withhold answers that are merely at the edge of a numerical tolerance. The asymmetry is what makes
+// the rule safe in that direction: not charging for a borderline answer costs us a fraction of a
+// cent, while charging for one we ourselves refused to stand behind takes a buyer's money for it.
 export function isChargeable(result) {
-  return !(result && result.ok === false);
+  if (!result || typeof result !== 'object') return true; // defensive: never skip settlement on a malformed result
+  if (result.ok === false) return false;
+  // Read the published envelope field first — it is the one the response advertises and the paper names
+  // — then fall back to the raw checks, so the rule holds on a result whose envelope was not attached.
+  const attested = result.proof || result.observation;
+  if (attested && attested.allSelfChecksPass === false) return false;
+  const checks = Array.isArray(result.checks) ? result.checks : [];
+  return !checks.some((c) => c && c.pass === false);
 }
 
 // Normalize the facilitator's settlement status for the receipt. The OKX facilitator can report

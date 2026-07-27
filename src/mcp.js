@@ -95,8 +95,26 @@ const TOOLS = [
     run: async (a) => {
       const e = await enrichPerpInputs(a);
       const { live, ...compute } = e;
+      // A venue this service cannot resolve is a caller error, not an answer. Serving the maths with
+      // the complaint embedded produced a signed result carrying an error string, which is neither a
+      // refusal nor a usable answer. Refuse, name what is supported, and say how to get the number
+      // anyway — the same self-teaching shape the schema refusals use.
+      if (live?.unsupportedVenue) {
+        return { ok: false, errors: [live.error], supportedVenues: live.supported };
+      }
       const r = perpGate(compute);
-      if (live) r.live = live;
+      if (live) {
+        // Symbol mode resolved a ticker against a venue, so this is an OBSERVATION, not a re-runnable
+        // proof. This handler previously sealed `live` inside a deterministic proof envelope, which
+        // put a key in the content hash that re-running the engine on proof.inputs can never produce:
+        // a caller following proof.reproduce got a mismatch from an envelope whose own text says a
+        // mismatch means tampering. services.js and the portfolio-gate handler below were both fixed
+        // for exactly this; the free MCP path — the one a builder is most likely to try — was not.
+        r.live = live;
+        r.mathReproducibility = 'The liquidation MATH is deterministic and re-runnable: run the open perp-gate engine on observation.inputs (the venue values frozen at observedAtUtc) and every number reproduces exactly. What is NOT re-runnable is the venue read itself — mark price, funding and margin tiers move — so this ships as a committed observation rather than as a proof that claims to reproduce from scratch.';
+        return observationEnvelope('perp-gate', compute, r, config.version);
+      }
+      // Caller supplied every input: nothing was fetched, so the answer really is re-runnable.
       return proofEnvelope('perp-gate', compute, r, config.version);
     },
   },

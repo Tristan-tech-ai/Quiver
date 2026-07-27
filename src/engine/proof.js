@@ -68,11 +68,30 @@ const hashRecipe = (envelopeKey, fields) =>
 // BUILD_ID — hash of all engine sources, computed once. Identifies the exact deterministic code that ran,
 // so "re-run the engine on these inputs" is unambiguous.
 let BUILD_ID = null;
+
+// The file list the build hash is taken over. This used to be a NON-RECURSIVE readdir, which is why
+// it is now a named, exported function rather than one line inside buildId: `src/engine/chart/`
+// holds the ECharts renderer and the indicator library — 42 kB of engine source that chartPress.js
+// imports — and none of it was hashed. So that code could change while the published codeHash stayed
+// identical, in a service whose every envelope carries the string "one hash over ALL engine sources".
+// The claim was the defect, not the arithmetic. Walking the tree makes the claim true; keys are the
+// path RELATIVE to src/engine, so a top-level file's key is unchanged and only the previously
+// invisible files move the hash.
+export function engineSourceFiles(dir, prefix = '') {
+  const out = [];
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const rel = prefix ? `${prefix}/${e.name}` : e.name;
+    if (e.isDirectory()) out.push(...engineSourceFiles(join(dir, e.name), rel));
+    else if (e.name.endsWith('.js')) out.push(rel);
+  }
+  return out.sort();
+}
+
 function buildId() {
   if (BUILD_ID) return BUILD_ID;
   try {
     const dir = dirname(fileURLToPath(import.meta.url)); // src/engine
-    const files = readdirSync(dir).filter((f) => f.endsWith('.js')).sort();
+    const files = engineSourceFiles(dir);
     const concat = files.map((f) => `${f}:${readFileSync(join(dir, f), 'utf8')}`).join('\n');
     BUILD_ID = 'q1-' + sha256(concat).slice(0, 16);
   } catch { BUILD_ID = 'unknown'; }
@@ -87,8 +106,29 @@ function buildId() {
  * @param version build/version string
  */
 export function proofEnvelope(engine, inputs, result, version = '0') {
+  // A deterministic proof promises that re-running the engine on `inputs` reproduces this result
+  // byte-for-byte. A live-provenance block is by definition NOT a function of `inputs`, so sealing one
+  // inside the content hash makes that promise unkeepable — and the envelope then tells the caller
+  // that a mismatch means tampering, so the instruction at the centre of this service accuses an
+  // honest answer. That defect was found and fixed at three call sites on three separate occasions;
+  // the fourth was the free MCP path. Fixing call sites one at a time has not worked, so the rule is
+  // enforced here instead: a result carrying live provenance is not a proof, and is routed to the
+  // envelope that can carry it honestly rather than sealed in one that cannot.
+  if (result && typeof result === 'object' && !Array.isArray(result) && result.live !== undefined) {
+    return observationEnvelope(engine, inputs, result, version);
+  }
   const checks = Array.isArray(result?.checks) ? result.checks : [];
-  const allChecksPass = checks.length === 0 ? null : checks.every((c) => c.pass !== false);
+  // Tri-state on purpose. The old form was `every(c => c.pass !== false)`, which read an explicitly
+  // SKIPPED check (`pass: null`) as a passing one — so a response where nothing was checked at all
+  // published `allSelfChecksPass: true`. exec-verify's reference mode refuses to report an un-run
+  // check as a pass, in those words, and this line then reinstated the guarantee its own comment had
+  // declined to make. A consumer gating on this field could not tell "every invariant held" from "no
+  // invariant was asserted". Now: false if any check failed, true only if every check explicitly
+  // passed, null when nothing conclusive was run.
+  const allChecksPass = checks.length === 0 ? null
+    : checks.some((c) => c.pass === false) ? false
+    : checks.every((c) => c.pass === true) ? true
+    : null;
   const codeHash = buildId();
   const cleanInputs = jsonClean(inputs);
   const contentHash = sha256(canonical({ engine, codeHash, inputs: cleanInputs, result: jsonClean(result) }));
@@ -122,9 +162,15 @@ export function proofEnvelope(engine, inputs, result, version = '0') {
       contentHash,
       verifyContentHash: hashRecipe('proof', 'engine, codeHash, inputs, result'),
       ...(signature ? { signature } : {}),
-      attestation: signature
-        ? 'T1 (re-runnable + self-checked + content-hashed + secp256k1-signed). On-chain anchor of contentHash is the T2 upgrade.'
-        : 'T0 (re-runnable + self-checked + content-hashed). T1 secp256k1 signature / on-chain anchor available when QUIVER_SIGNING_KEY is configured.',
+      // "self-checked" is claimed only when a check actually ran and passed. Printing it beside a
+      // response whose every check was skipped is the same overstatement allSelfChecksPass used to make.
+      attestation: (signature
+        ? `T1 (re-runnable + ${allChecksPass === true ? 'self-checked + ' : ''}content-hashed + secp256k1-signed).`
+        : `T0 (re-runnable + ${allChecksPass === true ? 'self-checked + ' : ''}content-hashed).`)
+        + (allChecksPass === null ? ' NOTE: no self-check was asserted on this call — see selfChecks for which were skipped and why.' : '')
+        + (signature
+          ? ' On-chain anchor of contentHash is the T2 upgrade.'
+          : ' T1 secp256k1 signature / on-chain anchor available when QUIVER_SIGNING_KEY is configured.'),
     },
   };
 }
@@ -140,7 +186,17 @@ export function proofEnvelope(engine, inputs, result, version = '0') {
 export function observationEnvelope(engine, inputs, result, version = '0') {
   if (!result || typeof result !== 'object' || Array.isArray(result)) return result; // envelope JSON objects only
   const checks = Array.isArray(result.checks) ? result.checks : [];
-  const allChecksPass = checks.length === 0 ? null : checks.every((c) => c.pass !== false);
+  // Tri-state on purpose. The old form was `every(c => c.pass !== false)`, which read an explicitly
+  // SKIPPED check (`pass: null`) as a passing one — so a response where nothing was checked at all
+  // published `allSelfChecksPass: true`. exec-verify's reference mode refuses to report an un-run
+  // check as a pass, in those words, and this line then reinstated the guarantee its own comment had
+  // declined to make. A consumer gating on this field could not tell "every invariant held" from "no
+  // invariant was asserted". Now: false if any check failed, true only if every check explicitly
+  // passed, null when nothing conclusive was run.
+  const allChecksPass = checks.length === 0 ? null
+    : checks.some((c) => c.pass === false) ? false
+    : checks.every((c) => c.pass === true) ? true
+    : null;
   const codeHash = buildId();
   const observedAtUtc = new Date().toISOString();
   const cleanInputs = jsonClean(inputs);

@@ -1,4 +1,6 @@
-// lp-risk — forward-looking impermanent loss / divergence (LVR) and fee-breakeven for an LP position.
+// lp-risk — forward-looking expected IMPERMANENT LOSS (divergence vs HODL) and fee-breakeven for an LP
+// position. Deliberately NOT called LVR: see the notLvr field below. IL is a bounded, path-independent
+// function of the terminal price ratio; loss-versus-rebalancing is an unbounded monotone path functional.
 // Deterministic. Complements lp-desk (which REPLAYS history) with a forecast grounded in closed forms,
 // so an agent about to provide liquidity can see whether the fee yield can plausibly beat the bleed.
 //
@@ -84,7 +86,7 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
     };
   }
 
-  // 2) Expected divergence (LVR) over a horizon from volatility.
+  // 2) Expected divergence (impermanent loss vs HODL — NOT LVR) over a horizon from volatility.
   const sigma = Number(input.volatility) > 0 ? Number(input.volatility) : null;   // per-period
   const T = Number(input.horizonPeriods) > 0 ? Number(input.horizonPeriods) : 1;
   if (sigma != null) {
@@ -109,6 +111,19 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
       expectedIlLeadingOrderPct: round(eIlLeading * 100, 4),
       approximationGapPct: round(divergentPct, 4),
       basis: 'exact lognormal expectation of 2√r/(1+r) − 1 under ln r ~ N(−v/2, v)',
+      // This engine used to call this quantity "divergence (LVR)". It is not LVR, and an adversarial
+      // reviewer was right to say so. Impermanent loss is a function of the TERMINAL price ratio
+      // alone: path-independent, and bounded in (−100%, 0] because a constant-product position can
+      // never be worth less than nothing relative to holding. Loss-versus-rebalancing is a different
+      // object — the running loss to arbitrageurs against a rebalancing portfolio — which accrues
+      // monotonically along the path, never gives anything back, and is therefore UNBOUNDED. On a
+      // path that ends where it started, IL is exactly zero while realised LVR is strictly positive.
+      // The two get conflated because they coincide in EXPECTATION to leading order under driftless
+      // lognormal: the constant-product LVR rate is σ²/8 per unit time and E[IL] ≈ −σ²T/8. Coinciding
+      // in expectation is not being the same quantity, and the note below used to treat the rate's
+      // unboundedness as an error when unboundedness is exactly right for the thing it names.
+      measures: 'expected impermanent loss versus HODL at the horizon — NOT loss-versus-rebalancing',
+      notLvr: 'LVR (Milionis, Moallemi, Roughgarden, Zhang) is a monotone path functional and is unbounded; this figure is a bounded function of the terminal price ratio. They agree only in expectation, only to leading order, only under a driftless lognormal. Use this number for "will fees beat what I give up against holding, over this horizon"; it is not the number for "how much will arbitrageurs extract from me along the way".',
       ...(conc > 1 ? {
         fullRangeExpectedIlPct: round(eIlExactFull * 100, 4),
         linearAmplificationPct: round(eIlAmplifiedRaw * 100, 4),
@@ -117,7 +132,7 @@ export function lpRisk(input = {}, { eps = 1e-6 } = {}) {
       } : {}),
       note: v <= 0.25
         ? 'Small-variance regime: the leading-order rate −σ²T/8 and the exact expectation agree closely; either may be used.'
-        : `Outside the small-variance regime (σ²T = ${round(v, 4)}): the leading-order rate −σ²T/8 OVERSTATES the loss and is unbounded, so the exact expectation is the headline. V2 divergence loss can never exceed −100%.`,
+        : `Outside the small-variance regime (σ²T = ${round(v, 4)}): the leading-order −σ²T/8 diverges from the exact expectation of impermanent loss, which is what this figure reports, so the exact value is the headline. Note the earlier framing here was loose: −σ²T/8 is unbounded because it is also the constant-product LVR rate, and LVR genuinely is unbounded — the boundedness at −100% belongs to impermanent loss, not to the rate. See notLvr.`,
       usd: capital != null ? round(eIlExact * capital, 2) : null,
     };
 

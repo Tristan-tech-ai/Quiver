@@ -91,7 +91,12 @@ export async function enrichPerpInputs(input, getContext) {
   if (!input || !input.symbol) return input;
   const venue = String(input.venue || 'hyperliquid').toLowerCase();
   const provider = getContext || PROVIDERS[venue];
-  if (!provider) return { ...input, live: { venue, error: `unsupported venue "${venue}" — supported: ${Object.keys(PROVIDERS).join(', ')}. (perp-gate math is venue-agnostic: pass maxLeverage/markPrice/fundingRateHourly manually for any venue.)` } };
+  // An unsupported venue is a CALLER error and is flagged as one. A provider that throws (below) is an
+  // upstream outage, which is a different thing and is correctly served with the failure disclosed.
+  // Both used to produce the same shape, so a request naming a venue this service cannot resolve got
+  // a confident answer with an error string welded into the signed result — and on an OKX submission,
+  // `venue: "okx"` was one of them. The marker lets the handlers refuse the first and serve the second.
+  if (!provider) return { ...input, live: { venue, unsupportedVenue: true, supported: Object.keys(PROVIDERS), error: `unsupported venue "${venue}" — supported: ${Object.keys(PROVIDERS).join(', ')}. (perp-gate math is venue-agnostic: pass maxLeverage/markPrice/fundingRateHourly manually for any venue.)` } };
   let ctx;
   try { ctx = await provider(input.symbol); }
   catch (e) { return { ...input, live: { venue, error: `unavailable: ${String(e.message || e).slice(0, 120)}` } }; }

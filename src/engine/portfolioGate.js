@@ -58,6 +58,15 @@ export function portfolioGate(input = {}) {
       }
     }
     const marginUsed = Number(p.margin) > 0 ? Number(p.margin) : (Number(p.leverage) > 0 ? notional / Number(p.leverage) : null);
+    // Cross-margin equity is NOT the margin requirement re-derived at the mark. `marginUsed` above is
+    // sized off the mark notional, which silently discards unrealized PnL — so a position 1.7% in
+    // profit contributed its mark-sized margin to the pool instead of its posted margin plus the gain.
+    // The account's real equity is what was POSTED (at entry) plus what the position has since made or
+    // lost, which is also the basis the isolated liquidation is solved from, so the two views agree.
+    const marginPosted = Number(p.margin) > 0 ? Number(p.margin)
+      : (Number(p.leverage) > 0 ? (sizeAbs * entry) / Number(p.leverage) : null);
+    const unrealizedPnlUsd = (side === 'long' ? 1 : -1) * sizeAbs * (mark - entry);
+    const equityUsd = marginPosted != null ? marginPosted + unrealizedPnlUsd : null;
     // Venue-reported liquidation price (e.g. Hyperliquid clearinghouseState.liquidationPx) — an EXTERNAL
     // cross-check on our computed number, from a source this engine does not control. For isolated legs the
     // two models coincide and the deviation is a genuine correctness check; for cross legs the venue's price
@@ -72,7 +81,8 @@ export function portfolioGate(input = {}) {
         deviationPtsVsComputed: liquidation && liquidation.moveToLiqPct != null ? round(liquidation.moveToLiqPct - impliedMovePct, 3) : null,
       };
     }
-    positions.push({ index: i, venue: String(p.venue || '?'), asset, kind, side, size: round(sizeAbs, 8), notional: round(notional, 2), markPrice: mark, marginUsed, liquidation, ...(venueLiquidation ? { venueLiquidation } : {}) });
+    positions.push({ index: i, venue: String(p.venue || '?'), asset, kind, side, size: round(sizeAbs, 8), notional: round(notional, 2), markPrice: mark, marginUsed,
+      marginMode: p.marginMode === 'cross' ? 'cross' : p.marginMode === 'isolated' ? 'isolated' : null, ...(equityUsd != null ? { unrealizedPnlUsd: round(unrealizedPnlUsd, 2), equityUsd: round(equityUsd, 2) } : {}), liquidation, ...(venueLiquidation ? { venueLiquidation } : {}) });
   }
   if (!positions.length) return { ok: false, errors };
 
@@ -129,8 +139,18 @@ export function portfolioGate(input = {}) {
   // mark-to-market PnL, beta-scaled) falls to total maintenance margin. Hedged books liquidate MUCH later
   // than their nearest isolated leg — the real diversification an isolated view can't see.
   const perpLegs = positions.filter((p) => p.kind === 'perp' && p.liquidation && p.markPrice > 0);
-  const marginsKnown = perpLegs.length > 0 && perpLegs.every((p) => Number(p.marginUsed) > 0);
+  // Equity, not margin: a leg can legitimately be underwater, so this tests that equity is KNOWN, not
+  // that it is positive. A pool that has already fallen below maintenance is a real state (breach at 0),
+  // not a reason to withhold the answer.
+  const marginsKnown = perpLegs.length > 0 && perpLegs.every((p) => Number.isFinite(Number(p.equityUsd)));
   const crossMargin = crossMarginLiquidation(perpLegs, input.accountEquityUsd, betas, marginsKnown);
+
+  // What the caller actually told us about margin mode, kept separate from what we assume in its
+  // absence. The isolated view is the DEFAULT model, not a fact about the account, and the headline
+  // must not speak as though it were one.
+  const perpKind = positions.filter((p) => p.kind === 'perp');
+  const anyCross = perpKind.some((p) => p.marginMode === 'cross');
+  const allIsolated = perpKind.length > 0 && perpKind.every((p) => p.marginMode === 'isolated');
 
   // Ground-truth self-checks (exact identities — a wrong aggregation fails its own check).
   // Reconciliation compares SUM-OF-ROUNDED (display values) vs ROUNDED-SUM, so its tolerance must carry
@@ -182,7 +202,22 @@ export function portfolioGate(input = {}) {
     nearestLiquidation: nearest ? {
       venue: nearest.venue, asset: nearest.asset, side: nearest.side,
       liquidationPrice: nearest.liquidation.price, moveToLiquidationPct: nearest.liquidation.moveToLiqPct,
-      note: `${nearest.asset} ${nearest.side} on ${nearest.venue} is the binding constraint among legs that are still live: it liquidates FIRST, at a ${nearest.liquidation.moveToLiqPct}% adverse move.` + (breached.length ? ` NOTE: ${breached.length} leg(s) are already PAST their liquidation price and are listed under breachedLegs; they are excluded from this ranking because their liquidation is not a future event.` : " That is the whole book's real distance to first blood."),
+      // Every liquidation here is solved under ISOLATED per-leg margin. On a cross-margined account
+      // the shared equity pool carries each leg far past its isolated price — on one real five-leg
+      // book the isolated view read 3% away while the venue's cross prices sat 240% to 62,000% away.
+      // This sentence used to close with an unconditional "that is the whole book's real distance to
+      // first blood", which is the one reading a caller must not take on a cross book, and it was
+      // asserted most confidently exactly where the model does not apply. It is now conditional on
+      // what the caller actually told us the margin mode is, and silence is treated as an assumption
+      // rather than as isolated.
+      marginModelAssumed: 'isolated per-leg margin',
+      note: `${nearest.asset} ${nearest.side} on ${nearest.venue} is the binding constraint among legs that are still live under ISOLATED margin: it liquidates FIRST, at a ${nearest.liquidation.moveToLiqPct}% adverse move.`
+        + (breached.length ? ` NOTE: ${breached.length} leg(s) are already PAST their liquidation price and are listed under breachedLegs; they are excluded from this ranking because their liquidation is not a future event.` : '')
+        + (anyCross
+          ? ' This is NOT the whole book\'s distance to first blood: at least one leg is cross-margined, so the shared equity pool carries it well past this price. Read crossMarginLiquidation for the account-level number, which is the binding one for this book.'
+          : allIsolated
+            ? " Every leg is declared isolated, so that is the whole book's real distance to first blood."
+            : ' Margin mode was not supplied on every leg, so isolated is ASSUMED. If this account is cross-margined the account liquidates much later than this: crossMarginLiquidation is the comparable figure.'),
     } : null,
     // Legs whose mark has already crossed liquidation are reported here rather than ranked as the
     // nearest future event. A caller needs to reconcile these, not protect them.
@@ -279,26 +314,37 @@ export function betaFor(asset, betas) {
 // shorts gain (hedges buffer). Returns null-with-reason when per-leg margins are unknown (can't sum a pool).
 export function crossMarginLiquidation(perpLegs, accountEquityUsd, betas, marginsKnown) {
   if (!perpLegs.length) return { available: false, note: 'No perp legs with a computed liquidation to aggregate.' };
-  const totalMaint = perpLegs.reduce((s, p) => s + ((p.liquidation.mmrPct || 0) / 100) * p.notional, 0);
   const explicitEquity = Number(accountEquityUsd) > 0 ? Number(accountEquityUsd) : null;
   if (explicitEquity == null && !marginsKnown) {
     return { available: false, note: 'Cross-margin liquidation needs the account equity: pass accountEquityUsd, or per-leg margin/leverage on every leg so the shared pool can be summed. Not assumed.' };
   }
-  const pool = explicitEquity != null ? explicitEquity : perpLegs.reduce((s, p) => s + Number(p.marginUsed), 0);
+  const pool = explicitEquity != null ? explicitEquity : perpLegs.reduce((s, p) => s + Number(p.equityUsd), 0);
+  // A leg without a known equity makes the pool NaN, and every comparison against NaN is false — which
+  // would have walked the whole scan and returned "survives a 100% move", the most reassuring answer
+  // available, from an input that supported no answer at all. Refuse instead, and say which it was.
+  if (!Number.isFinite(pool)) {
+    return { available: false, note: 'Cross-margin liquidation needs every leg\'s equity (posted margin + unrealized PnL) or an explicit accountEquityUsd. At least one leg had neither, and a pool cannot be part-summed.' };
+  }
+  const assetMove = (p, M, dir) => (dir === 'down' ? -1 : 1) * betaFor(p.asset, betas) * (M / 100);
   // Equity(M) is piecewise-linear in M; scan finely for the first breach in each direction.
-  const equityAt = (M, dir) => pool + perpLegs.reduce((s, p) => {
-    const f = (dir === 'down' ? -1 : 1) * betaFor(p.asset, betas) * (M / 100); // asset fractional move
-    return s + (p.side === 'long' ? 1 : -1) * p.notional * f;                    // long loses on a down move
-  }, 0);
+  const equityAt = (M, dir) => pool + perpLegs.reduce((s, p) =>
+    s + (p.side === 'long' ? 1 : -1) * p.notional * assetMove(p, M, dir), 0); // long loses on a down move
+  // Maintenance is charged on the notional AT THE MOVED PRICE, so it FALLS as the market falls. Holding
+  // it fixed at today's notional compared a shrinking equity against a frozen requirement and reported
+  // the account liquidating EARLIER than it does — on a one-leg book that contradicted the same engine's
+  // own isolated liquidation for the identical position, which is why the self-check below fired.
+  const maintAt = (M, dir) => perpLegs.reduce((s, p) =>
+    s + ((p.liquidation.mmrPct || 0) / 100) * p.notional * Math.max(0, 1 + assetMove(p, M, dir)), 0);
+  const totalMaint = maintAt(0, 'down'); // == the requirement at today's marks
   const breach = (dir) => {
-    if (equityAt(0, dir) <= totalMaint) return 0;
-    for (let M = 0.25; M <= 100; M += 0.25) if (equityAt(M, dir) <= totalMaint) return round(M, 2);
+    if (equityAt(0, dir) <= maintAt(0, dir)) return 0;
+    for (let M = 0.25; M <= 100; M += 0.25) if (equityAt(M, dir) <= maintAt(M, dir)) return round(M, 2);
     return null; // survives a 100% move in this direction (e.g. a net-flat/over-hedged book)
   };
   const downPct = breach('down'), upPct = breach('up');
   return {
     available: true,
-    equitySource: explicitEquity != null ? 'accountEquityUsd (caller)' : 'Σ per-leg margin (pool proxy)',
+    equitySource: explicitEquity != null ? 'accountEquityUsd (caller)' : 'Σ per-leg (posted margin + unrealized PnL) — pool proxy',
     poolEquityUsd: round(pool, 2),
     totalMaintenanceUsd: round(totalMaint, 2),
     accountLiquidationDownMovePct: downPct,

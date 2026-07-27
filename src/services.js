@@ -299,6 +299,12 @@ export const SERVICES = [
     run: async (i) => {
       const e = await enrichPerpInputs(i);
       const { live, ...compute } = e;                 // provenance is metadata, not a computation input
+      // Same refusal as the MCP handler: an unresolvable venue is a caller error, and serving the
+      // maths with the complaint welded into the signed result is neither a refusal nor a usable
+      // answer. Refused here means ok:false, which the billing contract already makes free.
+      if (live?.unsupportedVenue) {
+        return { ok: false, errors: [live.error], supportedVenues: live.supported };
+      }
       const r = perpGate(compute);
       if (live) {
         // A symbol was resolved against a venue, so this answer is an OBSERVATION, not a re-runnable

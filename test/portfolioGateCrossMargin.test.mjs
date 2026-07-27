@@ -3,7 +3,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { crossMarginLiquidation, portfolioGate } from '../src/engine/portfolioGate.js';
 
-const leg = (asset, side, notional, marginUsed, moveToLiqPct = 9) => ({ asset, side, notional, marginUsed, markPrice: 100, liquidation: { mmrPct: 0.5, moveToLiqPct } });
+// equityUsd is what the pool is summed from: posted margin PLUS unrealized PnL. These synthetic legs
+// carry no PnL, so equity equals the posted margin; the field is supplied explicitly because summing
+// `marginUsed` (which portfolioGate sizes off the MARK notional) silently drops any gain or loss, and
+// on a one-leg book that made the account liquidation disagree with the same engine's isolated one.
+const leg = (asset, side, notional, marginUsed, moveToLiqPct = 9) => ({ asset, side, notional, marginUsed, equityUsd: marginUsed, markPrice: 100, liquidation: { mmrPct: 0.5, moveToLiqPct } });
 
 test('cross-margin: a hedged (long+short same asset) book survives FAR beyond the isolated per-leg liq', () => {
   const r = crossMarginLiquidation([leg('BTC', 'long', 60000, 6000), leg('BTC', 'short', 60000, 6000)], null, { BTC: 1 }, true);
@@ -23,7 +27,7 @@ test('cross-margin: an all-long book DOES liquidate, and higher-beta legs pull t
 test('cross-margin: explicit accountEquityUsd overrides the summed-margin pool proxy', () => {
   const proxy = crossMarginLiquidation([leg('BTC', 'long', 50000, 5000)], null, { BTC: 1 }, true);
   const rich = crossMarginLiquidation([leg('BTC', 'long', 50000, 5000)], 50000, { BTC: 1 }, true);
-  assert.equal(proxy.equitySource, 'Σ per-leg margin (pool proxy)');
+  assert.equal(proxy.equitySource, 'Σ per-leg (posted margin + unrealized PnL) — pool proxy');
   assert.equal(rich.equitySource, 'accountEquityUsd (caller)');
   assert.equal(rich.poolEquityUsd, 50000);
   assert.ok(rich.accountLiquidationDownMovePct > proxy.accountLiquidationDownMovePct, 'more equity → survives a bigger move');

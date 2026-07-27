@@ -236,7 +236,18 @@ app.get('/proof/:contentHash', (req, res) => {
     status: 'ready', contentHash: h, protocol: rec.protocol,
     proof: rec.proof, publicSignals: rec.publicSignals,
     encodedInputs: rec.encoded, gapToServedPrice: rec.gapToServedPrice,
+    // Two separate claims, and the caller gets both or neither is implied. The proof says the
+    // arithmetic is right; the attestation says Quiver stands behind these exact eight field
+    // elements. Absent when no signing key is configured — an unattested proof is still a proof,
+    // and inventing a signature would be worse than shipping none. This response builds its own
+    // key list rather than spreading `rec`, which is how the attestation went missing in production
+    // for one deploy: the route was written before the field existed and silently dropped it.
+    signalsAttestation: rec.signalsAttestation || null,
     verificationKey: '/proof/vk', verify: rec.verify,
+    onChain: {
+      contract: 'QuiverProofRegistry.submit(uint256[24] proof, uint256[8] publicSignals, bytes attestation)',
+      note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The contract verifies the arithmetic itself and records the outcome; a bad proof is refused in public rather than reverted silently.',
+    },
   });
 });
 

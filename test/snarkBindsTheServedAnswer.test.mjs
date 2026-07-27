@@ -19,6 +19,12 @@ const scale = require('../src/util/scale.cjs');
 
 const SIG = { residual: 0, tolerance: 1, mHat: 2, qHat: 3, p0Hat: 4, s: 5, mmrHat: 6, pLiqHat: 7 };
 
+// Set before ANY proof is built, because the attestor memoises "no key configured" on first use. A
+// later assignment is silently ignored, which is how the first version of the endpoint test below
+// failed against correct code. Hardhat account #1 — published in their docs, throwaway everywhere.
+process.env.QUIVER_SIGNING_KEY = process.env.QUIVER_SIGNING_KEY
+  || '0x59c6995e998f97a5a0044966f0945389dc9e86dae88c7a8412f4603b6b78690d';
+
 // snarkjs spins up a BN254 worker pool and never tears it down, so a test process that has proved
 // anything hangs after the last assertion instead of exiting. A long-lived server does not care; a
 // test runner does, and a suite that never exits looks exactly like a suite that never finishes.
@@ -161,5 +167,34 @@ test('the free MCP path strips the proof flag and builds the proof too', async (
     if (rec && rec.status === 'ready') break;
     assert.ok(Date.now() < deadline, 'MCP asked for a proof and none was ever built');
     await new Promise((r) => setTimeout(r, 250));
+  }
+});
+
+test('the retrieval endpoint surfaces the attestation, not just the proof', async () => {
+  // This route builds its own key list instead of spreading the stored record, which is a deliberate
+  // choice — a public endpoint should say what it publishes — but it means a new field is invisible
+  // until it is added here. That is exactly what happened: the attestation shipped, production had a
+  // signing key, and /proof/<hash> returned everything except the attestation for a whole deploy.
+  const { default: app } = await import('../src/app.js');
+  const server = app.listen(0);
+  await new Promise((r) => server.once('listening', r));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const { rec } = await proven({ side: 'long', entryPrice: 41250, size: 0.6, leverage: 12, maintMarginRate: 0.008 });
+    assert.equal(rec.status, 'ready', rec.error || '');
+    const out = await byName['perp-gate'].run({ side: 'long', entryPrice: 41250, size: 0.6, leverage: 12, maintMarginRate: 0.008, snark: true });
+    const served = await (await fetch(`${base}/proof/${out.proof.contentHash}`)).json();
+
+    assert.equal(served.status, 'ready');
+    assert.ok(served.signalsAttestation, 'the endpoint dropped the attestation');
+    assert.equal(served.signalsAttestation.signer, rec.signalsAttestation.signer);
+    assert.equal(served.signalsAttestation.digest, rec.signalsAttestation.digest);
+
+    // And it must be a signature over the signals THIS response carries, recoverable by anyone.
+    const { verifyMessage, getBytes } = await import('ethers');
+    assert.equal(verifyMessage(getBytes(served.signalsAttestation.digest), served.signalsAttestation.signature),
+      served.signalsAttestation.signer);
+  } finally {
+    await new Promise((r) => server.close(r));
   }
 });

@@ -1,4 +1,4 @@
-# Quiver — Technical Documentation — part 1 of 6
+# Quiver — Technical Documentation — part 1 of 7
 
 > The complete document, split only because a single fetch truncates. **Nothing is abridged**: the
 > parts below concatenate to the whole text, cut at section boundaries. Every part is served as plain
@@ -8,10 +8,11 @@
 > - **Part 2** — `/paper/2` — 4. Service Catalogue
 > - **Part 3** — `/paper/3` — 5. Methodology
 > - **Part 4** — `/paper/4` — 6. Verification and Testing  |  7. Worked Walkthrough  |  8. Limitations and Honest Disclosures
-> - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario  |  11. Roadmap: Operating Quiver After the Hackathon
-> - **Part 6** — `/paper/6` — 12. Conclusion  |  Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
+> - **Part 5** — `/paper/5` — 9. Related Work and Positioning  |  10. The Build: Story, Process, and a User Scenario
+> - **Part 6** — `/paper/6` — 11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
+> - **Part 7** — `/paper/7` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (242 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (247 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
@@ -151,7 +152,9 @@ One page, for a reader with thirty documents to get through. Everything here is 
 
 - 11.8 Research programme
 
-- 11.9 What would falsify this plan
+- 11.9 What the proof changes, and what it does not — the year after
+
+- 11.10 What would falsify this plan
 
 - 12Conclusion
 
@@ -301,4 +304,4 @@ The financial mathematics is locked by an automated suite of model-free invarian
 
 ---
 
-**Continues in part 2 of 6: `/paper/2` — 4. Service Catalogue**
+**Continues in part 2 of 7: `/paper/2` — 4. Service Catalogue**

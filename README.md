@@ -5,7 +5,7 @@ agent calls over HTTP, pays for in-band with [x402](https://github.com/coinbase/
 through the [ERC-8004](https://eips.ethereum.org/EIPS/eip-8004) trustless-agent registry. No chat, no
 human in the loop. Every deterministic answer arrives with a proof you can re-derive yourself.
 
-- **Live endpoint:** https://quiver-production-c3a8.up.railway.app — [`/build`](https://quiver-production-c3a8.up.railway.app/build) and [`/paper`](https://quiver-production-c3a8.up.railway.app/paper) are free; the paper is also served as plain markdown in six AI-readable parts at `/paper/1` … `/paper/6`
+- **Live endpoint:** https://quiver-production-c3a8.up.railway.app — [`/build`](https://quiver-production-c3a8.up.railway.app/build) and [`/paper`](https://quiver-production-c3a8.up.railway.app/paper) are free; the paper is also served as plain markdown in seven AI-readable parts at `/paper/1` … `/paper/7`
 - **Free MCP:** `https://quiver-production-c3a8.up.railway.app/mcp` — Streamable HTTP, the nine risk-brain tools, fair-use daily quota; on the [official MCP registry](https://registry.modelcontextprotocol.io) as `quiver-risk-brain`
 - **On-chain identity:** ERC-8004 agent `#5152` on X Layer (`eip155:196`) · **Build:** `q1-e1fa99d08887d6cc`
 - **Payment (dual rail):** x402 v2 `exact` — USD₮0 on X Layer (OKX facilitator) **and** USDC on Base (Coinbase CDP facilitator); 0.005–0.05 per call
@@ -41,7 +41,7 @@ The full technical documentation is one continuous document, served as
 ([PDF](https://drive.google.com/file/d/1K44jmBBLyFed1qF6Ib62YRh8J-jMQ-xW/view?usp=sharing)).
 
 **Reading it with an AI?** That page is 400 kB of styled HTML and will not arrive whole in one fetch.
-The identical text is served as plain markdown in six parts, each small enough to read in a single
+The identical text is served as plain markdown in seven parts, each small enough to read in a single
 request. **Nothing is abridged** — the parts concatenate to the whole document, cut only at section
 boundaries, and [a test](test/paperMachineReadable.test.mjs) asserts exactly that.
 
@@ -50,9 +50,10 @@ boundaries, and [a test](test/paperMachineReadable.test.mjs) asserts exactly tha
 | [`/paper/1`](https://quiver-production-c3a8.up.railway.app/paper/1) | Abstract · At a Glance · Contents · 1 Introduction · 2 System Architecture · 3 Design Principles |
 | [`/paper/2`](https://quiver-production-c3a8.up.railway.app/paper/2) | 4 Service Catalogue |
 | [`/paper/3`](https://quiver-production-c3a8.up.railway.app/paper/3) | 5 Methodology |
-| [`/paper/4`](https://quiver-production-c3a8.up.railway.app/paper/4) | 6 Verification and Testing · 7 Worked Walkthrough · 8 Limitations · 9 Related Work |
-| [`/paper/5`](https://quiver-production-c3a8.up.railway.app/paper/5) | 10 The Build · 11 Roadmap · 12 Conclusion |
-| [`/paper/6`](https://quiver-production-c3a8.up.railway.app/paper/6) | Appendix A API · Appendix B Reproducibility · Appendix C Checkable Artifacts · References |
+| [`/paper/4`](https://quiver-production-c3a8.up.railway.app/paper/4) | 6 Verification and Testing · 7 Worked Walkthrough · 8 Limitations |
+| [`/paper/5`](https://quiver-production-c3a8.up.railway.app/paper/5) | 9 Related Work · 10 The Build |
+| [`/paper/6`](https://quiver-production-c3a8.up.railway.app/paper/6) | 11 Roadmap · 12 Conclusion |
+| [`/paper/7`](https://quiver-production-c3a8.up.railway.app/paper/7) | Appendix A API · Appendix B Reproducibility · Appendix C Checkable Artifacts · References |
 | [`/paper/full`](https://quiver-production-c3a8.up.railway.app/paper/full) | the whole document in one response (237 kB — may truncate in your client) |
 
 The split was measured, not guessed. Stripping the markup gave 237 kB of clean markdown, and a real
@@ -71,6 +72,8 @@ points at the artifact that settles its claims.
 | [**Verification**](docs/verification.md) | How the claims are held up: the invariant suite, ground-truthing against live venues, the population-scale crash study and the ablation it did not survive intact, the commissioned buyer audit, and the concurrency measurement. |
 | [**Limitations**](docs/limitations.md) | What this does not do, each labelled structural or scheduled — including the largest one, which is that the envelope is signed by our own server. |
 | [**Roadmap**](docs/roadmap.md) | What happens after the hackathon, the single metric that governs it, the unfinished engineering with definitions of done, and what would falsify the plan. |
+| [**Roadmap after the proof**](docs/roadmap-after-the-proof.md) | The year after. The on-chain registry covers one computation of twenty-two; this is the ladder out of that, ending at the input problem that no amount of proving the arithmetic touches. |
+| [**On-chain verification**](docs/onchain-verification.md) | The registry, the two transactions, and the commands to check them without our cooperation. |
 | [**Checkable artifacts**](docs/checkable-artifacts.md) | Transaction hashes with block heights, the EAS schema, the research manifest, and a worked proof — each with the command that checks it. |
 | [**API reference**](docs/api.md) | Every endpoint, its inputs and headline outputs, and every status the API returns with whether it costs anything. |
 | [**Reproducing the build**](REPRODUCIBLE.md) | Rebuild the engine to an identical `codeHash`, re-run any deterministic answer, and recover the signer. |

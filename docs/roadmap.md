@@ -79,36 +79,39 @@ shipping in the version described here, and each is disclosed in the relevant se
 3. **Deeper tape coverage.** The sampled-feed limit is the exchange's, but the implementation does not
    exhaust the pagination the endpoint does offer. *Done:* the tape is walked as deep as the venue
    permits and the density diagnostic reports coverage achieved against coverage available.
-4. **A succinct proof for a verifier that cannot run Node — built, with all three limits measured and
-   each answered.** A smart contract has no runtime, so today it can only check a signature, which
-   means trusting the signer rather than the arithmetic. The liquidation identity compiles to a
-   667-constraint Groth16 circuit over BN254: **242 ms to prove, a 256-byte proof constant in the
-   position, 8 ms to verify in JavaScript or 242,971 gas on chain** against a 2,025-byte Solidity
-   verifier, pinning the liquidation price to within 1e−9 of the canonical integer answer.
-   The word is *succinct*, not *zero-knowledge* — the circuit has **zero private inputs** and hides
-   nothing. Three limits, each with its cause and its remedy rather than a bare disclosure:
-   - *It certifies a fixed-point restatement, not the engine's float output* — 70.8% exact agreement,
-     up to 1.9×10⁻⁴ divergence. The cause is not float-versus-integer arithmetic: the encoder
-     truncates the maintenance rate onto the 1e−9 grid while the engine keeps the full double, so the
-     two describe **different positions**. Snapping service inputs to that grid collapses the worst
-     gap to **6.33×10⁻¹⁰**. *Done:* grid-snapped inputs become the canonical request representation
-     and the gap is zero by construction.
-   - *It binds six numbers to each other, not to an account* — every input is public and free, so an
-     adversary picks a liquidation price and solves for the margin that makes it true. The remedy
-     needs no new cryptography: every value the circuit constrains is **already inside the payload
-     this service signs**. *Done:* signature-plus-proof is documented as the supported integration,
-     with in-circuit signature verification held for a threat model that does not trust the signer.
+4. **A succinct proof for a verifier that cannot run Node — SHIPPED, on X Layer, 28 July 2026.** A
+   smart contract has no runtime, so it could previously check only a signature, which means trusting
+   the signer rather than the arithmetic. Add `"snark": true` to a `perp-gate` call and the answer
+   returns unchanged with a retrieval URL; a free `GET /proof/<contentHash>` returns a PLONK proof of
+   the liquidation identity for that exact position.
+   [`QuiverProofRegistry`](https://www.okx.com/web3/explorer/xlayer/address/0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60)
+   hands it to the deployed verifier and records the outcome: one transaction accepting a proof bought
+   from the live endpoint (468,459 gas, `ProofAccepted`) and one rejecting the same proof with the
+   certified price moved a single grid step (333,155 gas, `ProofRejected`). The chain holds
+   `58329.113924051` against the `58329.11` the service sold. The word is *succinct*, not
+   *zero-knowledge* — the circuit has **zero private inputs** and hides nothing.
+   All three limits this item used to list are closed, and how each closed is worth keeping:
+   - *It certified a fixed-point restatement, not the engine’s float output* — 70.8% exact agreement,
+     up to 1.9×10⁻⁴ divergence, because the encoder truncated the maintenance rate onto the 1e−9 grid
+     while the engine kept the full double, so the two described **different positions**. The service
+     now snaps inputs onto that grid before computing: worst divergence **5.53×10⁻¹⁰** over 3,000
+     sampled positions, none above 1e−9. Leverage is snapped too, because the engine derives margin
+     from it. No published content hash moved.
+   - *It bound six numbers to each other, not to an account.* Closed more carefully than this document
+     originally proposed. Composing the proof with the **envelope** signature leaves a gap you could
+     drive a position through — a valid proof of one position beside a valid signature over another,
+     each fine alone, because the content hash is a SHA-256 over canonical JSON that nothing on chain
+     can recompute. So the service signs the **public signals themselves**,
+     `keccak256(abi.encodePacked(uint256[8]))`, which is what the contract hashes from calldata. An
+     unattested proof is still accepted and recorded as unattested; an impostor signature over the
+     right digest does not set the flag.
    - *The circuit-specific phase of the Groth16 setup had one participant, and it was our machine* —
-     whoever holds that secret can forge a proof. Phase 1 is the public Hermez ceremony and is fine.
-     The remedy is removing the per-circuit ceremony rather than organising one: the same circuit
-     compiles under **Plonk over that same public reference string**, run end to end — setup, prove
-     and verify all pass. That is checkable rather than asserted: the Plonk verification key, proof
-     and public signals are committed at [`research/zk/build/`](../research/zk/build), so
-     `snarkjs plonk verify vk_plonk.json public_plonk.json proof_plonk.json` answers from a clone.
-     Re-verified against those exact files on 27 July 2026 — Plonk OK, Groth16 OK over byte-identical
-     public signals, and a control with one public signal incremented by one was rejected, so the
-     verifier can fail. *Done:* Plonk is the published artifact and this reduces to a note about
-     proof size.
+     whoever holds that secret can forge a proof. Phase 1 is the public Hermez ceremony and was never
+     the problem. The deployed verifier is therefore **Plonk over that same public reference string**,
+     at 13% more gas and 22× the proving time than the Groth16 artifact we did not deploy (32 ms
+     against 703 ms, measured). That is the price of not asking anyone to trust a ceremony we ran
+     alone, and it is paid where the caller never sees it: proving runs in a separate process, off the
+     request path entirely. → [on-chain verification](onchain-verification.md)
 5. **A block range on the concentrated-liquidity replay — shipped.** `lp-desk` replays real on-chain
    swaps, the most reproducible input here, and now names the range it walked: `firstBlock` and
    `lastBlock` beside the day count and swap count, so a reader re-fetches the identical window
@@ -154,3 +157,18 @@ Stating the kill signal is part of the honesty the rest of this argues for.
   choice, not the code, is the product's limit.
 
 Each is checkable by a reader from public artefacts, which is the point.
+
+---
+
+## What comes after the proof
+
+This document is the operating plan for the hackathon period and the commitments made inside it. The
+year after is a different question, and it has its own file:
+**[the roadmap after the proof](roadmap-after-the-proof.md)**.
+
+The one-line version, because it should not need a click: the on-chain registry above covers **one
+computation of twenty-two**. Five more deterministic engines can carry circuits, proofs should
+aggregate so an agent polling in a loop does not pay a transaction per answer, and the honest end of
+the road is not more circuits at all — it is the **input** problem, which no amount of proving the
+arithmetic touches. A proof that a liquidation price follows from a mark of 64,000 is worthless if the
+mark was 61,000, and that is why live-market answers ship as observations rather than proofs.

@@ -24,12 +24,21 @@ the checks this page invites, which is the page working as intended and the auth
 | **A real paid settlement for this exact service and these inputs**<br><sub>the exhibit below was regenerated later on a newer build, so this evidences the payment rail rather than that envelope</sub> | `0xa07957667cf53eb52814c4c4488027da2596f109c90f8d68f323eb60eec7e4b6` | X Layer, block 66,383,878 (`0x3f4f006`), 27 July 2026 |
 | EAS attestation schema for `risk-attest` | `0x59a8587b287d3f13776dccbe49e19d2e887f90b5e16650464b07e613d89287e0`<br><sub>schema string: `bytes32 merkleRoot, uint256 itemCount, string engineVersion`</sub> | Base, EAS SchemaRegistry `0x4200…0020` |
 | A Merkle root anchored under that schema | `0x01ffd2f9934a2c7f7df119e1e2043231fefe59be21011cb3184c956ea479a1b1`<br><sub>attestation `0x69d42632…`, 20 July 2026, `itemCount 2`</sub> | Base. It batches **two** computations, not a day's worth, and was produced by the pre-fix tree — so it records what was anchored on that date and is not a root the current engine reproduces |
+| **A contract that verifies our arithmetic**<br><sub>PLONK verifier at `0x59F6Aa860eE0d26Db873f7c7015CE869170b3b25`; both addresses are immutables you can read back</sub> | `0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60` | X Layer, deployed 28 July 2026 |
+| **A proof bought from the live endpoint, accepted on chain** | `0x50397d713b96414800fef2dc6c2b4b8a48bd89d7f793683df9deddfbe73f368a` | X Layer, block 66,412,787, 468,459 gas, event `ProofAccepted`. The registry stores `58329.113924051` against the `58329.11` the service sold |
+| **The same proof with the certified price moved one grid step, rejected** | `0x97502c78e61958a9a1013a257bf281c665684e214d6474c41444eb0294cb4aac` | X Layer, block 66,412,794, 333,155 gas, event `ProofRejected`. One part in 10⁹ invalidates it — a verifier that cannot refuse is not a verifier |
 
 ```bash
 # any of the above, on the matching chain
 curl -s -X POST https://rpc.xlayer.tech -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"eth_getTransactionReceipt","params":["0xa07957667cf53eb52814c4c4488027da2596f109c90f8d68f323eb60eec7e4b6"]}'
 # expect status 0x1, and a USD₮0 Transfer log to the advertised payTo
+
+# what the registry decided about that position, read straight from the chain.
+# returns 58329 and 113924051 — the full-precision price the proof certified,
+# against the 58329.11 the service served (rounded to two decimals for display)
+cast call 0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60 "liquidationPrice(bytes32)(uint256,uint256)" \
+  0x25669da50feb5d2dc6f6daaade452e7d22324183706330174218c8196c036206 --rpc-url https://xlayer.drpc.org
 ```
 
 ## Off chain

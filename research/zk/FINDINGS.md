@@ -1,5 +1,15 @@
 # FINDINGS — ZK circuit track
 
+> **STATUS, 28 July 2026 — READ THIS FIRST.** These are dated research notes from the circuit track,
+> kept because the reasoning is worth preserving. They are **not** a description of what shipped.
+> What shipped is **PLONK**, not the Groth16 artifact whose 242,971 gas and 242 ms appear throughout
+> below — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so
+> deploying that verifier would have invited reliance on a secret we hold. The live deployment is
+> `QuiverProofRegistry` `0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60` on X Layer, with the PLONK
+> verifier at `0x59F6Aa860eE0d26Db873f7c7015CE869170b3b25`, at 13% more gas and 22× the proving time.
+> See [on-chain verification](../../docs/onchain-verification.md) for what is actually live.
+
+
 Newest first. Every entry is dated with `new Date().toISOString()` (UTC) and marked MEASURED or ASSUMED.
 
 ---

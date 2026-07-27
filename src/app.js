@@ -80,7 +80,7 @@ const INDEX_JSON = () => ({
   payment: PAYMENT(),
   mcp: 'POST /mcp — Streamable HTTP MCP endpoint; add this URL to any MCP client (Claude/Cursor/LangChain) to call the verifiable risk brain (free, fair-use daily quota)',
   docs: '/paper',
-  docsMachineReadable: ['/paper/1', '/paper/2', '/paper/3', '/paper/4', '/paper/5', '/paper/6', '/paper/full'],
+  docsMachineReadable: [...PAPER_PARTS.map((_, i) => `/paper/${i + 1}`), '/paper/full'],
   build: '/build',
   changelog: '/changelog — dated record of what changed since the hackathon submission was written; the endpoint URL and the engine build hash do not move while judging runs',
   agentCard: '/.well-known/agent-card.json',
@@ -106,7 +106,7 @@ app.get(['/.well-known/agent-card.json', '/agent.json'], (_req, res) => res.json
   name: 'Quiver',
   description: 'The verifiable risk brain for autonomous agents — deterministic, proof-carrying risk computation over x402 + MCP.',
   identity: IDENTITY(),
-  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', docsMachineReadable: ['/paper/1', '/paper/2', '/paper/3', '/paper/4', '/paper/5', '/paper/6', '/paper/full'], build: '/build', proof: '/proof/<contentHash>', verificationKey: '/proof/vk' },
+  endpoints: { index: '/', api: '/api/<service>', mcp: '/mcp', docs: '/paper', docsMachineReadable: [...PAPER_PARTS.map((_, i) => `/paper/${i + 1}`), '/paper/full'], build: '/build', proof: '/proof/<contentHash>', verificationKey: '/proof/vk' },
   payment: PAYMENT(),
   repo: 'https://github.com/Tristan-tech-ai/Quiver',
   version: config.version,
@@ -125,7 +125,7 @@ Identity: ERC-8004 agent #5152 on X Layer (eip155:196), owner 0x65bb932d9987f1d1
 Payment: x402 v2 exact — USD₮0 on X Layer (eip155:196) and USDC on Base (eip155:8453); unpaid requests get the 402 challenge with both rails
 Free tier: POST /mcp (Streamable HTTP MCP, 9 risk tools, fair-use daily quota)
 Changes since submission: /changelog
-Docs: /paper (technical documentation, typeset) · /paper/1../paper/6 (same text, plain markdown, AI-readable) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
+Docs: /paper (technical documentation, typeset) · /paper/1../paper/${PAPER_PARTS.length} (same text, plain markdown, AI-readable) · /build (reproducibility provenance) · https://github.com/Tristan-tech-ai/Quiver
 
 ## Paid services (x402)
 ${svc}

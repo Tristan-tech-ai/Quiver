@@ -43,7 +43,7 @@ HTTP JSON-RPC) at a fair-use quota of three hundred tool calls per day per IP. `
 
 Free, unmetered: `GET /build` (code identity, the Node version it runs on, and the hashing rule that
 produced the identity), `GET /paper` (the technical documentation, typeset), `GET /paper/{1..6}` (the
-same text as plain markdown, in six parts each small enough for one fetch), `GET /paper/full` (the
+same text as plain markdown, in seven parts each small enough for one fetch), `GET /paper/full` (the
 whole document in one response), `GET /`.
 
 ---

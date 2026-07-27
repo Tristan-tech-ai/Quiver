@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="machine-readable-edition" content="/paper/1 /paper/2 /paper/3 /paper/4 /paper/5 /paper/6 (plain markdown, complete); /paper/full for the whole document in one response">
+<meta name="machine-readable-edition" content="/paper/1 /paper/2 /paper/3 /paper/4 /paper/5 /paper/6 /paper/7 (plain markdown, complete); /paper/full for the whole document in one response">
 <title>Quiver — Verifiable Financial and Security Primitives for the Agentic Economy</title>
 <style>
   :root {
@@ -88,15 +88,16 @@
 
 <div class="machine-note">
   <strong>Reading this with an automated tool?</strong> This page is 400&nbsp;kB of styled HTML and will not
-  arrive whole in a single fetch. The identical text is served as plain markdown in six parts, each small
+  arrive whole in a single fetch. The identical text is served as plain markdown in seven parts, each small
   enough to read in one request &mdash; nothing is abridged, and a test in the repository asserts that the
   parts concatenate to this document:
   <span class="mono">/paper/1</span> abstract, introduction, architecture, design principles &middot;
   <span class="mono">/paper/2</span> service catalogue &middot;
   <span class="mono">/paper/3</span> methodology &middot;
-  <span class="mono">/paper/4</span> verification, walkthrough, limitations, related work &middot;
-  <span class="mono">/paper/5</span> the build, roadmap, conclusion &middot;
-  <span class="mono">/paper/6</span> appendices and references &middot;
+  <span class="mono">/paper/4</span> verification, walkthrough, limitations &middot;
+  <span class="mono">/paper/5</span> related work, the build &middot;
+  <span class="mono">/paper/6</span> roadmap and conclusion &middot;
+  <span class="mono">/paper/7</span> appendices and references &middot;
   <span class="mono">/paper/full</span> the whole document in one response.
 </div>
 
@@ -236,7 +237,8 @@
       <li><span class="n">11.6</span> A second review, and the reason its findings are worse than the first&rsquo;s</li>
       <li><span class="n">11.7</span> A third round, and the pattern that predicts what is still there</li>
       <li><span class="n">11.8</span> Research programme</li>
-      <li><span class="n">11.9</span> What would falsify this plan</li>
+      <li><span class="n">11.9</span> What the proof changes, and what it does not &mdash; the year after</li>
+      <li><span class="n">11.10</span> What would falsify this plan</li>
     </ol>
   </li>
   <li><span class="n">12</span><a href="#s10">Conclusion</a></li>
@@ -1057,7 +1059,7 @@ recovered === QUIVER_SIGNER;   // true => the number came from Quiver, untampere
 <p>The financial mathematics is locked by 386 automated tests that run under the built-in Node test runner <sup class="cite">[34]</sup> with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.</p>
 
 <table>
-  <caption>Table 2 &mdash; representative invariants from the 333-test suite. All currently pass.</caption>
+  <caption>Table 2 &mdash; representative invariants from the 386-test suite. All currently pass.</caption>
   <tr><th>Property asserted</th><th>Why it must hold</th></tr>
   <tr><td>Put-call parity, <span class="mono">C − P = e<sup>−rT</sup>(F − K)</span></td><td>Model-free; a violation means the pricer is wrong.</td></tr>
   <tr><td>Delta parity, <span class="mono">Δ<sub>c</sub> − Δ<sub>p</sub> = e<sup>−rT</sup></span></td><td>Follows from parity; guards the greeks.</td></tr>
@@ -1380,7 +1382,7 @@ recovered === QUIVER_SIGNER;   // true => the number came from Quiver, untampere
 
 <h3>Known gaps that are engineering work, not limits</h3>
 
-<p>Section&nbsp;8 separates what cannot be fixed from what is merely unfinished. This is the unfinished list, stated as commitments with a definition of done, so that a reader can hold the plan to it rather than take a promise on faith. None of these is shipping in the version this document describes, and each is disclosed in the relevant service output today.</p>
+<p>Section&nbsp;8 separates what cannot be fixed from what is merely unfinished. This is the unfinished list, stated as commitments with a definition of done, so that a reader can hold the plan to it rather than take a promise on faith. Item&nbsp;4 has since shipped and is left in place, rewritten as what it became, because a commitments list that quietly deletes the commitments it met teaches a reader nothing about whether to believe the rest. Everything else here is still unfinished, and each is disclosed in the relevant service output today.</p>
 
 <ol class="body">
   <li><strong>Vanna-volga correction for one-touch barriers.</strong> The service currently prices barriers under a single volatility and publishes the model-uncertainty span. The correction is a closed-form overhedge from three vanilla quotes already present in the fitted smile, so this is arithmetic we have not yet written rather than a modelling barrier. <em>Done means</em>: barrier prices carry a vanna-volga-adjusted figure alongside the single-volatility one, the difference is reported, and a self-check asserts the correction vanishes as the smile flattens.</li>
@@ -1397,7 +1399,7 @@ recovered === QUIVER_SIGNER;   // true => the number came from Quiver, untampere
   <li><strong>Reproducible builds.</strong> Two different hashes sit behind this heading, and only one of them has a runtime question; an earlier draft of this item conflated them and understated the result. The <em>code</em> hash is <span class="mono">sha256</span> over the engine's source bytes and performs no arithmetic at all, so it is runtime-independent by construction rather than by promise &mdash; and that is checkable rather than asserted: feeding the same file list through coreutils <span class="mono">sha256sum</span>, outside JavaScript entirely, returns <span class="mono">q1-e1fa99d08887d6cc</span>, the identical string the service serves. <span class="mono">/build</span> publishes the selection and ordering rule alongside the hash precisely so that recomputation can be done in any language. The residual risk is the <em>content</em> hash, which covers computed floating-point results: basic IEEE-754 arithmetic is bit-identical across platforms, while transcendentals (<span class="mono">exp</span>, <span class="mono">log</span>, <span class="mono">pow</span>, <span class="mono">erf</span>) are stable within a V8 version. That too was measured rather than assumed &mdash; <span class="mono">size-gate</span>'s content hash is byte-identical on Windows and Linux on the same Node major. <em>Done means</em>: a locked toolchain and a published OS&times;runtime matrix, so the transcendental case is a table rather than a mechanism argument.</li>
 </ol>
 
-<p>Two of these — the barrier correction and the calendar fetch — were within reach during the hackathon and were deliberately not shipped in its final days, because both live in the deterministic engine and would have changed the build hash that this document, its demonstration video (in the launch thread, linked from the repository README), and the buyer's independent audit all quote. The scope of that constraint is worth stating plainly, because it is narrower than the freeze makes it sound: the build hash is taken over <span class="mono">src/engine/**</span> and nothing else, so the adapters, the routing layer, the payment code and the served documentation can all change without moving it. Most of the roadmap above is therefore hash-free, and the two items named here are among the few that are not. That reasoning survived contact with a reviewer who then found four outright defects in the same engine, and the build hash was changed to fix those (Section&nbsp;11.5). The distinction we are drawing, and a reader is entitled to test it, is that a wrong answer is worth breaking a freeze for and a better answer is not: the five items above would each make the service more useful without making any current output less true.</p>
+<p>Two of these — the barrier correction and the calendar fetch — were within reach during the hackathon and were deliberately not shipped in its final days, because both live in the deterministic engine and would have changed the build hash that this document, its demonstration video (in the launch thread, linked from the repository README), and the buyer's independent audit all quote. The scope of that constraint is worth stating plainly, because it is narrower than the freeze makes it sound: the build hash is taken over <span class="mono">src/engine/**</span> and nothing else, so the adapters, the routing layer, the payment code and the served documentation can all change without moving it. Most of the roadmap above is therefore hash-free, and the two items named here are among the few that are not. That reasoning survived contact with a reviewer who then found four outright defects in the same engine, and the build hash was changed to fix those (Section&nbsp;11.5). The distinction we are drawing, and a reader is entitled to test it, is that a wrong answer is worth breaking a freeze for and a better answer is not: the six that remain unfinished above would each make the service more useful without making any current output less true. Item&nbsp;4 is the case that tested the distinction rather than merely stating it: shipping the succinct proof required grid-snapping the service&rsquo;s inputs, which sits in the routing layer and not the engine, so the whole of it shipped without moving the hash at all.</p>
 
 <h3>Defects a live adversarial test found after the freeze, and how they were closed</h3>
 
@@ -1497,6 +1499,24 @@ archive node, none failing; later rounds have taken it to 386 and 381, the last 
 <h3>Research programme</h3>
 
 <p>The crash study in Section&nbsp;6 is the template, not a one-off. Its discipline — hypotheses and thresholds fixed, in published files, before the data is touched, a temporal cutoff, out-of-sample events the model has never seen, and publication of the runs that failed — carries forward to the questions that come next: whether the correlated-stress betas remain transportable as market structure changes, whether the flag's dose-response holds on venues outside the calibration set, and whether the variance premium becomes significant on a longer sample or should be retired. Each will be pre-registered the same way, and each will be published whether or not it supports the product. A validation record that only ever confirms the thing being sold is not a validation record.</p>
+
+<h3>What the proof changes, and what it does not — the year after</h3>
+<p>The registry described in 11.4 covers <strong>one computation of twenty-two</strong>. Saying so first is not modesty; it is the only way the rest of this section can be read as a plan rather than a boast. The ladder a buyer actually climbs has four rungs, and it is worth naming which services stand on which.</p>
+<table class="tbl">
+  <caption>Table 11 &mdash; the four rungs, and how many services stand on each today.</caption>
+  <thead><tr><th>Rung</th><th>What the buyer must trust</th><th>Services today</th></tr></thead>
+  <tbody>
+    <tr><td>T0 — re-runnable</td><td>that they can run Node</td><td>all 22 deterministic answers</td></tr>
+    <tr><td>T1 — signed</td><td>our key, for provenance only</td><td>all 22</td></tr>
+    <tr><td>T2 — proven on chain</td><td>nothing; a contract checks the arithmetic</td><td><strong>1</strong> — <span class="mono">perp-gate</span> liquidation</td></tr>
+    <tr><td>T3 — attested input</td><td>that the venue reported what we say it did</td><td><strong>0</strong></td></tr>
+  </tbody>
+</table>
+<p>The distance between T2's one and T1's twenty-two is engineering with a known shape. Six engines rest on a closed-form identity a circuit can state: <span class="mono">size-gate</span> (the Kelly first-order condition, smaller than the liquidation circuit and therefore the one to do next, precisely because doing it easily is what turns <em>we built a circuit</em> into <em>we build circuits</em>), <span class="mono">portfolio-gate</span> (harder, because the first leg to liquidate is a minimum over legs and proving a minimum means proving no other leg qualifies), <span class="mono">lp-risk</span> and <span class="mono">treasury-risk</span> (closed form, and the treasury residual bound is already published), <span class="mono">exec-verify</span> (trivial arithmetic whose honest difficulty is that <em>fair price</em> is an input, so the proof says less than it appears to until the input is itself attested), and <span class="mono">options-risk</span> last, because Black-76 greeks need <span class="mono">exp</span> and <span class="mono">erf</span> in-circuit, which is where this stops being arithmetic and becomes a research project. A circuit whose constraint count pushes proving past a few seconds, or whose identity needs a value the service does not publish, should be abandoned and said so publicly, leaving that service at T1 — a circuit that proves <em>nearly</em> the served answer is worse than none, which is the lesson 11.4 already paid for once.</p>
+<p>Two structural pieces follow. Proofs are held in memory today, so a redeploy clears them and the next request rebuilds; content-addressed storage makes a proof outlive the process that built it, which anything on chain will eventually depend on. And every proof presently costs its own transaction, which no agent polling risk in a loop will accept: folding <em>n</em> proofs into one aggregate replaces <span class="mono">risk-attest</span>'s Merkle root of <em>claims</em> with a single proof of <em>arithmetic</em>, and it is worth being exact that a Merkle root establishes inclusion and nothing else — this document has never said otherwise, and aggregation closes precisely that gap.</p>
+<p><strong>The harder problem is not more circuits.</strong> Everything above proves arithmetic <em>over inputs</em>. It says nothing about whether the inputs are true, and a proof that a liquidation price follows from a mark of 64,000 is worthless if the mark was 61,000. Where the caller supplies the inputs this is correct and sufficient — they chose them. For live-market answers it is the whole question, and it is why those ship as observations rather than proofs (Section 5.19). Three approaches exist and the cheapest may be enough: carrying a venue's own signature through where one exists, which is partial and honest; a TEE attestation binding <em>this binary</em> to <em>this response at this time</em>, which converts trust-in-Quiver into trust-in-a-silicon-vendor — a genuine improvement, not a proof, and the history of enclave side-channel breaks is not short; and zkTLS, which is the honest end state and the least mature. A real possible outcome, stated now so it cannot be quietly redefined later, is that for a public API <em>"go and fetch it yourself"</em> dominates every cryptographic answer. If three months of work does not beat that, the finding is the deliverable.</p>
+<p>One speed note belongs here rather than in a footnote. Groth16 proves in 32 ms against Plonk's 703 ms and verifies for 13% less gas; with native proving it would be fast enough to put back on the request path and the proof would become free from the caller's perspective. The blocker is social, not technical — a per-circuit ceremony needs participants who do not know each other, and that cost multiplies with every circuit added above. If seven independent participants cannot be found, Plonk stays permanently and so does the 703 ms, which is a better outcome than a ceremony staffed by our friends.</p>
+
 
 <h3>What would falsify this plan</h3>
 

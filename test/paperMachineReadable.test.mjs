@@ -12,6 +12,7 @@
 // machine edition at all and let a reader silently receive a fraction of the argument.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import app from '../src/app.js';
 import { perpGate } from '../src/engine/perpGate.js';
 import { proofEnvelope } from '../src/engine/proof.js';
@@ -32,7 +33,17 @@ async function get(path) {
   }
 }
 
-const PART_COUNT = 6;
+// Derived from what is on disk, not written down. It was 6 until the document grew a section, and a
+// hardcoded count turns every honest addition to the paper into six red tests that say nothing about
+// the paper. The properties worth asserting are that each part FITS and that they CONCATENATE TO THE
+// WHOLE — both below, both independent of how many there happen to be.
+const PART_COUNT = (() => {
+  let n = 0;
+  for (;;) {
+    try { readFileSync(new URL(`../assets/whitepaper.part${n + 1}.md`, import.meta.url)); n++; }
+    catch { return n; }
+  }
+})();
 // Strip the navigation header and the continues-in footer, leaving only document text.
 function core(part) {
   const navEnd = part.indexOf('\n---\n\n');
@@ -74,8 +85,8 @@ test('a part fits, and says so in its first characters', async () => {
   // A reader whose fetch is cut off still receives the opening. The map must therefore be at the TOP,
   // not the bottom — putting it at the end would tell only the readers who did not need telling.
   const opening = r.body.slice(0, 1400);
-  assert.match(opening, /part 1 of 6/, 'the part number and total must be in the opening bytes');
-  assert.match(opening, /\/paper\/6/, 'the map of every part must be in the opening bytes');
+  assert.match(opening, new RegExp(`part 1 of ${PART_COUNT}`), 'the part number and total must be in the opening bytes');
+  assert.match(opening, new RegExp(`/paper/${PART_COUNT}`), 'the map of every part must be in the opening bytes');
   assert.match(opening, /Nothing is abridged/i);
   assert.ok(Buffer.byteLength(r.body) < 60_000,
     `a part must fit inside a single fetch (got ${Buffer.byteLength(r.body)} bytes)`);
@@ -121,7 +132,14 @@ test('the whole document is still complete and still served', async () => {
   const { proof } = perpGateExhibit();
   assert.ok(md.includes(proof.contentHash),
     "Appendix C's content hash must survive into the edition a machine actually reads");
-  assert.equal((md.match(/^\| --- \|/gm) || []).length, 11, 'all 11 tables must survive');
+  // Counted from the HTML rather than written down, for the same reason as PART_COUNT above: the
+  // property worth asserting is that every table in the source survives the conversion, not that
+  // there happen to be eleven of them. A literal here goes red when the paper gains a table, which
+  // is a change the paper is allowed to make.
+  const tablesInSource = (readFileSync(new URL('../assets/whitepaper.html', import.meta.url), 'utf8')
+    .match(/<table[\s>]/g) || []).length;
+  assert.equal((md.match(/^\| --- \|/gm) || []).length, tablesInSource,
+    `all ${tablesInSource} tables must survive`);
 });
 
 test('the tail of the document is reachable in one fetch, which is what failed before', async () => {

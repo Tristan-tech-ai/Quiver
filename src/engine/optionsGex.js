@@ -85,7 +85,13 @@ export function computeGex(options, spot, { mult = 1 } = {}) {
       dealerVolgaUsdPerVolPt: round(netVolga, 0),
       vannaVolgaNote: `Second-order vol greeks under the same assumed dealer sign as NetGEX. dealerVanna = USD of delta the dealer book gains per +1 vol-point rise in IV: ${netVanna >= 0 ? 'positive → a vol spike lengthens dealer delta, so they SELL into it (a spot↓/vol↑ feedback that can accelerate down-moves)' : 'negative → a vol spike shortens dealer delta, so they BUY (dampening)'}. dealerVolga = USD of vega gained per +1 vol-point (vega convexity of the book).`,
     },
-    assumption: 'Dealer positioning is ASSUMED (dealers long call gamma / short put gamma), not observed; NetGEX = call GEX − put GEX, weighted by open interest. We do NOT infer the dealer sign from trade flow: Deribit\'s public feed carries no block-trade tag and reports block-trade direction from the maker side (verified), so a flow-based dealer position would be invertible for much of the volume. The OI-based convention is a transparent assumption; treat GEX as a positioning map under that convention, not measured dealer inventory.',
+    // This string used to say the public feed "carries no block-trade tag ... (verified)". It does
+    // carry one — `block_trade_id`, `block_trade_leg_count`, and `block_rfq_id` on ETH — and the
+    // tagged share of contract volume is large: 48.9% of BTC and 30.2% of ETH option volume in a
+    // 200-trade window sampled 27 July 2026. Shipping a false premise to a paying caller with the
+    // word "verified" attached is worse than shipping no premise at all, so the reason is restated
+    // as the one that actually holds, and the part that is still unmeasured is labelled as such.
+    assumption: 'Dealer positioning is ASSUMED (dealers long call gamma / short put gamma), not observed; NetGEX = call GEX − put GEX, weighted by open interest. We do NOT infer the dealer sign from trade flow, and the reason is attribution rather than tagging: the public feed DOES mark block trades (block_trade_id / block_trade_leg_count), so they are identifiable, but a trade\'s reported direction identifies the side it was booked from, not whether the dealer was the buyer or the seller — and whether the block maker is a dealer at all is not something this feed states. A flow-based dealer sign would therefore be invertible on exactly the largest trades. The OI-based convention is a transparent assumption; treat GEX as a positioning map under that convention, not measured dealer inventory.',
     strikesUsed: usable.length,
   };
 }

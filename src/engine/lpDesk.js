@@ -105,7 +105,11 @@ export async function lpDesk({ chain = 'ethereum', pool, days = 2, capital = 100
   return {
     ok: true, service: 'lp-desk', chain, pool,
     poolMeta: { token0: meta.token0, token1: meta.token1, feeTierPct: meta.feeTierPct, decimals: [meta.d0, meta.d1] },
-    window: { swaps: rows.length, days: round(spanDays, 1), realisedVolPctPerDay: round(sigDaily * 100, 2), capitalUsd: capital, gasUsdPerRebalance: gasUsd },
+    // The block range was already sitting on every row the replay iterates (`block`, decoded from the
+    // log), and reporting only "days and swap count" made the most reproducible input in the catalogue
+    // unpinnable: a reader could not re-fetch the identical window. Naming the endpoints costs two
+    // fields and turns "we replayed real swaps" into something someone else can replay.
+    window: { swaps: rows.length, days: round(spanDays, 1), firstBlock: rows[0].block, lastBlock: rows[rows.length - 1].block, realisedVolPctPerDay: round(sigDaily * 100, 2), capitalUsd: capital, gasUsdPerRebalance: gasUsd },
     yourRange: asked ? { ...asked, verdict: asked.lpVsHodlPct < 0 ? 'this range LOST to simply holding the two tokens, over this window' : 'this range beat holding, over this window' } : null,
     sweep,
     oracle: { bestWidthPct: best.widthPct, bestLpVsHodlPct: best.lpVsHodlPct, hardcoded5pctLpVsHodlPct: w5 ? w5.lpVsHodlPct : null, maxGainOverHardcodedPct: w5 ? round(best.lpVsHodlPct - w5.lpVsHodlPct, 3) : null, curveSpreadPct: round(spread, 3) },

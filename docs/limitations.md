@@ -41,10 +41,17 @@ margin mode as an assumption rather than as isolated.
 
 ### 3. [structural] Dealer positioning in GEX is an assumption
 
-The sign convention assumes dealers are long call gamma and short put gamma. It cannot be replaced by
-a flow-inferred position: Deribit's public feed reports block-trade direction from the maker side and
-carries no block tag, so a flow-based sign would be invertible for much of the volume. GEX is a
-positioning map under a stated convention, not measured inventory.
+The sign convention assumes dealers are long call gamma and short put gamma. An earlier version of
+this page, and of the service's own output, said the public feed "carries no block tag". It does —
+`block_trade_id` and `block_trade_leg_count`, plus `block_rfq_id` on ETH — so block trades are
+identifiable, and that justification was simply false.
+
+The obstacle is attribution, not tagging. A trade's reported direction names the side it was booked
+from, not whether a dealer was the buyer or the seller, and nothing in the feed says whether a block
+maker is a dealer at all. Since block-tagged trades are a large share of volume — **48.9% of BTC and
+30.2% of ETH option contract volume** in a 200-trade window sampled 27 July 2026 — a flow-based sign
+would be invertible on exactly the largest trades. GEX is a positioning map under a stated
+convention, not measured inventory.
 
 ### 4. [structural] The variance risk premium is not statistically significant
 
@@ -61,8 +68,17 @@ service already has, which makes this unbuilt work rather than a property of the
 
 ### 6. [scheduled] Transaction simulation is single-transaction and single-block
 
-It does not model multi-transaction bundles, sandwich or other MEV exposure, or custom state
-overrides. Spender reputation uses reachable on-chain signals; a verified-source check and an
+It prices one call at one block. Two of the three things this item used to bundle together are not
+blocked at all: the adapter already speaks `eth_simulateV1`, which *is* a bundle simulator, and the
+array it passes simply has one element. Measured against the first public RPC in the service's own
+list, with no key: a three-call bundle carried state between calls (an allowance moving 0 → 1,000,000
+across an `approve` in the middle), `stateOverrides` were accepted, and a two-block simulation ran.
+Multi-transaction bundles and custom state overrides are therefore unbuilt work, not a missing
+capability.
+
+What remains genuinely out of reach for a stateless HTTP service is the MEV half: sandwich exposure
+needs a view of the pending mempool, which this service does not have and will not fabricate.
+Separately, spender reputation uses reachable on-chain signals; a verified-source check and an
 approval graph would need an indexer that is not wired.
 
 ### 7. [structural] The exchange tape can be a sampled feed

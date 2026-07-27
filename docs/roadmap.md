@@ -89,12 +89,19 @@ shipping in the version described here, and each is disclosed in the relevant se
      whoever holds that secret can forge a proof. Phase 1 is the public Hermez ceremony and is fine.
      The remedy is removing the per-circuit ceremony rather than organising one: the same circuit
      compiles under **Plonk over that same public reference string**, run end to end — setup, prove
-     and verify all pass. *Done:* Plonk is the published artifact and this reduces to a note about
+     and verify all pass. That is checkable rather than asserted: the Plonk verification key, proof
+     and public signals are committed at [`research/zk/build/`](../research/zk/build), so
+     `snarkjs plonk verify vk_plonk.json public_plonk.json proof_plonk.json` answers from a clone.
+     Re-verified against those exact files on 27 July 2026 — Plonk OK, Groth16 OK over byte-identical
+     public signals, and a control with one public signal incremented by one was rejected, so the
+     verifier can fail. *Done:* Plonk is the published artifact and this reduces to a note about
      proof size.
-5. **A block range on the concentrated-liquidity replay.** `lp-desk` replays real on-chain swaps —
-   the most reproducible input here — then reports the window in days and swap count rather than the
-   block range it walked. *Done:* the response names the first and last block and the node it read
-   them from.
+5. **A block range on the concentrated-liquidity replay — shipped.** `lp-desk` replays real on-chain
+   swaps, the most reproducible input here, and now names the range it walked: `firstBlock` and
+   `lastBlock` beside the day count and swap count, so a reader re-fetches the identical window
+   rather than an approximately similar one. The block numbers were already on every log the replay
+   iterated; not publishing them was the defect and the fix was two fields. *Remaining:* the response
+   does not yet name which node it read them from.
 6. **Cross-region redundancy behind a custom domain.** *Done:* the registered endpoint resolves
    through a domain we control, a second region can serve it, and the published availability record
    shows the improvement rather than asserting it.
@@ -102,7 +109,7 @@ shipping in the version described here, and each is disclosed in the relevant se
    one of them has a runtime question. The *code* hash is `sha256` over the engine's source bytes and
    performs no arithmetic at all, so it is runtime-independent by construction rather than by promise
    — and that is checkable: feeding the same file list through coreutils `sha256sum`, outside
-   JavaScript entirely, returns `q1-404d7ab899d32fef`, the identical string the service serves.
+   JavaScript entirely, returns `q1-6f46d53490b3a29f`, the identical string the service serves.
    `/build` publishes the selection and ordering rule alongside the hash so the recomputation can be
    done in any language. The residual risk is the *content* hash, over computed floating-point
    results: basic IEEE-754 arithmetic is bit-identical across platforms, transcendentals

@@ -30,7 +30,7 @@ const ZK = path.join(SCRIPTS, '..');
 // Artifacts a reader must find in the checkout, not just in the author's build directory.
 // padprobe is a measuring stick for zk/scripts/domain-scaling.mjs, not a Quiver statement, but it is
 // still an artifact a reader needs in order to reproduce the timing table.
-const CIRCUITS = ['kelly', 'concentration', 'divergence', 'constantproduct', 'padprobe'];
+const CIRCUITS = ['kelly', 'concentration', 'divergence', 'constantproduct', 'padprobe', 'greeks'];
 const REQUIRED_ARTIFACTS = CIRCUITS.flatMap((c) => [
   `build/${c}.r1cs`,
   `build/${c}_plonk.zkey`,

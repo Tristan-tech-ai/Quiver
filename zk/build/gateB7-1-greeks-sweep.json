@@ -1,0 +1,12 @@
+{
+  "at": "2026-07-28T10:48:29.240Z",
+  "passed": false,
+  "samples": 4000,
+  "kept": 3956,
+  "outOfDomain": 0,
+  "tooSmall": 44,
+  "worstRootRatio": 0.7369453627975431,
+  "worstTenorRatio": 1.228300922973867,
+  "worstGreekRelative": 0.607716844,
+  "suggestedRelativeDivisor": 1
+}

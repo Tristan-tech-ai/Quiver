@@ -1,14 +1,14 @@
-// eth_getProof state anchoring — Merkle-Patricia verification against a block's stateRoot.
+// eth_getProof state anchoring. Merkle-Patricia verification against a block's stateRoot.
 //
 // WHAT THIS PROVES, EXACTLY. A verified proof says: "a state trie whose root is R contains value V at
 // key K". Nothing more. Three separate links have to hold before that is worth anything, and each one
 // is a different kind of claim:
 //
-//   1. TRIE  — keccak-chained nodes from R down to the leaf. Pure cryptography, no trust. (verifyMpt)
-//   2. HEADER — R is the stateRoot inside a header whose keccak256(rlp(header)) equals the reported
+//   1. TRIE , keccak-chained nodes from R down to the leaf. Pure cryptography, no trust. (verifyMpt)
+//   2. HEADER. R is the stateRoot inside a header whose keccak256(rlp(header)) equals the reported
 //      blockHash. Also pure cryptography, and it is the link that stops an RPC handing back a stateRoot
 //      that belongs to no block at all. (headerHash)
-//   3. CANONICITY — that blockHash is the one the network actually agreed on at that height. This is
+//   3. CANONICITY, that blockHash is the one the network actually agreed on at that height. This is
 //      NOT cryptography and this module CANNOT close it. All it can do is ask several independent
 //      operators and report whether they agree. (corroborateHeader)
 //
@@ -26,7 +26,7 @@
 //   rpc.mevblocker.io                     head-1,000,000 (full archive) head-100,000 +
 //   eth.api.onfinality.io/public          head-256, refuses head-1024   head-100,000 +
 //   ethereum-rpc.publicnode.com           head-64,  refuses head-128    head-100,000 +
-//   arb1.arbitrum.io/rpc                  head-256, refuses head-1024   —
+//   arb1.arbitrum.io/rpc                  head-256, refuses head-1024   (n/a)
 //   mainnet.base.org                      shallow only, rate-limits hard after a few calls
 //   base-rpc.publicnode.com               REFUSES ("maximum proof window") at every depth tried
 //
@@ -35,14 +35,14 @@
 //   1. Serving eth_call or eth_getLogs does NOT imply serving eth_getProof, so this list is its own
 //      list and is not inherited from evmrpc.js / univ3.js. It is ORDERED BY MEASURED DEPTH, not by
 //      latency, because a fast node that refuses the height is worth nothing to an anchor.
-//   2. HEADERS survive at depth on every operator even where PROOFS do not — all three mainnet
+//   2. HEADERS survive at depth on every operator even where PROOFS do not, all three mainnet
 //      operators returned the identical blockHash at head-100,000. So the proof needs one archive
 //      node while the ROOT it is checked against stays corroborable by three. That asymmetry is the
 //      only reason multi-operator corroboration is available for a historical window at all.
 //
 //   • Header RLP reconstructs the blockHash with 21 fields on ethereum and base (through requestsHash)
 //     and 16 on arbitrum (through baseFeePerGas). The tail is OPTIONAL and version-dependent, so the
-//     encoder stops at the first absent field and REFUSES if the hash does not come out — it never
+//     encoder stops at the first absent field and REFUSES if the hash does not come out, it never
 //     guesses which fork it is talking to.
 import { keccak256, encodeRlp, decodeRlp, getBytes, hexlify } from 'ethers';
 
@@ -58,7 +58,7 @@ const PROOF_RPCS = {
     { url: 'https://arb1.arbitrum.io/rpc', operator: 'Offchain Labs', proofDepth: 256 },
   ],
   base: [
-    // Kept because it does answer, and excluded from nothing — but it rate-limits within a handful of
+    // Kept because it does answer, and excluded from nothing, but it rate-limits within a handful of
     // calls and has returned "no state found" four blocks behind its own head. A gate that runs a
     // batch of Base proofs will go red on rate limits, which is NOT a cryptographic failure and must
     // never be reported as one.
@@ -74,7 +74,7 @@ export const EMPTY_TRIE_ROOT = '0x56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cad
 
 // A TRANSPORT failure and a VERIFICATION failure are different events and must never be reported as
 // the same thing. Measured the hard way: a free node under load stops answering JSON and starts
-// serving an HTML rate-limit page, which JSON.parse rejects — and a gate that read that as "the proof
+// serving an HTML rate-limit page, which JSON.parse rejects, and a gate that read that as "the proof
 // did not verify" would report a cryptographic failure that never happened. Everything below marks
 // transport errors so callers can retry or skip them, and nothing marks a bad proof that way.
 function markTransport(e) { e.transport = true; return e; }
@@ -92,7 +92,7 @@ async function call(url, method, params, timeoutMs = 20000) {
   const text = await r.text().catch(() => '');
   let j;
   try { j = JSON.parse(text); }
-  catch { throw markTransport(new Error(`${method}: HTTP ${r.status}, non-JSON reply (${text.slice(0, 60).replace(/\s+/g, ' ')}) — rate limit or gateway page, not an RPC answer`)); }
+  catch { throw markTransport(new Error(`${method}: HTTP ${r.status}, non-JSON reply (${text.slice(0, 60).replace(/\s+/g, ' ')}), rate limit or gateway page, not an RPC answer`)); }
   if (j.error) {
     const msg = String(j.error.message || JSON.stringify(j.error));
     const e = new Error(`${method}: ${msg.slice(0, 160)}`);
@@ -177,7 +177,7 @@ export function headerHash(blk) {
   try { hash = keccak256(encodeRlp(items)); } catch (e) { return { ok: false, reason: `header RLP failed: ${String(e.message).slice(0, 80)}` }; }
   const reported = String(blk.hash || '').toLowerCase();
   if (hash.toLowerCase() !== reported) {
-    return { ok: false, hash, reported, fields: used, reason: `recomputed header hash ${hash} != reported ${reported} — the ${used.length}-field encoding does not match this chain/fork, so stateRoot is NOT pinned to a block. Refusing rather than trusting the stateRoot on the node's word.` };
+    return { ok: false, hash, reported, fields: used, reason: `recomputed header hash ${hash} != reported ${reported}, the ${used.length}-field encoding does not match this chain/fork, so stateRoot is NOT pinned to a block. Refusing rather than trusting the stateRoot on the node's word.` };
   }
   return { ok: true, hash, fields: used, fieldCount: used.length };
 }
@@ -209,7 +209,7 @@ const isList = (x) => Array.isArray(x);
  * @returns { ok, kind:'inclusion'|'exclusion', value (hex RLP payload | null), reason, nodesUsed }
  *
  * Both outcomes are PROOFS. An exclusion proof is what makes "this storage slot is zero" a verified
- * statement instead of an absence of evidence — which matters directly: calldata-x's `isProxy:false`
+ * statement instead of an absence of evidence, which matters directly: calldata-x's `isProxy:false`
  * rests on three EIP-1967 slots being empty, and a verifier that could not prove emptiness would have
  * to report "unknown" for every non-proxy contract on chain.
  */
@@ -225,7 +225,7 @@ export function verifyMpt(rootHex, keyHex, nodesHex) {
   if (nodesHex.length === 0) {
     return root === EMPTY_TRIE_ROOT
       ? { ok: true, kind: 'exclusion', value: null, nodesUsed: 0, reason: 'empty trie' }
-      : { ok: false, reason: 'empty proof against a non-empty root — proves nothing (an absent proof is not an exclusion proof)' };
+      : { ok: false, reason: 'empty proof against a non-empty root, proves nothing (an absent proof is not an exclusion proof)' };
   }
 
   let expect = root;          // a 32-byte hash we must match next...
@@ -242,7 +242,7 @@ export function verifyMpt(rootHex, keyHex, nodesHex) {
       let raw;
       try { raw = getBytes(rawHex); } catch { return { ok: false, reason: `node ${used - 1} is not hex` }; }
       const h = keccak256(raw).toLowerCase();
-      if (h !== expect) return { ok: false, reason: `node ${used - 1} hashes to ${h.slice(0, 14)}… but its parent commits to ${expect.slice(0, 14)}… — the chain to the root is broken` };
+      if (h !== expect) return { ok: false, reason: `node ${used - 1} hashes to ${h.slice(0, 14)}… but its parent commits to ${expect.slice(0, 14)}…, the chain to the root is broken` };
       try { node = decodeRlp(raw); } catch (e) { return { ok: false, reason: `node ${used - 1} is not valid RLP: ${String(e.message).slice(0, 60)}` }; }
     }
     if (!isList(node)) return { ok: false, reason: `node ${used - 1} decoded to a string, not a trie node` };
@@ -260,7 +260,7 @@ export function verifyMpt(rootHex, keyHex, nodesHex) {
       }
       if (isList(child)) { embedded = child; continue; }
       const c = String(child).toLowerCase();
-      if (!/^0x[0-9a-f]{64}$/.test(c)) return { ok: false, reason: `branch child at depth ${step} is ${c.length / 2 - 1} bytes — neither a 32-byte hash nor an inlined node` };
+      if (!/^0x[0-9a-f]{64}$/.test(c)) return { ok: false, reason: `branch child at depth ${step} is ${c.length / 2 - 1} bytes, neither a 32-byte hash nor an inlined node` };
       expect = c;
       continue;
     }
@@ -283,9 +283,9 @@ export function verifyMpt(rootHex, keyHex, nodesHex) {
       expect = c;
       continue;
     }
-    return { ok: false, reason: `node ${used - 1} has ${node.length} items — not a 2-item or 17-item trie node` };
+    return { ok: false, reason: `node ${used - 1} has ${node.length} items, not a 2-item or 17-item trie node` };
   }
-  return { ok: false, reason: 'proof exceeded 128 levels — malformed' };
+  return { ok: false, reason: 'proof exceeded 128 levels, malformed' };
 }
 
 // A storage leaf holds RLP(minimal-big-endian value), so the leaf payload must be RLP-decoded once more.
@@ -316,13 +316,13 @@ export const accountKey = (address) => keccak256(String(address).toLowerCase());
 /**
  * Fetch and verify an eth_getProof for `address` at `slots` and `blockTag`.
  *
- * Returns { ok:false, reason } on ANY failure — a missing header field, a broken node chain, an RPC
+ * Returns { ok:false, reason } on ANY failure, a missing header field, a broken node chain, an RPC
  * that will not serve the height. It never degrades to "probably fine": an unverified proof is the
  * same as no proof, and the caller is not given a value it might mistake for an anchored one.
  */
 export async function anchorState({ chain = 'ethereum', address, slots = [], block, endpoint = null, corroborate = true } = {}) {
   const eps = endpoint ? [{ url: endpoint, operator: 'caller-supplied' }] : rotate(chain, proofEndpoints(chain));
-  if (!eps.length) return { ok: false, reason: `no eth_getProof endpoint is known for chain '${chain}' — refusing rather than guessing one (measured list: ${Object.keys(PROOF_RPCS).join(', ')})` };
+  if (!eps.length) return { ok: false, reason: `no eth_getProof endpoint is known for chain '${chain}', refusing rather than guessing one (measured list: ${Object.keys(PROOF_RPCS).join(', ')})` };
   if (!/^0x[0-9a-fA-F]{40}$/.test(String(address || ''))) return { ok: false, reason: `address '${address}' is not a 20-byte hex address` };
   const tag = typeof block === 'number' ? '0x' + block.toString(16) : String(block || 'latest');
   if (tag === 'latest') return { ok: false, reason: "refusing 'latest': an anchor must name a fixed height, or it proves nothing reproducible" };
@@ -341,14 +341,14 @@ export async function anchorState({ chain = 'ethereum', address, slots = [], blo
       if (!pf.result) throw markTransport(new Error('eth_getProof returned null'));
     } catch (e) { lastErr = `${ep.url}: ${String(e.message).slice(0, 150)}`; lastTransport = !!e.transport; continue; }
 
-    // LINK 2 — header preimage. Do this BEFORE trusting stateRoot for anything.
+    // LINK 2, header preimage. Do this BEFORE trusting stateRoot for anything.
     const hh = headerHash(blk);
     if (!hh.ok) return { ok: false, reason: `header verification failed on ${ep.url}: ${hh.reason}`, endpoint: ep.url };
 
     const stateRoot = String(blk.stateRoot).toLowerCase();
     const res = pf.result;
 
-    // LINK 1a — account proof against stateRoot.
+    // LINK 1a, account proof against stateRoot.
     const av = verifyMpt(stateRoot, accountKey(address), res.accountProof || []);
     if (!av.ok) return { ok: false, reason: `account proof does not verify against stateRoot ${stateRoot.slice(0, 14)}…: ${av.reason}`, endpoint: ep.url };
 
@@ -366,10 +366,10 @@ export async function anchorState({ chain = 'ethereum', address, slots = [], blo
       if (res.nonce != null && BigInt(res.nonce) !== account.nonce) echoMismatch.push(`nonce echo ${BigInt(res.nonce)} != proven ${account.nonce}`);
       if (res.codeHash && String(res.codeHash).toLowerCase() !== account.codeHash) echoMismatch.push('codeHash echo != proven');
       if (res.storageHash && String(res.storageHash).toLowerCase() !== account.storageHash) echoMismatch.push('storageHash echo != proven');
-      if (echoMismatch.length) return { ok: false, reason: `RPC's unproven echo contradicts the proven account leaf (${echoMismatch.join('; ')}) — refusing`, endpoint: ep.url };
+      if (echoMismatch.length) return { ok: false, reason: `RPC's unproven echo contradicts the proven account leaf (${echoMismatch.join('; ')}), refusing`, endpoint: ep.url };
     }
 
-    // LINK 1b — each storage proof against the PROVEN storageHash (never against the echoed one).
+    // LINK 1b, each storage proof against the PROVEN storageHash (never against the echoed one).
     const values = {};
     for (const sp of res.storageProof || []) {
       const slot = BigInt(sp.key);
@@ -378,13 +378,13 @@ export async function anchorState({ chain = 'ethereum', address, slots = [], blo
       const proven = sv.kind === 'exclusion' ? 0n : decodeStorageLeaf(sv.value);
       if (proven == null) return { ok: false, reason: `storage leaf for slot ${sp.key} did not RLP-decode to a value`, endpoint: ep.url };
       const echoed = BigInt(sp.value ?? '0x0');
-      if (echoed !== proven) return { ok: false, reason: `RPC echoed ${sp.value} for slot ${sp.key} but the proof commits to 0x${proven.toString(16)} — refusing the echo`, endpoint: ep.url };
+      if (echoed !== proven) return { ok: false, reason: `RPC echoed ${sp.value} for slot ${sp.key} but the proof commits to 0x${proven.toString(16)}, refusing the echo`, endpoint: ep.url };
       values['0x' + slot.toString(16)] = { value: proven, hex: '0x' + proven.toString(16).padStart(64, '0'), kind: sv.kind, nodes: (sp.proof || []).length };
     }
     const missing = slotHex.filter((s) => !(s in values));
-    if (missing.length) return { ok: false, reason: `RPC returned no storage proof for ${missing.join(', ')} — refusing a partial answer`, endpoint: ep.url };
+    if (missing.length) return { ok: false, reason: `RPC returned no storage proof for ${missing.join(', ')}, refusing a partial answer`, endpoint: ep.url };
 
-    // LINK 3 — canonicity. Not cryptography. Ask other operators and report, do not conclude.
+    // LINK 3, canonicity. Not cryptography. Ask other operators and report, do not conclude.
     let agreement = null;
     if (corroborate && eps.length > 1) agreement = await corroborateHeader(chain, tag, ep.url, blk.hash);
 
@@ -419,7 +419,7 @@ export async function anchorState({ chain = 'ethereum', address, slots = [], blo
       },
     };
   }
-  return { ok: false, transport: lastTransport, reason: `no eth_getProof endpoint served ${chain} at ${tag}: ${lastErr || 'unknown'}${lastTransport ? ' [TRANSPORT — a node would not serve the request; NOT a verification failure]' : ''}` };
+  return { ok: false, transport: lastTransport, reason: `no eth_getProof endpoint served ${chain} at ${tag}: ${lastErr || 'unknown'}${lastTransport ? ' [TRANSPORT, a node would not serve the request; NOT a verification failure]' : ''}` };
 }
 
 /**
@@ -447,7 +447,7 @@ export async function corroborateHeader(chain, tag, primaryUrl, primaryHash) {
     disagree: answered.filter((r) => r.hash !== want).map((r) => ({ operator: r.operator, hash: r.hash })),
     operators: [primaryUrl, ...agree.map((r) => r.url)],
     sources: rows,
-    meaning: 'Operator agreement on a blockHash. NOT a proof of canonicity — it raises the cost of a forgery from one compromised endpoint to all of them, and nothing more.',
+    meaning: 'Operator agreement on a blockHash. NOT a proof of canonicity, it raises the cost of a forgery from one compromised endpoint to all of them, and nothing more.',
   };
 }
 
@@ -456,7 +456,7 @@ export async function corroborateHeader(chain, tag, primaryUrl, primaryHash) {
 //
 // These are the ones that come out BEST, and it is worth being precise about why: calldata-x's
 // spender verdict does not rest on a derived aggregate or an off-chain quote, it rests on three
-// things that are literally fields of the account leaf and of the storage trie —
+// things that are literally fields of the account leaf and of the storage trie:
 //   • contract-vs-EOA   -> account.codeHash (EOA iff keccak256('') )
 //   • codeSizeBytes     -> the code preimage, bound to the PROVEN codeHash
 //   • outboundTxCount   -> account.nonce, verbatim
@@ -474,7 +474,7 @@ export const PROXY_SLOTS = {
 
 /**
  * Anchor the account-level quantities calldata-x reports about a spender or target.
- * `withCode: true` also fetches eth_getCode and binds it to the PROVEN codeHash — without that step
+ * `withCode: true` also fetches eth_getCode and binds it to the PROVEN codeHash, without that step
  * "codeSizeBytes" is still just the node's word, even though codeHash is proven.
  */
 export async function anchorAddress({ chain = 'ethereum', address, block, withCode = true, corroborate = true, endpoint = null } = {}) {
@@ -489,7 +489,7 @@ export async function anchorAddress({ chain = 'ethereum', address, block, withCo
   const proxy = { isProxy: false, standard: null, implementation: null, provenSlots: {} };
   for (const [name, slotHex] of Object.entries(PROXY_SLOTS)) {
     const s = readSlot(slotHex);
-    if (!s) return { ok: false, reason: `no proof returned for ${name} slot — refusing a partial proxy verdict` };
+    if (!s) return { ok: false, reason: `no proof returned for ${name} slot, refusing a partial proxy verdict` };
     proxy.provenSlots[name] = { value: '0x' + s.value.toString(16), proofKind: s.kind };
     if (s.value !== 0n && !proxy.isProxy) {
       proxy.isProxy = true;
@@ -499,10 +499,10 @@ export async function anchorAddress({ chain = 'ethereum', address, block, withCo
   }
   // "not a proxy" is only sound if every slot came back as a VERIFIED exclusion (or a proven zero).
   // An unverified absence would let a malicious node hide an upgradeable implementation by simply
-  // omitting the proof — which is exactly the failure calldata-x's UPGRADEABLE_PROXY_TARGET flag exists
+  // omitting the proof, which is exactly the failure calldata-x's UPGRADEABLE_PROXY_TARGET flag exists
   // to catch, so it is not allowed to be silent here.
   const allProven = Object.values(proxy.provenSlots).every((p) => p.proofKind === 'inclusion' || p.proofKind === 'exclusion');
-  if (!allProven) return { ok: false, reason: 'a proxy slot was neither proven present nor proven absent — refusing to report "not a proxy"' };
+  if (!allProven) return { ok: false, reason: 'a proxy slot was neither proven present nor proven absent, refusing to report "not a proxy"' };
 
   let codeCheck = null;
   let delegated = false;
@@ -515,12 +515,12 @@ export async function anchorAddress({ chain = 'ethereum', address, block, withCo
         const { result: codeHex } = await callRetry(a.endpoint, 'eth_getCode', [address, tag]);
         const h = keccak256(codeHex || '0x').toLowerCase();
         if (h !== a.account.codeHash) {
-          return { ok: false, reason: `eth_getCode returned bytecode hashing to ${h.slice(0, 14)}… but the PROVEN account codeHash is ${a.account.codeHash.slice(0, 14)}… — the node served code that is not this account's code. Refusing.` };
+          return { ok: false, reason: `eth_getCode returned bytecode hashing to ${h.slice(0, 14)}… but the PROVEN account codeHash is ${a.account.codeHash.slice(0, 14)}…, the node served code that is not this account's code. Refusing.` };
         }
         // EIP-7702: a delegated wallet carries exactly 23 bytes of 0xef0100 || address. Its codeHash is
         // NOT the empty hash, so `isEoa` is false and a naive reading calls it a contract. calldataX.js
-        // draws this distinction on purpose — its DANGER verdict for "unlimited approval to a wallet,
-        // not a protocol contract" keys on it — so an anchor that collapsed 7702 into "contract" would
+        // draws this distinction on purpose, its DANGER verdict for "unlimited approval to a wallet,
+        // not a protocol contract" keys on it, so an anchor that collapsed 7702 into "contract" would
         // quietly downgrade the exact alert it exists to support. Caught by measuring vitalik.eth,
         // which came back tier=contract with 23 bytes of code.
         delegated = /^0xef0100[0-9a-f]{40}$/i.test(String(codeHex || ''));
@@ -545,7 +545,7 @@ export async function anchorAddress({ chain = 'ethereum', address, block, withCo
       balanceWei: a.account.balance.toString(),
       proxy,
       code: codeCheck,
-      anchored: 'tier, outboundTxCount, balance and every proxy slot are read from the Merkle-verified account leaf and storage trie at this block — not from an eth_call the node could answer freely.',
+      anchored: 'tier, outboundTxCount, balance and every proxy slot are read from the Merkle-verified account leaf and storage trie at this block, not from an eth_call the node could answer freely.',
     },
   };
 }

@@ -1,4 +1,4 @@
-// GATE E — eth_getProof state anchoring for lp-desk and calldata-x.
+// GATE E, eth_getProof state anchoring for lp-desk and calldata-x.
 //
 // The claim under test is NOT "we can call eth_getProof". It is: a value this stack used can be shown
 // to be the value the chain's state trie committed at a named block, and a value that was NOT can be
@@ -13,7 +13,7 @@
 // server.
 //
 //   node --test gates/gateE-ethproof-anchor.mjs     (npm run gate:e)
-//   node gates/gateE-revert.mjs                     (npm run gate:e-revert) — proves it goes red
+//   node gates/gateE-revert.mjs                     (npm run gate:e-revert), proves it goes red
 //
 // Live-network gate. Network flakiness is tolerated ONLY where it is not the thing being measured:
 // a pool that cannot be fetched is skipped and counted, a proof that fetches and fails to verify is
@@ -64,7 +64,7 @@ async function rpc(method, params, url = null, timeoutMs = 30000) {
 
 const HEAD = parseInt(await rpc('eth_blockNumber', []), 16);
 // PIN sits inside the window ALL THREE mainnet operators can prove (measured: publicnode 64,
-// onfinality 256, mevblocker 1,000,000). That is deliberate — it lets the gate exercise real
+// onfinality 256, mevblocker 1,000,000). That is deliberate, it lets the gate exercise real
 // failover and real 3-of-3 agreement instead of leaning on the single archive node. E15 then goes
 // deliberately deep to record what is lost out there.
 const PIN = HEAD - 40;
@@ -100,13 +100,13 @@ function startTamperProxy(upstream) {
       try { payload = JSON.parse(body); } catch { res.writeHead(400).end('{}'); return; }
       try {
         // 'other-block': answer eth_getProof for a DIFFERENT height while the header stays honest.
-        // The header then verifies perfectly and the proof still has to be refused — which is the
+        // The header then verifies perfectly and the proof still has to be refused, which is the
         // "proof against the wrong state root" case, in the form an attacker would actually use.
         const params = (state.mode === 'other-block' && payload.method === 'eth_getProof')
           ? [payload.params[0], payload.params[1], state.swapBlockTag]
           : payload.params;
         // The proxy rotates its own upstream on a rate limit. Which honest node served the bytes is
-        // irrelevant — this test is about how the ADAPTER reacts to the tampered reply, and letting
+        // irrelevant, this test is about how the ADAPTER reacts to the tampered reply, and letting
         // an upstream 429 masquerade as a refusal would make the red half untrustworthy.
         const j = await upstreamJson({ ...payload, params });
         const out = tamper(j, payload.method, state.mode);
@@ -124,7 +124,7 @@ function tamper(j, method, mode) {
   const r = j.result;
   if (method === 'eth_getProof') {
     if (mode === 'fake-value' && r.storageProof?.[0]) {
-      // The proof is left intact and only the ECHO is changed — the attack against a caller that
+      // The proof is left intact and only the ECHO is changed, the attack against a caller that
       // reads `storageProof[i].value` without verifying the leaf it came from.
       r.storageProof[0].value = '0x1234567890abcdef';
     }
@@ -150,7 +150,7 @@ function tamper(j, method, mode) {
 
 // ---------------------------------------------------------------------------------------------
 
-test('E1 GREEN — a pool\'s slot0 and liquidity anchor to the block stateRoot, on several real pools', async () => {
+test('E1 GREEN, a pool\'s slot0 and liquidity anchor to the block stateRoot, on several real pools', async () => {
   let anchored = 0;
   for (const p of POOLS) {
     let st;
@@ -158,7 +158,7 @@ test('E1 GREEN — a pool\'s slot0 and liquidity anchor to the block stateRoot, 
     catch (e) { M.skipped.push(`${p.name}: transport ${String(e.message).slice(0, 60)}`); continue; }
     if (!st.ok && st.transport) { M.skipped.push(`${p.name}: TRANSPORT ${st.reason.slice(0, 60)}`); continue; }
     assert.equal(st.ok, true, `${p.name} failed to anchor: ${st.reason}`);
-    // The proven word must be internally consistent — this is the check that a wrong slot number or a
+    // The proven word must be internally consistent, this is the check that a wrong slot number or a
     // V3 fork trips, and it is adversary-independent arithmetic on the proven bytes.
     assert.ok(st.selfCheck.tickDelta <= 2, `${p.name}: sqrtPriceX96 implies tick ${st.selfCheck.impliedTick} but slot0 says ${st.proven.tick}`);
     assert.equal(st.layout.checked, true, `${p.name}: storage layout was not confirmed against the pool's own getters`);
@@ -169,15 +169,15 @@ test('E1 GREEN — a pool\'s slot0 and liquidity anchor to the block stateRoot, 
     if (st.agreement) M.agreements.push(`${st.agreement.agree}/${st.agreement.asked}`);
     anchored++;
   }
-  assert.ok(anchored >= 4, `only ${anchored} of ${POOLS.length} pools anchored — too few to call this measured (skips: ${M.skipped.join('; ')})`);
+  assert.ok(anchored >= 4, `only ${anchored} of ${POOLS.length} pools anchored, too few to call this measured (skips: ${M.skipped.join('; ')})`);
   console.log(`\n  E1: ${anchored}/${POOLS.length} pools anchored at block ${PIN}`);
 });
 
-test('E2 GREEN — lp-desk rows: every last-in-block row agrees with the proven slot0', async () => {
+test('E2 GREEN, lp-desk rows: every last-in-block row agrees with the proven slot0', async () => {
   const pool = POOLS[0].addr;
   const from = PIN - 60, to = PIN;
   const logs = await rpc('eth_getLogs', [{ address: pool, topics: [SWAP_TOPIC], fromBlock: '0x' + from.toString(16), toBlock: '0x' + to.toString(16) }]);
-  assert.ok(logs.length > 0, 'no swaps in the sampled window — cannot measure agreement');
+  assert.ok(logs.length > 0, 'no swaps in the sampled window, cannot measure agreement');
 
   // Group exactly the way lp-desk's rows arrive, then pick the terminal row BY logIndex (measured,
   // not by trusting array order).
@@ -193,7 +193,7 @@ test('E2 GREEN — lp-desk rows: every last-in-block row agrees with the proven 
     if (!res.ok && res.transport) { M.skipped.push(`row@${blk}: TRANSPORT`); continue; }
     tested++;
     assert.equal(res.ok, true, `block ${blk}: ${res.reason}`);
-    assert.equal(res.agree, true, `block ${blk}: the terminal swap's post-state does NOT match proven slot0 — ${JSON.stringify(res.fields)}`);
+    assert.equal(res.agree, true, `block ${blk}: the terminal swap's post-state does NOT match proven slot0, ${JSON.stringify(res.fields)}`);
     assert.equal(res.fields.sqrtPriceX96.match, true);
     assert.equal(res.fields.tick.match, true);
     agreed++;
@@ -206,12 +206,12 @@ test('E2 GREEN — lp-desk rows: every last-in-block row agrees with the proven 
   M.coverage.push({ liqAgreed, tested });
 });
 
-test('E3 RED — a fabricated storage VALUE must be refused (honest proof, lying echo)', async () => {
+test('E3 RED, a fabricated storage VALUE must be refused (honest proof, lying echo)', async () => {
   const px = await startTamperProxy(RPC);
   try {
     px.state.mode = 'honest';
     const ok = await anchorState({ chain: CHAIN, address: POOLS[0].addr, slots: [0, 4], block: PIN, endpoint: px.url, corroborate: false });
-    assert.equal(ok.ok, true, `control through the proxy failed: ${ok.reason} — a red test whose control is broken proves nothing`);
+    assert.equal(ok.ok, true, `control through the proxy failed: ${ok.reason}, a red test whose control is broken proves nothing`);
 
     px.state.mode = 'fake-value';
     const bad = await anchorState({ chain: CHAIN, address: POOLS[0].addr, slots: [0, 4], block: PIN, endpoint: px.url, corroborate: false });
@@ -221,7 +221,7 @@ test('E3 RED — a fabricated storage VALUE must be refused (honest proof, lying
   } finally { await px.close(); }
 });
 
-test('E4 RED — a leaf rewritten to encode a different value must be refused', async () => {
+test('E4 RED, a leaf rewritten to encode a different value must be refused', async () => {
   const px = await startTamperProxy(RPC);
   try {
     px.state.mode = 'fake-leaf';
@@ -232,7 +232,7 @@ test('E4 RED — a leaf rewritten to encode a different value must be refused', 
   } finally { await px.close(); }
 });
 
-test('E5 RED — a proof taken against the WRONG state root must be refused', async () => {
+test('E5 RED, a proof taken against the WRONG state root must be refused', async () => {
   const px = await startTamperProxy(RPC);
   try {
     // (a) the honest-looking version: header for block PIN, proof lifted from block PIN-5000.
@@ -244,7 +244,7 @@ test('E5 RED — a proof taken against the WRONG state root must be refused', as
     M.refusals.push(`other-block: ${bad.reason.slice(0, 80)}`);
 
     // (b) the crude version: a doctored stateRoot. The HEADER check catches this one before the trie
-    // is even walked, which is the point of link 2 — a stateRoot that belongs to no block is not a
+    // is even walked, which is the point of link 2, a stateRoot that belongs to no block is not a
     // root, and the failure names that rather than reporting a proof mismatch.
     px.state.mode = 'fake-stateroot';
     const bad2 = await anchorState({ chain: CHAIN, address: POOLS[0].addr, slots: [0], block: PIN, endpoint: px.url, corroborate: false });
@@ -254,7 +254,7 @@ test('E5 RED — a proof taken against the WRONG state root must be refused', as
   } finally { await px.close(); }
 });
 
-test('E6 RED — a truncated proof, and an absent proof, must both be refused', async () => {
+test('E6 RED, a truncated proof, and an absent proof, must both be refused', async () => {
   const px = await startTamperProxy(RPC);
   try {
     px.state.mode = 'drop-node';
@@ -273,7 +273,7 @@ test('E6 RED — a truncated proof, and an absent proof, must both be refused', 
   } finally { await px.close(); }
 });
 
-test('E7 RED — a lying account echo (nonce) must be refused', async () => {
+test('E7 RED, a lying account echo (nonce) must be refused', async () => {
   const px = await startTamperProxy(RPC);
   try {
     px.state.mode = 'fake-nonce';
@@ -284,7 +284,7 @@ test('E7 RED — a lying account echo (nonce) must be refused', async () => {
   } finally { await px.close(); }
 });
 
-test('E8 RED — code that does not hash to the proven codeHash must be refused', async () => {
+test('E8 RED, code that does not hash to the proven codeHash must be refused', async () => {
   const px = await startTamperProxy(RPC);
   const ROUTER = '0xe592427a0aece92de3edee1f18e0157c05861564';
   try {
@@ -305,7 +305,7 @@ test('E8 RED — code that does not hash to the proven codeHash must be refused'
   } finally { await px.close(); }
 });
 
-test('E9 RED — verifyMpt unit battery: every corruption must be caught', async () => {
+test('E9 RED, verifyMpt unit battery: every corruption must be caught', async () => {
   const raw = await rpc('eth_getProof', [POOLS[0].addr, ['0x0'], '0x' + PIN.toString(16)]);
   const blk = await rpc('eth_getBlockByNumber', ['0x' + PIN.toString(16), false]);
   const root = blk.stateRoot;
@@ -321,17 +321,17 @@ test('E9 RED — verifyMpt unit battery: every corruption must be caught', async
   ];
   for (const [name, fn] of cases) {
     const r = fn();
-    assert.equal(r.ok, false, `"${name}" was ACCEPTED — the verifier cannot fail`);
+    assert.equal(r.ok, false, `"${name}" was ACCEPTED, the verifier cannot fail`);
     M.refusals.push(`${name}: ${String(r.reason).slice(0, 70)}`);
   }
   // and the positive control, so this battery is not passing because everything returns false
   const honest = verifyMpt(raw.storageHash, storageKey(0n), sp.proof);
-  assert.equal(honest.ok, true, `the honest storage proof was refused: ${honest.reason} — the battery above would be vacuous`);
+  assert.equal(honest.ok, true, `the honest storage proof was refused: ${honest.reason}, the battery above would be vacuous`);
   assert.equal(honest.kind, 'inclusion');
   console.log(`  E9: ${cases.length} corruptions refused, honest control accepted`);
 });
 
-test('E10 RED — a contract that is not a V3 pool must be refused, not decoded', async () => {
+test('E10 RED, a contract that is not a V3 pool must be refused, not decoded', async () => {
   // USDC: real contract, real storage, and slot 0 is nothing like a V3 slot0.
   const bad = await anchorPoolState({ chain: CHAIN, pool: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', block: PIN, corroborate: false });
   assert.equal(bad.ok, false, 'a non-V3 contract was decoded as a pool');
@@ -348,13 +348,13 @@ test('E10 RED — a contract that is not a V3 pool must be refused, not decoded'
   assert.equal(s.ok, false, 'an inconsistent slot0 word was accepted');
 });
 
-test('E11 RED — an intra-block swap row must be refused as unanchorable, not silently compared', async () => {
+test('E11 RED, an intra-block swap row must be refused as unanchorable, not silently compared', async () => {
   const pool = POOLS[0].addr;
   const logs = await rpc('eth_getLogs', [{ address: pool, topics: [SWAP_TOPIC], fromBlock: '0x' + (PIN - 120).toString(16), toBlock: '0x' + PIN.toString(16) }]);
   const byBlock = new Map();
   for (const l of logs) { const b = parseInt(l.blockNumber, 16); if (!byBlock.has(b)) byBlock.set(b, []); byBlock.get(b).push(decodeSwapPostState(l)); }
   const multi = [...byBlock.entries()].find(([, v]) => v.length > 1);
-  assert.ok(multi, 'no multi-swap block in the window — cannot test the coverage boundary');
+  assert.ok(multi, 'no multi-swap block in the window, cannot test the coverage boundary');
   const rows = multi[1].sort((a, b) => a.logIndex - b.logIndex);
   const notLast = rows[0];
   const res = await anchorSwapRow({ chain: CHAIN, pool, block: multi[0], claimed: { sqrtPriceX96: notLast.sqrtPriceX96.toString(), tick: notLast.tick, liquidity: notLast.liquidity.toString() } });
@@ -365,7 +365,7 @@ test('E11 RED — an intra-block swap row must be refused as unanchorable, not s
   console.log(`  E11: block ${multi[0]} has ${rows.length} swaps; the non-terminal row is refused`);
 });
 
-test('E12 GREEN — calldata-x quantities anchor, including the empty-slot case', async () => {
+test('E12 GREEN, calldata-x quantities anchor, including the empty-slot case', async () => {
   const cases = [
     { name: 'USDC (legacy zeppelinos proxy)', addr: '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48', wantProxy: true, wantTier: 'contract' },
     { name: 'Uniswap V3 SwapRouter', addr: '0xe592427a0aece92de3edee1f18e0157c05861564', wantProxy: false, wantTier: 'contract' },
@@ -376,14 +376,14 @@ test('E12 GREEN — calldata-x quantities anchor, including the empty-slot case'
     assert.equal(r.reputation.tier, c.wantTier, `${c.name}: tier ${r.reputation.tier}`);
     assert.equal(r.reputation.proxy.isProxy, c.wantProxy, `${c.name}: proxy verdict ${r.reputation.proxy.isProxy}`);
     assert.ok(r.reputation.codeSizeBytes > 0, `${c.name}: code size not bound to the proven codeHash`);
-    // every proxy slot must be PROVEN either present or absent — never merely unreported
+    // every proxy slot must be PROVEN either present or absent, never merely unreported
     for (const [slot, p] of Object.entries(r.reputation.proxy.provenSlots)) {
       assert.ok(p.proofKind === 'inclusion' || p.proofKind === 'exclusion', `${c.name}: ${slot} was ${p.proofKind}`);
     }
     if (!c.wantProxy) assert.ok(Object.values(r.reputation.proxy.provenSlots).every((p) => p.proofKind === 'exclusion'), `${c.name}: "not a proxy" must rest on exclusion proofs`);
     console.log(`  E12 ${c.name}: tier=${r.reputation.tier} nonce=${r.reputation.outboundTxCount} code=${r.reputation.codeSizeBytes}B proxy=${r.reputation.proxy.isProxy ? r.reputation.proxy.standard : 'none (3 exclusion proofs)'}`);
   }
-  // EIP-7702: a delegated wallet has non-empty code and must NOT be reported as a contract — that
+  // EIP-7702: a delegated wallet has non-empty code and must NOT be reported as a contract, that
   // distinction is what calldata-x's DANGER verdict for "approval to a wallet" keys on.
   const v = await anchorAddress({ chain: CHAIN, address: '0xd8da6bf26964af9d7eed9e03e53415d37aa96045', block: PIN, corroborate: false });
   if (v.ok && v.reputation.codeSizeBytes === 23) {
@@ -392,7 +392,7 @@ test('E12 GREEN — calldata-x quantities anchor, including the empty-slot case'
   }
 });
 
-test('E13 CONTROL — repeated honest runs must not produce a single false refusal', async () => {
+test('E13 CONTROL, repeated honest runs must not produce a single false refusal', async () => {
   let refusals = 0, runs = 0;
   for (let i = 0; i < 5; i++) {
     const st = await anchorPoolState({ chain: CHAIN, pool: POOLS[0].addr, block: PIN - i, corroborate: false });
@@ -400,17 +400,17 @@ test('E13 CONTROL — repeated honest runs must not produce a single false refus
     if (!st.ok) { if (st.transport) { M.skipped.push('control: TRANSPORT'); runs--; } else refusals++; }
     if (st.ok) M.latencies.push(st.latencyMs);
   }
-  assert.equal(refusals, 0, `${refusals} false refusals in ${runs} honest runs — the gate is strict rather than correct`);
+  assert.equal(refusals, 0, `${refusals} false refusals in ${runs} honest runs, the gate is strict rather than correct`);
   console.log(`  E13: ${runs} honest runs, 0 false refusals`);
 });
 
-test('E15 — at lp-desk\'s real window depth, the anchor survives but the corroboration thins out', async () => {
+test('E15, at lp-desk\'s real window depth, the anchor survives but the corroboration thins out', async () => {
   // lp-desk's default pull is 2 days = ~14,400 mainnet blocks. That is outside the proof window of
   // two of the three operators, so this records what an anchor at that depth actually gets: one
-  // server for the PROOF, and — the part that saves it — still three for the ROOT.
+  // server for the PROOF, and, the part that saves it, still three for the ROOT.
   const deep = HEAD - 14400;
   const st = await anchorPoolState({ chain: CHAIN, pool: POOLS[0].addr, block: deep, corroborate: true });
-  if (!st.ok && st.transport) { console.log(`  E15: SKIPPED (transport) — ${st.reason.slice(0, 90)}`); M.skipped.push('deep anchor'); return; }
+  if (!st.ok && st.transport) { console.log(`  E15: SKIPPED (transport), ${st.reason.slice(0, 90)}`); M.skipped.push('deep anchor'); return; }
   assert.equal(st.ok, true, `deep anchor failed: ${st.reason}`);
   assert.ok(st.selfCheck.tickDelta <= 2);
 
@@ -422,26 +422,26 @@ test('E15 — at lp-desk\'s real window depth, the anchor survives but the corro
   }
   const agreed = st.agreement ? st.agreement.agree : 1;
   console.log(`  E15 at head-14400 (lp-desk's 2-day window): proof servable by ${canProve.length}/${proofEndpoints(CHAIN).length} operators (${canProve.join(', ')}); blockHash agreed by ${agreed}/${st.agreement?.asked ?? 1}`);
-  assert.ok(agreed >= 2, `only ${agreed} operator(s) could corroborate the root at depth — the anchor would rest on a single server end to end`);
+  assert.ok(agreed >= 2, `only ${agreed} operator(s) could corroborate the root at depth, the anchor would rest on a single server end to end`);
   M.latencies.push(st.latencyMs);
   M.sizes.push({ pool: 'deep', bytes: st.size.totalProofBytes });
 });
 
-test('E14 — the coverage table must not claim more than the code delivers', async () => {
+test('E14, the coverage table must not claim more than the code delivers', async () => {
   // The coverage statement is data, not prose, so it can be asserted on. These are the two claims
   // that would do real damage if they drifted, so they are pinned here rather than trusted.
   const amounts = LP_DESK_COVERAGE.find((r) => /amount0/.test(r.quantity));
-  assert.equal(amounts.anchored, 'NO', 'the coverage table claims swap amounts are anchorable — they are in the receipts trie, which eth_getProof never touches');
+  assert.equal(amounts.anchored, 'NO', 'the coverage table claims swap amounts are anchorable, they are in the receipts trie, which eth_getProof never touches');
   const dec = LP_DESK_COVERAGE.find((r) => /decimals/.test(r.quantity));
   assert.equal(dec.anchored, 'NO');
   const sim = CALLDATA_X_COVERAGE.find((r) => /simulation/.test(r.quantity));
-  assert.equal(sim.anchored, 'NO', 'the coverage table claims eth_simulateV1 output is anchorable — it is a counterfactual, not committed state');
+  assert.equal(sim.anchored, 'NO', 'the coverage table claims eth_simulateV1 output is anchorable, it is a counterfactual, not committed state');
   // NOT ONE lp-desk quantity is anchored outright by a storage proof. The single 'YES' in the table is
   // the block number/timestamp, and it says "BY A DIFFERENT MECHANISM" because it is a header field
   // and no state trie is involved. If a future edit ever promotes a row to a bare 'YES', that is the
   // claim outrunning the build, and this line is what catches it.
   const bareYes = LP_DESK_COVERAGE.filter((r) => r.anchored === 'YES');
-  assert.equal(bareYes.length, 0, `lp-desk coverage now claims ${bareYes.length} quantities are outright anchored (${bareYes.map((r) => r.quantity).join(', ')}) — no storage proof delivers that`);
+  assert.equal(bareYes.length, 0, `lp-desk coverage now claims ${bareYes.length} quantities are outright anchored (${bareYes.map((r) => r.quantity).join(', ')}), no storage proof delivers that`);
   assert.equal(LP_DESK_COVERAGE.filter((r) => r.anchored.startsWith('PARTIAL')).length, 3);
 
   // and the summary
@@ -455,7 +455,7 @@ test('E14 — the coverage table must not claim more than the code delivers', as
   console.log(`  operator agreement on blockHash:         ${[...new Set(M.agreements)].join(', ') || 'n/a'}`);
   if (cov) console.log(`  lp-desk coverage (${cov.pool}):      ${cov.blocks} of ${cov.swaps} rows are last-in-block = ${cov.pctLastInBlock.toFixed(1)}% anchorable`);
   console.log(`  refusals exercised:                      ${M.refusals.length}`);
-  if (M.skipped.length) console.log(`  skipped (transport, NOT verification):   ${M.skipped.length} — ${M.skipped.slice(0, 3).join('; ')}`);
+  if (M.skipped.length) console.log(`  skipped (transport, NOT verification):   ${M.skipped.length}, ${M.skipped.slice(0, 3).join('; ')}`);
   console.log('=== end measurements ===\n');
-  assert.ok(M.refusals.length >= 12, `only ${M.refusals.length} refusals exercised — the red half is too thin to trust the green half`);
+  assert.ok(M.refusals.length >= 12, `only ${M.refusals.length} refusals exercised, the red half is too thin to trust the green half`);
 });

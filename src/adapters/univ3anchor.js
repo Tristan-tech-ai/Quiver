@@ -10,7 +10,7 @@
 // tick are all decoded out of `log.data`. Event logs are committed to the **receiptsRoot**.
 // `eth_getProof` proves the **stateRoot**. They are different tries, and no eth_getProof of any
 // depth or size will ever contain a Swap event. The remaining pool metadata (token0/token1/fee) is
-// `immutable` in Solidity, which means it lives in the deployed BYTECODE and not in storage either —
+// `immutable` in Solidity, which means it lives in the deployed BYTECODE and not in storage either.
 // measured here: slots 0-9 of the ETH/USDC pool contain slot0/feeGrowth/protocolFees/liquidity/
 // observations and no token addresses at all.
 //
@@ -19,7 +19,7 @@
 //   slot0.sqrtPriceX96 and slot0.tick are written ONLY by swap(). Mint, Burn, Collect and Flash do
 //   not touch them. Therefore, at the END of a block, storage slot 0 must equal the post-state that
 //   the LAST Swap event in that block emitted. Proving slot 0 at block B therefore proves the last
-//   Swap row of block B — not the ones before it.
+//   Swap row of block B, not the ones before it.
 //
 // That invariant is asserted here and MEASURED by the gate, never assumed. Its cost is the coverage
 // ceiling, measured on live pools 2026-07-28:
@@ -42,7 +42,7 @@ export const V3_SLOTS = {
   feeGrowthGlobal1X128: 2,
   protocolFees: 3,             // packed: uint128 token0 | uint128 token1
   liquidity: 4,
-  ticks: 5,                    // mapping base — always zero, entries live at keccak(key . 5)
+  ticks: 5,                    // mapping base, always zero, entries live at keccak(key . 5)
   tickBitmap: 6,               // mapping base
   positions: 7,                // mapping base
   observations: 8,             // fixed array start
@@ -82,12 +82,12 @@ export function tickFromSqrtPriceX96(sqrtPriceX96) {
 export function slot0LooksLikeV3(raw) {
   let s;
   try { s = decodeSlot0(raw); } catch { return { ok: false, reason: 'slot 0 did not decode' }; }
-  if (s.sqrtPriceX96 === 0n) return { ok: false, reason: 'slot0.sqrtPriceX96 is zero — pool uninitialised, or this is not a V3 pool' };
+  if (s.sqrtPriceX96 === 0n) return { ok: false, reason: 'slot0.sqrtPriceX96 is zero, pool uninitialised, or this is not a V3 pool' };
   const implied = tickFromSqrtPriceX96(s.sqrtPriceX96);
   if (implied == null) return { ok: false, reason: 'sqrtPriceX96 out of representable range' };
   const d = Math.abs(implied - s.tick);
-  if (d > 2) return { ok: false, reason: `slot0 self-consistency failed: sqrtPriceX96 implies tick ${implied} but the word says ${s.tick} (delta ${d}). This storage is not a UniswapV3 slot0 — refusing to decode it as one.`, impliedTick: implied, wordTick: s.tick };
-  if (s.observationCardinality === 0) return { ok: false, reason: 'observationCardinality is 0 — an initialised V3 pool always has at least 1' };
+  if (d > 2) return { ok: false, reason: `slot0 self-consistency failed: sqrtPriceX96 implies tick ${implied} but the word says ${s.tick} (delta ${d}). This storage is not a UniswapV3 slot0, refusing to decode it as one.`, impliedTick: implied, wordTick: s.tick };
+  if (s.observationCardinality === 0) return { ok: false, reason: 'observationCardinality is 0, an initialised V3 pool always has at least 1' };
   return { ok: true, decoded: s, impliedTick: implied, tickDelta: d };
 }
 
@@ -123,8 +123,8 @@ async function ethCall(url, to, data, tag, tries = 4) {
  *
  * Two layout defences, because the storage LAYOUT is an assumption about the contract and an
  * assumption is not evidence:
- *   (1) arithmetic — sqrtPriceX96 must imply the tick sitting beside it (adversary-independent);
- *   (2) the contract's own getters — slot0() and liquidity() via eth_call at the same block must
+ *   (1) arithmetic, sqrtPriceX96 must imply the tick sitting beside it (adversary-independent);
+ *   (2) the contract's own getters, slot0() and liquidity() via eth_call at the same block must
  *       return exactly the proven words. eth_call is UNPROVEN, so this confirms the LAYOUT, never
  *       the value; the value's authority comes from the Merkle proof and from nowhere else.
  * Either failing is a REFUSAL. A V3 fork with a different slot map (Algebra's globalState, say)
@@ -133,7 +133,7 @@ async function ethCall(url, to, data, tag, tries = 4) {
 export async function anchorPoolState({ chain = 'ethereum', pool, block, verifyLayout = true, corroborate = true, endpoint = null } = {}) {
   const a = await anchorState({ chain, address: pool, slots: [V3_SLOTS.slot0, V3_SLOTS.liquidity], block, corroborate, endpoint });
   if (!a.ok) return a;
-  if (a.account.isEoa) return { ok: false, reason: `${pool} has no code at block ${block} — not a pool` };
+  if (a.account.isEoa) return { ok: false, reason: `${pool} has no code at block ${block}, not a pool` };
 
   const s0raw = a.slots['0x0'].value;
   const liquidity = a.slots['0x4'].value;
@@ -148,7 +148,7 @@ export async function anchorPoolState({ chain = 'ethereum', pool, block, verifyL
         ethCall(a.endpoint, pool, '0x3850c7bd', tag),          // slot0()
         ethCall(a.endpoint, pool, '0x1a686502', tag),          // liquidity()
       ]);
-      if (!s0hex || s0hex.length < 66 * 1) return { ok: false, reason: 'slot0() returned no data — this contract does not expose the V3 getter, so its storage layout is unknown. Refusing.' };
+      if (!s0hex || s0hex.length < 66 * 1) return { ok: false, reason: 'slot0() returned no data, this contract does not expose the V3 getter, so its storage layout is unknown. Refusing.' };
       const w = (i) => s0hex.slice(2 + i * 64, 2 + (i + 1) * 64);
       const getterSqrt = BigInt('0x' + w(0));
       let getterTick = BigInt('0x' + w(1)); if (getterTick >= 1n << 255n) getterTick -= 1n << 256n;
@@ -158,10 +158,10 @@ export async function anchorPoolState({ chain = 'ethereum', pool, block, verifyL
       if (getterSqrt !== d.sqrtPriceX96) bad.push(`slot0().sqrtPriceX96=${getterSqrt} but proven storage decodes to ${d.sqrtPriceX96}`);
       if (Number(getterTick) !== d.tick) bad.push(`slot0().tick=${getterTick} but proven storage decodes to ${d.tick}`);
       if (getterLiq !== liquidity) bad.push(`liquidity()=${getterLiq} but proven slot 4 is ${liquidity}`);
-      if (bad.length) return { ok: false, reason: `storage layout does NOT match the contract's own getters (${bad.join('; ')}) — this is a V3 fork with a different slot map, or the slot numbering is wrong. Refusing to report an anchored value.`, block: a.block };
-      layout = { checked: true, method: 'slot0() + liquidity() eth_call at the same block equal the proven words', proves: 'the SLOT MAP only — eth_call is unproven, so this rules out misdecoding, not a lying node' };
+      if (bad.length) return { ok: false, reason: `storage layout does NOT match the contract's own getters (${bad.join('; ')}), this is a V3 fork with a different slot map, or the slot numbering is wrong. Refusing to report an anchored value.`, block: a.block };
+      layout = { checked: true, method: 'slot0() + liquidity() eth_call at the same block equal the proven words', proves: 'the SLOT MAP only, eth_call is unproven, so this rules out misdecoding, not a lying node' };
     } catch (e) {
-      return { ok: false, transport: !!e.transport, reason: `could not confirm the storage layout against the pool's own getters (${String(e.message).slice(0, 80)}) — refusing rather than assuming slot 0 is slot0`, block: a.block };
+      return { ok: false, transport: !!e.transport, reason: `could not confirm the storage layout against the pool's own getters (${String(e.message).slice(0, 80)}), refusing rather than assuming slot 0 is slot0`, block: a.block };
     }
   }
 
@@ -233,7 +233,7 @@ export async function anchorSwapRow({ chain = 'ethereum', pool, block, claimed, 
 
   const last = await lastSwapInBlock(st.endpoint, pool, block).catch((e) => ({ __err: String(e.message).slice(0, 80) }));
   if (last && last.__err) return { ok: false, block, transport: true, reason: `could not read the block's Swap logs to establish which row is last: ${last.__err}` };
-  if (!last) return { ok: false, block, reason: `no Swap log in block ${block} — nothing to anchor` };
+  if (!last) return { ok: false, block, reason: `no Swap log in block ${block}, nothing to anchor` };
 
   const c = { sqrtPriceX96: BigInt(claimed.sqrtPriceX96), tick: Number(claimed.tick), liquidity: BigInt(claimed.liquidity) };
   const isLast = c.sqrtPriceX96 === last.sqrtPriceX96 && c.tick === last.tick && c.liquidity === last.liquidity;
@@ -270,12 +270,12 @@ export async function anchorSwapRow({ chain = 'ethereum', pool, block, claimed, 
 
 export const LP_DESK_COVERAGE = [
   { quantity: 'sqrtPriceX96 (per swap)', usedFor: 'p01, the price path, realised vol', source: 'Swap log word 2', anchored: 'PARTIAL', how: 'equals slot0.sqrtPriceX96 at end-of-block, so ONLY the last swap of each block is provable', measuredCoverage: '49.9%-62.1% of rows depending on pool' },
-  { quantity: 'tick (per swap)', usedFor: 'pOf(r) — the range in/out test that drives every rebalance', source: 'Swap log word 4', anchored: 'PARTIAL', how: 'same terminal-state bridge as sqrtPriceX96', measuredCoverage: 'same' },
+  { quantity: 'tick (per swap)', usedFor: 'pOf(r), the range in/out test that drives every rebalance', source: 'Swap log word 4', anchored: 'PARTIAL', how: 'same terminal-state bridge as sqrtPriceX96', measuredCoverage: 'same' },
   { quantity: 'liquidity (per swap)', usedFor: 'fee share L/(activeL+L)', source: 'Swap log word 3', anchored: 'PARTIAL, WEAKER', how: 'slot 4 matches at end-of-block only when no Mint/Burn follows the last swap in that block', measuredCoverage: 'a subset of the terminal rows; measured by the gate, not assumed' },
   { quantity: 'amount0 / amount1 (per swap)', usedFor: 'feeAmt, the entire fee accrual', source: 'Swap log words 0 and 1', anchored: 'NO', how: 'a trade size is never written to state; it exists only in the receipt. Committed to receiptsRoot, which eth_getProof does not touch.' },
   { quantity: 'feeAmt', usedFor: 'the headline LP-vs-HODL number', source: 'derived from amount0/1 x feePpm', anchored: 'NO', how: 'inherits amount0/1' },
-  { quantity: 'block number and timestamp', usedFor: 'window span, realised vol scaling', source: 'log / eth_getBlockByNumber', anchored: 'YES, BY A DIFFERENT MECHANISM', how: 'both are header fields, and the header preimage is keccak-verified against blockHash — no state trie involved' },
-  { quantity: 'token0 / token1 / fee / tickSpacing', usedFor: 'decimals alignment, fee tier', source: 'eth_call (Solidity `immutable`)', anchored: 'NO (INDIRECT ONLY)', how: 'immutables live in the deployed bytecode, not in any storage slot — measured: slots 0-9 hold slot0/feeGrowth/protocolFees/liquidity/observations and no addresses. Reachable only via the account codeHash plus a bytecode extraction, which is not built here.' },
+  { quantity: 'block number and timestamp', usedFor: 'window span, realised vol scaling', source: 'log / eth_getBlockByNumber', anchored: 'YES, BY A DIFFERENT MECHANISM', how: 'both are header fields, and the header preimage is keccak-verified against blockHash, no state trie involved' },
+  { quantity: 'token0 / token1 / fee / tickSpacing', usedFor: 'decimals alignment, fee tier', source: 'eth_call (Solidity `immutable`)', anchored: 'NO (INDIRECT ONLY)', how: 'immutables live in the deployed bytecode, not in any storage slot, measured: slots 0-9 hold slot0/feeGrowth/protocolFees/liquidity/observations and no addresses. Reachable only via the account codeHash plus a bytecode extraction, which is not built here.' },
   { quantity: 'token decimals (d0, d1)', usedFor: 'every price and every amount', source: 'eth_call decimals() on each token', anchored: 'NO', how: 'the slot differs per token and is often a constant or immutable. Not generically locatable, so this adapter REFUSES rather than guessing a slot number.' },
 ];
 

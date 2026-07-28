@@ -1,0 +1,2388 @@
+{
+ "_meta": {
+  "measuredOnUtc": "2026-07-28T13:17:52.207Z",
+  "script": "gates/calibrate-divergence.mjs",
+  "statistic": "p95 of independentSpreadBps across rounds",
+  "rounds": 340,
+  "intervalMs": 3500,
+  "sourceSets": {
+   "native": [
+    "hyperliquid_mark",
+    "hyperliquid_oracle",
+    "dydx_oracle",
+    "okx_index",
+    "okx_spot",
+    "deribit_index"
+   ],
+   "all": [
+    "hyperliquid_mark",
+    "hyperliquid_oracle",
+    "dydx_oracle",
+    "okx_index",
+    "okx_spot",
+    "deribit_index",
+    "coinbase_spot",
+    "kraken_spot"
+   ]
+  },
+  "hostsPerSet": {
+   "native": 4,
+   "all": 6
+  }
+ },
+ "BTC": {
+  "native": {
+   "rounds": 170,
+   "floorBps": 11.6,
+   "independentSpreadBps": {
+    "p50": 9.297,
+    "p95": 11.602,
+    "p99": 13.513,
+    "max": 14.496,
+    "min": 6.528
+   },
+   "allReadingsSpreadBps": {
+    "p50": 11.466,
+    "p95": 14.7,
+    "max": 17.301
+   },
+   "sourceCoverage": {
+    "deribit_index": 170,
+    "dydx_oracle": 170,
+    "hyperliquid_mark": 170,
+    "hyperliquid_oracle": 170,
+    "okx_index": 170,
+    "okx_spot": 170
+   },
+   "pairs": [
+    {
+     "a": "dydx_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 8.807,
+     "p95": 13.645,
+     "max": 17.299
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.81,
+     "p95": 12.742,
+     "max": 15.751
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.817,
+     "p95": 12.656,
+     "max": 16.032
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 8.618,
+     "p95": 12.243,
+     "max": 15.938
+    },
+    {
+     "a": "okx_spot",
+     "b": "okx_index",
+     "sameHost": true,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 11.087,
+     "p95": 11.81,
+     "max": 12.782
+    },
+    {
+     "a": "okx_spot",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.988,
+     "p95": 11.63,
+     "max": 13.149
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 7.431,
+     "p95": 9.567,
+     "max": 12.958
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 7.484,
+     "p95": 9.385,
+     "max": 12.432
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 5.177,
+     "p95": 8.846,
+     "max": 12.194
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 2.572,
+     "p95": 6.6,
+     "max": 7.898
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 2.757,
+     "p95": 6.054,
+     "max": 7.762
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 3.615,
+     "p95": 5.51,
+     "max": 8.693
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "hyperliquid_oracle",
+     "sameHost": true,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 3.455,
+     "p95": 4.245,
+     "max": 6.008
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 0.482,
+     "p95": 3.048,
+     "max": 5.246
+    },
+    {
+     "a": "okx_index",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 0.258,
+     "p95": 1.03,
+     "max": 2.208
+    }
+   ],
+   "minDetectableFabricationBps": {
+    "hyperliquid_mark": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 4.605,
+      "p95": 7.418,
+      "max": 10.142
+     },
+     "hardestBps": {
+      "p50": 30.296,
+      "p95": 33.77,
+      "max": 37.842
+     },
+     "spreadReducingBps": {
+      "p50": 25.5,
+      "p95": 32.387,
+      "max": 43.5
+     }
+    },
+    "hyperliquid_oracle": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 4.604,
+      "p95": 7.416,
+      "max": 10.138
+     },
+     "hardestBps": {
+      "p50": 30.284,
+      "p95": 33.759,
+      "max": 37.83
+     },
+     "spreadReducingBps": {
+      "p50": 25.5,
+      "p95": 32.387,
+      "max": 43.5
+     }
+    },
+    "dydx_oracle": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 4.491,
+      "p95": 7.067,
+      "max": 7.621
+     },
+     "hardestBps": {
+      "p50": 9.26,
+      "p95": 14.37,
+      "max": 17.019
+     },
+     "spreadReducingBps": {
+      "p50": 6.75,
+      "p95": 12.887,
+      "max": 18.75
+     }
+    },
+    "okx_index": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 12.087,
+      "p95": 13.219,
+      "max": 13.736
+     },
+     "hardestBps": {
+      "p50": 15.96,
+      "p95": 19.03,
+      "max": 24.444
+     },
+     "spreadReducingBps": {
+      "p50": 7,
+      "p95": 12.25,
+      "max": 22.75
+     }
+    },
+    "okx_spot": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 12.073,
+      "p95": 13.205,
+      "max": 13.722
+     },
+     "hardestBps": {
+      "p50": 15.942,
+      "p95": 19.008,
+      "max": 24.413
+     },
+     "spreadReducingBps": {
+      "p50": 7,
+      "p95": 12.25,
+      "max": 22.75
+     }
+    },
+    "deribit_index": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 2.418,
+      "p95": 4.497,
+      "max": 6.457
+     },
+     "hardestBps": {
+      "p50": 13.998,
+      "p95": 17.019,
+      "max": 17.537
+     },
+     "spreadReducingBps": {
+      "p50": 11.5,
+      "p95": 15.5,
+      "max": 20.25
+     }
+    }
+   }
+  },
+  "all": {
+   "rounds": 170,
+   "floorBps": 15.88,
+   "independentSpreadBps": {
+    "p50": 10.591,
+    "p95": 15.877,
+    "p99": 19.788,
+    "max": 22.046,
+    "min": 7.587
+   },
+   "allReadingsSpreadBps": {
+    "p50": 12.489,
+    "p95": 18.42,
+    "max": 25.754
+   },
+   "sourceCoverage": {
+    "coinbase_spot": 170,
+    "deribit_index": 170,
+    "dydx_oracle": 170,
+    "hyperliquid_mark": 170,
+    "hyperliquid_oracle": 170,
+    "kraken_spot": 170,
+    "okx_index": 170,
+    "okx_spot": 170
+   },
+   "pairs": [
+    {
+     "a": "okx_spot",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 12.136,
+     "p95": 18.075,
+     "max": 25.756
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 11.893,
+     "p95": 17.667,
+     "max": 24.005
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 8.558,
+     "p95": 14.105,
+     "max": 20.292
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 8.807,
+     "p95": 13.645,
+     "max": 17.299
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.81,
+     "p95": 12.742,
+     "max": 15.751
+    },
+    {
+     "a": "okx_spot",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 11.176,
+     "p95": 12.683,
+     "max": 16.127
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.817,
+     "p95": 12.656,
+     "max": 16.032
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.887,
+     "p95": 12.48,
+     "max": 15.799
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 8.618,
+     "p95": 12.243,
+     "max": 15.938
+    },
+    {
+     "a": "okx_spot",
+     "b": "okx_index",
+     "sameHost": true,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 11.087,
+     "p95": 11.81,
+     "max": 12.782
+    },
+    {
+     "a": "okx_spot",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 10.988,
+     "p95": 11.63,
+     "max": 13.149
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 7.431,
+     "p95": 9.567,
+     "max": 12.958
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 7.512,
+     "p95": 9.43,
+     "max": 10.577
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 7.484,
+     "p95": 9.385,
+     "max": 12.432
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 5.177,
+     "p95": 8.846,
+     "max": 12.194
+    },
+    {
+     "a": "deribit_index",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 1.601,
+     "p95": 8.067,
+     "max": 14.805
+    },
+    {
+     "a": "okx_index",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 1.618,
+     "p95": 7.928,
+     "max": 12.974
+    },
+    {
+     "a": "coinbase_spot",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 1.428,
+     "p95": 7.56,
+     "max": 13.227
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 3.257,
+     "p95": 7.203,
+     "max": 13.561
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 2.572,
+     "p95": 6.6,
+     "max": 7.898
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 2.757,
+     "p95": 6.054,
+     "max": 7.762
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 2.718,
+     "p95": 6.045,
+     "max": 7.392
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 3.615,
+     "p95": 5.51,
+     "max": 8.693
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "hyperliquid_oracle",
+     "sameHost": true,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 3.455,
+     "p95": 4.245,
+     "max": 6.008
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 0.482,
+     "p95": 3.048,
+     "max": 5.246
+    },
+    {
+     "a": "deribit_index",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 0.677,
+     "p95": 2.812,
+     "max": 4.637
+    },
+    {
+     "a": "okx_index",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 170,
+     "p50": 0.522,
+     "p95": 2.51,
+     "max": 4.863
+    },
+    {
+     "a": "okx_index",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 170,
+     "p50": 0.258,
+     "p95": 1.03,
+     "max": 2.208
+    }
+   ],
+   "minDetectableFabricationBps": {
+    "hyperliquid_mark": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 10.572,
+      "p95": 13.332,
+      "max": 16.578
+     },
+     "hardestBps": {
+      "p50": 38.827,
+      "p95": 42.092,
+      "max": 46.396
+     },
+     "spreadReducingBps": {
+      "p50": 28,
+      "p95": 37.662,
+      "max": 56.25
+     }
+    },
+    "hyperliquid_oracle": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 10.568,
+      "p95": 13.326,
+      "max": 16.572
+     },
+     "hardestBps": {
+      "p50": 38.813,
+      "p95": 42.078,
+      "max": 46.381
+     },
+     "spreadReducingBps": {
+      "p50": 28,
+      "p95": 37.525,
+      "max": 56.25
+     }
+    },
+    "dydx_oracle": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 8.68,
+      "p95": 10.659,
+      "max": 11.292
+     },
+     "hardestBps": {
+      "p50": 12.401,
+      "p95": 14.95,
+      "max": 18.323
+     },
+     "spreadReducingBps": {
+      "p50": 6.75,
+      "p95": 10.387,
+      "max": 13.75
+     }
+    },
+    "okx_index": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 18.252,
+      "p95": 20.99,
+      "max": 22.29
+     },
+     "hardestBps": {
+      "p50": 24.46,
+      "p95": 27.033,
+      "max": 32.069
+     },
+     "spreadReducingBps": {
+      "p50": 8,
+      "p95": 12.25,
+      "max": 37.25
+     }
+    },
+    "okx_spot": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 18.232,
+      "p95": 20.966,
+      "max": 22.269
+     },
+     "hardestBps": {
+      "p50": 24.432,
+      "p95": 27.003,
+      "max": 32.03
+     },
+     "spreadReducingBps": {
+      "p50": 8,
+      "p95": 12.25,
+      "max": 37.25
+     }
+    },
+    "deribit_index": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 6.616,
+      "p95": 8.324,
+      "max": 9.882
+     },
+     "hardestBps": {
+      "p50": 14.613,
+      "p95": 17.738,
+      "max": 20.328
+     },
+     "spreadReducingBps": {
+      "p50": 9,
+      "p95": 12.387,
+      "max": 17.5
+     }
+    },
+    "coinbase_spot": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 5.653,
+      "p95": 9.698,
+      "max": 10.903
+     },
+     "hardestBps": {
+      "p50": 16.499,
+      "p95": 20.477,
+      "max": 29.143
+     },
+     "spreadReducingBps": {
+      "p50": 10.75,
+      "p95": 19.987,
+      "max": 35.25
+     }
+    },
+    "kraken_spot": {
+     "n": 170,
+     "cheapestBps": {
+      "p50": 6.643,
+      "p95": 8.571,
+      "max": 11.491
+     },
+     "hardestBps": {
+      "p50": 14.682,
+      "p95": 16.51,
+      "max": 17.477
+     },
+     "spreadReducingBps": {
+      "p50": 9.125,
+      "p95": 11.25,
+      "max": 13
+     }
+    }
+   }
+  }
+ },
+ "ETH": {
+  "native": {
+   "rounds": 85,
+   "floorBps": 11.95,
+   "independentSpreadBps": {
+    "p50": 9.014,
+    "p95": 11.95,
+    "p99": 14.935,
+    "max": 17.136,
+    "min": 6.237
+   },
+   "allReadingsSpreadBps": {
+    "p50": 12.197,
+    "p95": 15.557,
+    "max": 21.974
+   },
+   "sourceCoverage": {
+    "deribit_index": 85,
+    "dydx_oracle": 85,
+    "hyperliquid_mark": 85,
+    "hyperliquid_oracle": 85,
+    "okx_index": 85,
+    "okx_spot": 85
+   },
+   "pairs": [
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 11.117,
+     "p95": 14.53,
+     "max": 21.977
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 9.265,
+     "p95": 14.069,
+     "max": 15.613
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 9.918,
+     "p95": 13.797,
+     "max": 17.75
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.905,
+     "p95": 13.711,
+     "max": 18.195
+    },
+    {
+     "a": "okx_spot",
+     "b": "okx_index",
+     "sameHost": true,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.797,
+     "p95": 12.051,
+     "max": 14.011
+    },
+    {
+     "a": "okx_spot",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.377,
+     "p95": 11.482,
+     "max": 13.479
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.913,
+     "p95": 9.67,
+     "max": 19.851
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.522,
+     "p95": 9.257,
+     "max": 16.069
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.651,
+     "p95": 8.52,
+     "max": 11.282
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.377,
+     "p95": 6.99,
+     "max": 15.97
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.864,
+     "p95": 6.724,
+     "max": 11.331
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.151,
+     "p95": 5.893,
+     "max": 12.188
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "hyperliquid_oracle",
+     "sameHost": true,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.308,
+     "p95": 5.802,
+     "max": 6.468
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 0.955,
+     "p95": 3.727,
+     "max": 13.457
+    },
+    {
+     "a": "okx_index",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 0.635,
+     "p95": 2.471,
+     "max": 3.782
+    }
+   ],
+   "minDetectableFabricationBps": {
+    "hyperliquid_mark": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 5.87,
+      "p95": 9.96,
+      "max": 11.426
+     },
+     "hardestBps": {
+      "p50": 29.73,
+      "p95": 36.17,
+      "max": 38.657
+     },
+     "spreadReducingBps": {
+      "p50": 24,
+      "p95": 35.4,
+      "max": 44
+     }
+    },
+    "hyperliquid_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 5.867,
+      "p95": 9.954,
+      "max": 11.42
+     },
+     "hardestBps": {
+      "p50": 29.714,
+      "p95": 36.152,
+      "max": 38.644
+     },
+     "spreadReducingBps": {
+      "p50": 24,
+      "p95": 35.4,
+      "max": 44
+     }
+    },
+    "dydx_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 4.387,
+      "p95": 7.551,
+      "max": 8.228
+     },
+     "hardestBps": {
+      "p50": 10.769,
+      "p95": 15.617,
+      "max": 18.229
+     },
+     "spreadReducingBps": {
+      "p50": 7.25,
+      "p95": 14.2,
+      "max": 19.5
+     }
+    },
+    "okx_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 12.877,
+      "p95": 15.254,
+      "max": 15.842
+     },
+     "hardestBps": {
+      "p50": 17.655,
+      "p95": 20.593,
+      "max": 23.316
+     },
+     "spreadReducingBps": {
+      "p50": 6.25,
+      "p95": 12.75,
+      "max": 33.25
+     }
+    },
+    "okx_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 12.862,
+      "p95": 15.239,
+      "max": 15.825
+     },
+     "hardestBps": {
+      "p50": 17.635,
+      "p95": 20.57,
+      "max": 23.289
+     },
+     "spreadReducingBps": {
+      "p50": 6.25,
+      "p95": 12.75,
+      "max": 33.25
+     }
+    },
+    "deribit_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 3.741,
+      "p95": 5.352,
+      "max": 6.33
+     },
+     "hardestBps": {
+      "p50": 13.096,
+      "p95": 16.903,
+      "max": 17.988
+     },
+     "spreadReducingBps": {
+      "p50": 9.5,
+      "p95": 14.95,
+      "max": 18.25
+     }
+    }
+   }
+  },
+  "all": {
+   "rounds": 85,
+   "floorBps": 19.63,
+   "independentSpreadBps": {
+    "p50": 9.882,
+    "p95": 19.629,
+    "p99": 27.638,
+    "max": 30.388,
+    "min": 7.313
+   },
+   "allReadingsSpreadBps": {
+    "p50": 13.062,
+    "p95": 22.748,
+    "max": 33.103
+   },
+   "sourceCoverage": {
+    "coinbase_spot": 85,
+    "deribit_index": 85,
+    "dydx_oracle": 85,
+    "hyperliquid_mark": 85,
+    "hyperliquid_oracle": 85,
+    "kraken_spot": 85,
+    "okx_index": 85,
+    "okx_spot": 85
+   },
+   "pairs": [
+    {
+     "a": "hyperliquid_oracle",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.207,
+     "p95": 19.166,
+     "max": 33.129
+    },
+    {
+     "a": "okx_spot",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 9.808,
+     "p95": 17.224,
+     "max": 31.318
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 11.065,
+     "p95": 14.983,
+     "max": 24.161
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 11.117,
+     "p95": 14.53,
+     "max": 21.977
+    },
+    {
+     "a": "okx_spot",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 10.59,
+     "p95": 14.263,
+     "max": 15.936
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 9.265,
+     "p95": 14.069,
+     "max": 15.613
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 9.918,
+     "p95": 13.797,
+     "max": 17.75
+    },
+    {
+     "a": "okx_index",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.687,
+     "p95": 13.779,
+     "max": 24.927
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.437,
+     "p95": 13.729,
+     "max": 27.695
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.905,
+     "p95": 13.711,
+     "max": 18.195
+    },
+    {
+     "a": "deribit_index",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.568,
+     "p95": 13.065,
+     "max": 21.145
+    },
+    {
+     "a": "okx_spot",
+     "b": "okx_index",
+     "sameHost": true,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.797,
+     "p95": 12.051,
+     "max": 14.011
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.968,
+     "p95": 11.761,
+     "max": 29.408
+    },
+    {
+     "a": "okx_spot",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.377,
+     "p95": 11.482,
+     "max": 13.479
+    },
+    {
+     "a": "coinbase_spot",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 1.86,
+     "p95": 11.321,
+     "max": 27.111
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.913,
+     "p95": 9.67,
+     "max": 19.851
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 6.02,
+     "p95": 9.417,
+     "max": 22.035
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.522,
+     "p95": 9.257,
+     "max": 16.069
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.651,
+     "p95": 8.52,
+     "max": 11.282
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.377,
+     "p95": 6.99,
+     "max": 15.97
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.864,
+     "p95": 6.724,
+     "max": 11.331
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.151,
+     "p95": 5.893,
+     "max": 12.188
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "hyperliquid_oracle",
+     "sameHost": true,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 5.308,
+     "p95": 5.802,
+     "max": 6.468
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.251,
+     "p95": 5.632,
+     "max": 18.154
+    },
+    {
+     "a": "deribit_index",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.546,
+     "p95": 3.975,
+     "max": 6.072
+    },
+    {
+     "a": "okx_index",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.386,
+     "p95": 3.961,
+     "max": 5.859
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 0.955,
+     "p95": 3.727,
+     "max": 13.457
+    },
+    {
+     "a": "okx_index",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 0.635,
+     "p95": 2.471,
+     "max": 3.782
+    }
+   ],
+   "minDetectableFabricationBps": {
+    "hyperliquid_mark": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 19.504,
+      "p95": 23.534,
+      "max": 25.376
+     },
+     "hardestBps": {
+      "p50": 45.012,
+      "p95": 50.635,
+      "max": 52.197
+     },
+     "spreadReducingBps": {
+      "p50": 25.25,
+      "p95": 41.8,
+      "max": 60
+     }
+    },
+    "hyperliquid_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 19.493,
+      "p95": 23.522,
+      "max": 25.362
+     },
+     "hardestBps": {
+      "p50": 44.986,
+      "p95": 50.61,
+      "max": 52.172
+     },
+     "spreadReducingBps": {
+      "p50": 25.25,
+      "p95": 41.8,
+      "max": 60
+     }
+    },
+    "dydx_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 11.931,
+      "p95": 15.169,
+      "max": 15.394
+     },
+     "hardestBps": {
+      "p50": 17.25,
+      "p95": 20.874,
+      "max": 24.262
+     },
+     "spreadReducingBps": {
+      "p50": 7.25,
+      "p95": 12.15,
+      "max": 20.25
+     }
+    },
+    "okx_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 26.201,
+      "p95": 29.627,
+      "max": 30.839
+     },
+     "hardestBps": {
+      "p50": 32.849,
+      "p95": 35.612,
+      "max": 38.669
+     },
+     "spreadReducingBps": {
+      "p50": 8.75,
+      "p95": 16.25,
+      "max": 41.25
+     }
+    },
+    "okx_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 26.172,
+      "p95": 29.594,
+      "max": 30.807
+     },
+     "hardestBps": {
+      "p50": 32.816,
+      "p95": 35.572,
+      "max": 38.624
+     },
+     "spreadReducingBps": {
+      "p50": 8.75,
+      "p95": 16.25,
+      "max": 41.25
+     }
+    },
+    "deribit_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 11.311,
+      "p95": 13.014,
+      "max": 14.003
+     },
+     "hardestBps": {
+      "p50": 18.127,
+      "p95": 21.865,
+      "max": 24.79
+     },
+     "spreadReducingBps": {
+      "p50": 8.25,
+      "p95": 12.65,
+      "max": 21
+     }
+    },
+    "coinbase_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 11.487,
+      "p95": 14.747,
+      "max": 15.567
+     },
+     "hardestBps": {
+      "p50": 18.517,
+      "p95": 26.204,
+      "max": 38.494
+     },
+     "spreadReducingBps": {
+      "p50": 8,
+      "p95": 27.8,
+      "max": 49.25
+     }
+    },
+    "kraken_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 11.05,
+      "p95": 13.239,
+      "max": 14.995
+     },
+     "hardestBps": {
+      "p50": 18.536,
+      "p95": 21.612,
+      "max": 24.294
+     },
+     "spreadReducingBps": {
+      "p50": 8.5,
+      "p95": 15.6,
+      "max": 33
+     }
+    }
+   }
+  }
+ },
+ "SOL": {
+  "native": {
+   "rounds": 85,
+   "floorBps": 11.25,
+   "independentSpreadBps": {
+    "p50": 7.794,
+    "p95": 11.249,
+    "p99": 13.069,
+    "max": 13.936,
+    "min": 5
+   },
+   "allReadingsSpreadBps": {
+    "p50": 12.314,
+    "p95": 14.885,
+    "max": 18.598
+   },
+   "sourceCoverage": {
+    "deribit_index": 85,
+    "dydx_oracle": 85,
+    "hyperliquid_mark": 85,
+    "hyperliquid_oracle": 85,
+    "okx_index": 85,
+    "okx_spot": 85
+   },
+   "pairs": [
+    {
+     "a": "dydx_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 9.201,
+     "p95": 14.008,
+     "max": 18.597
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 11.632,
+     "p95": 13.86,
+     "max": 15.754
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 9.264,
+     "p95": 13.809,
+     "max": 17.227
+    },
+    {
+     "a": "okx_spot",
+     "b": "okx_index",
+     "sameHost": true,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.975,
+     "p95": 13.437,
+     "max": 13.736
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.845,
+     "p95": 13.232,
+     "max": 16.152
+    },
+    {
+     "a": "okx_spot",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.607,
+     "p95": 12.058,
+     "max": 13.152
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 6.176,
+     "p95": 8.729,
+     "max": 12.876
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.969,
+     "p95": 7.574,
+     "max": 9.25
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 3.09,
+     "p95": 7,
+     "max": 10.65
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "hyperliquid_oracle",
+     "sameHost": true,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 6.694,
+     "p95": 6.893,
+     "max": 8.192
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.183,
+     "p95": 6.39,
+     "max": 9.647
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.509,
+     "p95": 5.756,
+     "max": 8.714
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.078,
+     "p95": 5.144,
+     "max": 8.165
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 0.684,
+     "p95": 3.421,
+     "max": 6.162
+    },
+    {
+     "a": "okx_index",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 1,
+     "p95": 2.054,
+     "max": 3.669
+    }
+   ],
+   "minDetectableFabricationBps": {
+    "hyperliquid_mark": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 6.93,
+      "p95": 9.451,
+      "max": 15.255
+     },
+     "hardestBps": {
+      "p50": 27.955,
+      "p95": 31.593,
+      "max": 37.89
+     },
+     "spreadReducingBps": {
+      "p50": 20.5,
+      "p95": 31.25,
+      "max": 41
+     }
+    },
+    "hyperliquid_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 6.925,
+      "p95": 9.445,
+      "max": 15.245
+     },
+     "hardestBps": {
+      "p50": 27.936,
+      "p95": 31.573,
+      "max": 37.866
+     },
+     "spreadReducingBps": {
+      "p50": 20.5,
+      "p95": 31.25,
+      "max": 41
+     }
+    },
+    "dydx_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 4.986,
+      "p95": 7.306,
+      "max": 7.908
+     },
+     "hardestBps": {
+      "p50": 10.078,
+      "p95": 14.169,
+      "max": 18.37
+     },
+     "spreadReducingBps": {
+      "p50": 6.25,
+      "p95": 12.5,
+      "max": 20.5
+     }
+    },
+    "okx_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 12.102,
+      "p95": 14.305,
+      "max": 15.677
+     },
+     "hardestBps": {
+      "p50": 17.025,
+      "p95": 19.764,
+      "max": 29.215
+     },
+     "spreadReducingBps": {
+      "p50": 5.25,
+      "p95": 10.9,
+      "max": 25
+     }
+    },
+    "okx_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 12.088,
+      "p95": 14.29,
+      "max": 15.658
+     },
+     "hardestBps": {
+      "p50": 17.004,
+      "p95": 19.743,
+      "max": 29.179
+     },
+     "spreadReducingBps": {
+      "p50": 5.25,
+      "p95": 10.9,
+      "max": 25
+     }
+    },
+    "deribit_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 3.686,
+      "p95": 5.088,
+      "max": 6.848
+     },
+     "hardestBps": {
+      "p50": 12.627,
+      "p95": 15.992,
+      "max": 16.505
+     },
+     "spreadReducingBps": {
+      "p50": 9,
+      "p95": 12.95,
+      "max": 15.75
+     }
+    }
+   }
+  },
+  "all": {
+   "rounds": 85,
+   "floorBps": 13.23,
+   "independentSpreadBps": {
+    "p50": 8.815,
+    "p95": 13.234,
+    "p99": 18.76,
+    "max": 22.939,
+    "min": 6.518
+   },
+   "allReadingsSpreadBps": {
+    "p50": 12.687,
+    "p95": 16.611,
+    "max": 26.705
+   },
+   "sourceCoverage": {
+    "coinbase_spot": 85,
+    "deribit_index": 85,
+    "dydx_oracle": 85,
+    "hyperliquid_mark": 85,
+    "hyperliquid_oracle": 85,
+    "kraken_spot": 85,
+    "okx_index": 85,
+    "okx_spot": 85
+   },
+   "pairs": [
+    {
+     "a": "okx_spot",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 10.923,
+     "p95": 14.795,
+     "max": 16.486
+    },
+    {
+     "a": "okx_spot",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 10.271,
+     "p95": 14.387,
+     "max": 25.34
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 9.201,
+     "p95": 14.008,
+     "max": 18.597
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 11.632,
+     "p95": 13.86,
+     "max": 15.754
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 9.264,
+     "p95": 13.809,
+     "max": 17.227
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.927,
+     "p95": 13.712,
+     "max": 26.708
+    },
+    {
+     "a": "okx_spot",
+     "b": "okx_index",
+     "sameHost": true,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.975,
+     "p95": 13.437,
+     "max": 13.736
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.845,
+     "p95": 13.232,
+     "max": 16.152
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.287,
+     "p95": 13.149,
+     "max": 16.641
+    },
+    {
+     "a": "okx_spot",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 10.607,
+     "p95": 12.058,
+     "max": 13.152
+    },
+    {
+     "a": "coinbase_spot",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 2.049,
+     "p95": 9.744,
+     "max": 16.486
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.507,
+     "p95": 9.689,
+     "max": 19.182
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 6.176,
+     "p95": 8.729,
+     "max": 12.876
+    },
+    {
+     "a": "okx_index",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.049,
+     "p95": 8.097,
+     "max": 15.084
+    },
+    {
+     "a": "deribit_index",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.7,
+     "p95": 7.823,
+     "max": 14.837
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.969,
+     "p95": 7.574,
+     "max": 9.25
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "dydx_oracle",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 3.09,
+     "p95": 7,
+     "max": 10.65
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "hyperliquid_oracle",
+     "sameHost": true,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 6.694,
+     "p95": 6.893,
+     "max": 8.192
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.106,
+     "p95": 6.663,
+     "max": 9.889
+    },
+    {
+     "a": "hyperliquid_mark",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 4.183,
+     "p95": 6.39,
+     "max": 9.647
+    },
+    {
+     "a": "deribit_index",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.659,
+     "p95": 5.883,
+     "max": 10.721
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "okx_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.509,
+     "p95": 5.756,
+     "max": 8.714
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "coinbase_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.884,
+     "p95": 5.75,
+     "max": 16.049
+    },
+    {
+     "a": "okx_index",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 1.371,
+     "p95": 5.47,
+     "max": 9.596
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "kraken_spot",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.369,
+     "p95": 5.242,
+     "max": 6.37
+    },
+    {
+     "a": "dydx_oracle",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 2.078,
+     "p95": 5.144,
+     "max": 8.165
+    },
+    {
+     "a": "hyperliquid_oracle",
+     "b": "okx_spot",
+     "sameHost": false,
+     "sameQuote": false,
+     "sameQuantity": false,
+     "n": 85,
+     "p50": 0.684,
+     "p95": 3.421,
+     "max": 6.162
+    },
+    {
+     "a": "okx_index",
+     "b": "deribit_index",
+     "sameHost": false,
+     "sameQuote": true,
+     "sameQuantity": true,
+     "n": 85,
+     "p50": 1,
+     "p95": 2.054,
+     "max": 3.669
+    }
+   ],
+   "minDetectableFabricationBps": {
+    "hyperliquid_mark": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 8.973,
+      "p95": 12.64,
+      "max": 15.358
+     },
+     "hardestBps": {
+      "p50": 31.637,
+      "p95": 35.555,
+      "max": 38.755
+     },
+     "spreadReducingBps": {
+      "p50": 22.25,
+      "p95": 33.45,
+      "max": 53.25
+     }
+    },
+    "hyperliquid_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 8.968,
+      "p95": 12.632,
+      "max": 15.347
+     },
+     "hardestBps": {
+      "p50": 31.619,
+      "p95": 35.532,
+      "max": 38.728
+     },
+     "spreadReducingBps": {
+      "p50": 22.25,
+      "p95": 33.45,
+      "max": 53.25
+     }
+    },
+    "dydx_oracle": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 6.908,
+      "p95": 8.934,
+      "max": 9.887
+     },
+     "hardestBps": {
+      "p50": 10.7,
+      "p95": 14.066,
+      "max": 15.255
+     },
+     "spreadReducingBps": {
+      "p50": 6.25,
+      "p95": 13.15,
+      "max": 17
+     }
+    },
+    "okx_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 14.17,
+      "p95": 17.205,
+      "max": 18.298
+     },
+     "hardestBps": {
+      "p50": 20.972,
+      "p95": 23.728,
+      "max": 33.172
+     },
+     "spreadReducingBps": {
+      "p50": 7.25,
+      "p95": 14.9,
+      "max": 25
+     }
+    },
+    "okx_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 14.153,
+      "p95": 17.186,
+      "max": 18.278
+     },
+     "hardestBps": {
+      "p50": 20.949,
+      "p95": 23.702,
+      "max": 33.131
+     },
+     "spreadReducingBps": {
+      "p50": 7,
+      "p95": 14.9,
+      "max": 25
+     }
+    },
+    "deribit_index": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 5.662,
+      "p95": 7.023,
+      "max": 8.232
+     },
+     "hardestBps": {
+      "p50": 12.14,
+      "p95": 15.383,
+      "max": 17.107
+     },
+     "spreadReducingBps": {
+      "p50": 7.75,
+      "p95": 12.25,
+      "max": 15
+     }
+    },
+    "coinbase_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 5.237,
+      "p95": 9.051,
+      "max": 9.54
+     },
+     "hardestBps": {
+      "p50": 12.547,
+      "p95": 16.594,
+      "max": 26.24
+     },
+     "spreadReducingBps": {
+      "p50": 8,
+      "p95": 16.15,
+      "max": 35.75
+     }
+    },
+    "kraken_spot": {
+     "n": 85,
+     "cheapestBps": {
+      "p50": 5.692,
+      "p95": 8.641,
+      "max": 9.393
+     },
+     "hardestBps": {
+      "p50": 11.88,
+      "p95": 15.011,
+      "max": 17.172
+     },
+     "spreadReducingBps": {
+      "p50": 7.5,
+      "p95": 13.2,
+      "max": 18.5
+     }
+    }
+   }
+  }
+ }
+}

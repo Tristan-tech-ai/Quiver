@@ -52,7 +52,7 @@ liquidation identity needed a division cleared through three factors of SCALE.
 
 | | |
 |---|---|
-| Circuit | [`zk/circuits/kelly.circom`](zk/circuits/kelly.circom) — **357 R1CS / 718 Plonk constraints**, zero private inputs |
+| Circuit | [`zk/circuits/kelly.circom`](zk/circuits/kelly.circom) — **357 R1CS / 718 Plonk constraints**, zero private inputs (the first circuit, liquidation, is the older [`research/zk/circuits/liquidation.circom`](research/zk/circuits/liquidation.circom), where its build notes live) |
 | Statement | `f̂·b̂ = p̂·b̂ + S·p̂ − S²`, with the residual bounded by `2·|R| ≤ b̂`, derived from a public signal so a prover cannot widen it |
 | Proving | **547 ms**, zkey 2.2 MB (the liquidation circuit: 703 ms, 5.3 MB) |
 | Verifier | [`zk/build/KellyVerifier.sol`](zk/build/KellyVerifier.sol), 6,552 bytes deployed |

@@ -81,6 +81,46 @@ Kelly verifier is deployed on chain. Both need either a deploy or gas, and neith
 while reviewers are testing. This is exactly what the paper said about the liquidation circuit before
 it shipped: built, and verifiable from a clone.
 
+### The proof now outlives the process
+
+Until this week the proof store was a `Map`. A redeploy cleared it, and a second replica would answer
+404 for a proof the first replica had just built. The endpoint said so in its own 404 body, which was
+honest but was not a fix — and "held in memory" is not a property anything on chain should depend on.
+
+A proof is immutable and is already named by its own content hash, so this is a lookup change, not a
+design change. [`src/util/proofStore.js`](src/util/proofStore.js) writes a finished proof under its
+hash and reads it back on a memory miss. Two decisions are worth stating because they are the ones
+that could have been wrong:
+
+- **Only `ready` is persisted.** A `building` record is a fact about a process, not about arithmetic.
+  Persisting it would mean a crash mid-proof leaves a permanent "building" on disk that nobody is
+  working on and every later reader polls forever. `failed` and `unavailable` are excluded for the
+  same reason: a refusal is a judgement made by one build of the code, and a fixed prover should not
+  keep serving the old refusal.
+- **Off unless configured.** No `QUIVER_PROOF_DIR`, no behaviour change of any kind. `/build` now
+  reports which of the two worlds a deploy is in, and the 404 body says the matching thing rather
+  than the reassuring one.
+
+```bash
+npm run gate:a          # builds a proof in one process, kills it, reads it from another
+npm run gate:a-revert   # removes the feature, proves the gate goes red, restores it
+```
+
+`gate:a` spawns a real child process, waits for it to exit, then reads the proof from a second,
+unrelated pid. It carries its own negative control: a third process with no store configured must
+**not** find the same proof, otherwise the gate would be measuring the prover instead of the store.
+`gate:a-revert` is the part that makes the green result mean something. It neuters the durable write,
+reruns the gate, and requires **3 of 5 failures**, then restores the file and requires 5 of 5 passes.
+A gate that is red in both states is broken, not strict, so both halves are checked.
+
+**Not yet shipped, again plainly:** the live service still runs memory-only, which you can confirm
+yourself — `curl .../build` has no `proofStorage` key, because that key only exists in code that has
+not been deployed. Turning it on is one environment variable plus a shared volume, and it is a deploy,
+so it waits. These five tests deliberately sit in `gates/` rather than `test/`: the paper is served
+live and states the size of the model-free suite, and moving that number in the repo while the live
+paper keeps the old one would create exactly the staleness this project keeps auditing for. When the
+durable store ships, the gate moves into `test/` and the paper's count moves with it, in one deploy.
+
 ### Quiver bought from another agent
 
 See the [At a Glance](#at-a-glance) row and [on-chain verification](docs/onchain-verification.md).

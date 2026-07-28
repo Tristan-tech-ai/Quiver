@@ -14,7 +14,9 @@
     "test:local": "node test/run-local.mjs",
     "postinstall": "node tools/fetch-cli.mjs",
     "test": "node --test test/*.test.mjs",
-    "fetch-cli": "node tools/fetch-cli.mjs"
+    "fetch-cli": "node tools/fetch-cli.mjs",
+    "gate:a": "node --test gates/gateA-proof-durability.mjs",
+    "gate:a-revert": "node gates/gateA-revert.mjs"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

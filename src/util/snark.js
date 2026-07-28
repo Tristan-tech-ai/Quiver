@@ -24,6 +24,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { fork } from 'node:child_process';
 import { attestSignals } from './attest.js';
+import * as proofStore from './proofStore.js';
 
 const require = createRequire(import.meta.url);
 const scale = require('./scale.cjs');
@@ -93,13 +94,25 @@ export async function stopProver() {
 const MAX = 200;
 const store = new Map();   // contentHash -> { status, proof?, publicSignals?, error?, at }
 
+// On a memory miss, ask the durable store before answering 404: the proof may have been built by a
+// process that no longer exists, or by a different replica. Stays synchronous on purpose. The disk
+// read only happens when memory has already missed, the record is a few kilobytes, and making it
+// async would turn a lookup change into a change of shape for every caller.
 export function getProof(contentHash) {
-  return store.get(contentHash) || null;
+  const hot = store.get(contentHash);
+  if (hot) return hot;
+  const cold = proofStore.read(contentHash);
+  if (cold) store.set(contentHash, cold);   // hydrate, so the next poll costs nothing
+  return cold || null;
 }
 
 function put(contentHash, rec) {
   if (store.size >= MAX) store.delete(store.keys().next().value);
-  store.set(contentHash, { ...rec, at: new Date().toISOString() });
+  const full = { ...rec, at: new Date().toISOString() };
+  store.set(contentHash, full);
+  // No-op unless durability is configured, and only ever for `ready`. See proofStore.js for why a
+  // `building` or `failed` record must not outlive the process that decided it.
+  proofStore.write(contentHash, full);
 }
 
 /**
@@ -156,7 +169,8 @@ let queued = 0;
 
 /** Build a proof in the background and record it under the response's content hash. */
 export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
-  if (store.has(contentHash)) return;
+  // getProof, not store.has: a proof already on disk from an earlier process must not be re-proved.
+  if (getProof(contentHash)) return;
   const w = witnessFor(echoedInputs, liquidationPrice);
   if (!w) { put(contentHash, { status: 'unavailable', error: 'this position is outside the circuit domain' }); return; }
   // Refuse rather than certify a position that is not the one that was answered. The served price is

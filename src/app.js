@@ -10,6 +10,7 @@ import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { getProof, verificationKey, warmProver } from './util/snark.js';
+import { durable as proofsAreDurable, count as storedProofCount } from './util/proofStore.js';
 import { _internal, engineSourceFiles } from './engine/proof.js';
 
 // The same directory buildId() hashes, resolved the same way, so /build cannot describe a rule over
@@ -168,6 +169,11 @@ app.get('/build', (_req, res) => {
       files,
       note: 'If your recomputation matches this file list but not the codeHash, the sources changed. If it does not match the file list, your recipe is out of date — this object is the current one.',
     },
+    // Reported rather than claimed. A reader who wants to know whether a proof they fetched will
+    // still be there after a redeploy can read it here instead of taking a docs sentence for it.
+    proofStorage: proofsAreDurable()
+      ? { durable: true, kind: 'content-addressed files', stored: storedProofCount(), note: 'A finished proof survives this process and is readable by any replica sharing the store.' }
+      : { durable: false, kind: 'in-memory only', stored: 0, note: 'Proofs are held in memory and cleared by a redeploy. Set QUIVER_PROOF_DIR to a shared path to make them durable.' },
     reproduce: 'Rebuild from source → identical codeHash. Then re-run the open engine on proof.inputs (on this Node version) → identical result & contentHash. Correctness is re-derived, not trusted.',
   });
 });
@@ -237,9 +243,14 @@ app.get('/proof/:contentHash', (req, res) => {
   }
   const rec = getProof(h);
   if (!rec) {
+    // The note has to say which of the two worlds this deploy is in, because "a redeploy clears them"
+    // stops being true the moment durable storage is configured, and a stale reassurance in a 404 is
+    // exactly the kind of claim this service exists to not make.
     return res.status(404).json({
       error: 'no_proof_for_that_hash',
-      note: 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.',
+      note: proofsAreDurable()
+        ? 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Finished proofs are stored by content hash and survive a redeploy, so this hash was never proved here; ask again and it will be built.'
+        : 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.',
     });
   }
   if (rec.status === 'building') return res.status(202).json({ status: 'building', retryAfterMs: 900, contentHash: h });

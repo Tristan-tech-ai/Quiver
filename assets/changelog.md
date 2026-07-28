@@ -12,6 +12,58 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the signpost could only name twelve of the twenty-two, and nobody had counted
+
+The mis-route signpost added yesterday works by scoring a request against all twenty-two services on
+two signals kept deliberately apart: **shape**, meaning does the body carry a service's required keys,
+which is a fact; and **words**, meaning vocabulary overlap, which is a guess. Only shape is allowed to
+redirect.
+
+Shape read one field, `inputSchema.required`, and **eight of the twenty-two declare that empty** —
+chart-press, calldata-x, macro-sentry, perp-gate, portfolio-gate, size-gate, lp-risk, risk-attest.
+They declare it honestly: each accepts alternative input forms, so no single key is required across
+all of them. size-gate takes `{winProb, winLossRatio}` **or** `{expectedReturn, volatility}`; perp-gate
+takes `margin` **or** `leverage`. There is no one list to put in `required` without lying. The
+consequence, measured by sweeping all 651 ordered pairs of distinct services with a genuine body for
+every accepted form rather than by spot-checking: **the signpost could name only 12 of 22 services**,
+and a request that was unmistakably a size-gate call, sent to perp-gate, produced nothing at all.
+
+The same measurement found something nobody was looking for, and it is the worse half. Both existing
+silence sweeps skip a service whose `required` list is empty — so a third of the catalogue had never
+been checked by the one check whose failure costs the most, and **three services were flagging their
+own correct calls**. A genuine `portfolio-gate` request carrying `positions` scored zero against
+portfolio-gate and one against treasury-risk, so a correct, paid portfolio answer arrived with a
+notice telling the caller they had meant a different service. A signpost that fires on a correct call
+is worse than one that stays quiet on a wrong one, because it makes a right answer look wrong.
+
+What changed:
+
+- Each service that accepts alternative forms now states them as **declared fact**, derived from what
+  its validator actually enforces rather than from what its description says. Shape scores a full
+  match when any one complete form is present. This widens which sets count as complete; it does not
+  soften what counts as evidence, and none of it goes anywhere near the words signal.
+- Two services whose declared `required` **understated** what they enforce are stated accurately:
+  exec-verify also needs a pricing reference, and event-vol also needs a vol and a horizon. Both were
+  collecting redirects they had not earned.
+- Candidates are now ranked so that **a count of matched requirements outranks a vocabulary
+  coincidence**. A body of `{symbol, notional, leverage}` satisfies three of perp-gate's required keys
+  and exactly one of chart-press's, and the blended score gave it to chart-press, 3.18 to 3.10, on
+  word overlap alone.
+
+Measured after: **19 of 22 reachable**, correct redirects over the 651 pairs 249 → 536, mis-directed
+127 → 75, and **no service flags its own correct call any more**. Three remain unreachable and are
+named rather than rounded away: macro-sentry requires nothing at all, so it has no shape to match, and
+token-scan and wallet-audit share one schema object with tape-pulse, so `{chain, address}` genuinely
+does not say which of the three questions is being asked.
+
+Nothing a buyer reads moved. The engine build hash is still `q1-e1fa99d08887d6cc`; the advertised
+`inputSchema` of all twenty-two is byte-identical, verified against the live `/` index and the live
+MCP `tools/list` rather than assumed; and the alternatives are kept in a table keyed by service name
+inside `src/util/routing.js`, never as a field on a service object, so there is no path by which they
+could reach the listing. Content hashes are untouched: this component only ever adds a `routingNotice`
+sibling, and the preflight sweep that replays every service and every optional field of each still
+reports every body byte-identical.
+
 ## 28 July 2026 (later) — a wrong shop is now told apart from a wrong answer
 
 Nothing about the mathematics changed. The engine build hash is still `q1-e1fa99d08887d6cc`, all

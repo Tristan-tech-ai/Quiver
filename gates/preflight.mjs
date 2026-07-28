@@ -16,7 +16,8 @@
 // Exit 0 means safe to deploy. Anything else means do not.
 import { SERVICES } from '../src/services.js';
 import { repairBody } from '../src/util/repair.js';
-import { suggestService } from '../src/util/routing.js';
+import { suggestService, REQUIRED_ALTERNATIVES } from '../src/util/routing.js';
+import { GENUINE, UNREACHABLE_BY_SHAPE, invalidFixtures, coverageSummary, noisyOnCorrectCalls } from './routing-fixtures.mjs';
 import { handleRpc } from '../src/mcp.js';
 import { _internal, engineSourceFiles } from '../src/engine/proof.js';
 import { readFileSync, existsSync } from 'node:fs';
@@ -107,6 +108,65 @@ for (const s of SERVICES) {
   if (suggestService(s, body, SERVICES)) noisy.push(s.name);
 }
 check('the routing signpost stays silent on correct calls', noisy.length === 0, noisy.join(', ') || `${SERVICES.length} services quiet`);
+
+// ── 3b. the same question, asked of the third of the catalogue the sweep above cannot reach ──────
+//
+// `if (!req.length) continue` above is not a detail. Eight of the twenty-two declare `required: []`
+// — honestly, because they accept ALTERNATIVE input forms and no single key is required across all
+// of them — so the sweep synthesises an empty body for them and skips. A third of the services had
+// therefore never been checked by the one check whose failure is worst, and three of them were
+// failing it: a genuine portfolio-gate call carrying `positions` came back with a notice saying the
+// caller had meant treasury-risk. The bodies below are written down rather than generated, because a
+// requirement that is not a flat list cannot be generated from one, and each is put through the
+// service's own validate() first so a stale fixture fails loudly instead of measuring nothing.
+check('every fixture used below is a call the service itself would accept',
+  invalidFixtures().length === 0,
+  invalidFixtures().slice(0, 4).join('\n           ') || `${Object.keys(GENUINE).length} services, every accepted input form`);
+
+const noisyAll = noisyOnCorrectCalls();
+check('the signpost stays silent on a correct call to ANY of the twenty-two, including the eight',
+  noisyAll.length === 0,
+  noisyAll.slice(0, 5).join('\n           ') || `${SERVICES.length} services and every input form each, all quiet`);
+
+// How much of the catalogue the signpost can NAME, swept over every ordered pair rather than
+// spot-checked. A judging agent that lands on the wrong service gets a refusal it does not
+// understand; this number is the fraction of the time it can be told where to go instead.
+const cov = coverageSummary();
+const unreachable = SERVICES.map((s) => s.name).filter((n) => !cov.reachable.has(n));
+check('every service a body can single out is reachable as a redirect target',
+  JSON.stringify(unreachable) === JSON.stringify(UNREACHABLE_BY_SHAPE),
+  `${cov.reachable.size}/${cov.total} reachable over ${cov.rows.length} ordered pairs `
+  + `(${cov.correct} correct, ${cov.misdirected} mis-directed, ${cov.silent} silent) — `
+  + `unreachable [${unreachable.join(', ')}], expected [${UNREACHABLE_BY_SHAPE.join(', ')}]`);
+
+// The table lives in routing.js keyed by service name so that no field is added to a service object
+// and nothing can leak into the advertised inputSchema. Drift is the price of that, and this is where
+// it is paid: a declared key that is not a real property, or a service with no flat required list and
+// no entry, means the signpost and the published listing disagree about what a service needs.
+const drift = [];
+for (const [name, forms] of Object.entries(REQUIRED_ALTERNATIVES)) {
+  const s = SERVICES.find((x) => x.name === name);
+  if (!s) { drift.push(`${name}: declared, but not a service`); continue; }
+  const props = new Set(Object.keys(s.inputSchema?.properties || {}));
+  for (const form of forms) for (const k of form) if (!props.has(k)) drift.push(`${name}.${k} is not a property of ${name}`);
+}
+for (const s of SERVICES) {
+  if ((s.inputSchema?.required || []).length) continue;
+  if (!(s.name in REQUIRED_ALTERNATIVES)) drift.push(`${s.name}: required:[] and no entry — it can never be suggested`);
+}
+check('the routing table has not drifted from the schemas it describes', drift.length === 0,
+  drift.slice(0, 5).join('\n           ') || `${Object.keys(REQUIRED_ALTERNATIVES).length} declarations, every key a real property`);
+
+// The constraint that outranks the feature: an OKX re-review pulls all 22 listings back into
+// moderation, and it is triggered by the ADVERTISED surface moving. The alternatives are deliberately
+// not a field on the service object, so this is a proof rather than a hope.
+const advertised = JSON.stringify({
+  index: liveIndex ? Object.keys(liveIndex.services || {}) : null,
+  schemas: SERVICES.map((s) => s.inputSchema),
+});
+check('nothing about the routing table reaches the advertised inputSchema',
+  !/anyOfRequired|REQUIRED_ALTERNATIVES|requiredAlternatives/.test(advertised),
+  'the alternatives are keyed by service name inside src/util/routing.js and never attached to a service object');
 
 // Any service that builds a Plonk proof must snap its inputs onto the grid the circuit works over,
 // or the proof certifies an identity a few 1e-6 away from the one the answer reports.

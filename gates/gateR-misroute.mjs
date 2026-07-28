@@ -18,7 +18,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { SERVICES } from '../src/services.js';
-import { suggestService, redirectLine, fitScore } from '../src/util/routing.js';
+import { suggestService, redirectLine, fitScore, REQUIRED_ALTERNATIVES, requiredAlternatives } from '../src/util/routing.js';
+import { GENUINE, UNREACHABLE_BY_SHAPE, invalidFixtures, coverageSummary, noisyOnCorrectCalls } from './routing-fixtures.mjs';
 
 const byName = (n) => SERVICES.find((s) => s.name === n);
 
@@ -88,6 +89,132 @@ test('an empty body is left to the validator, not the signpost', () => {
     assert.equal(suggestService(s, {}, SERVICES), null);
     assert.equal(suggestService(s, null, SERVICES), null);
   }
+});
+
+// ── COVERAGE: which services the signpost can NAME ────────────────────────────────────────────────
+//
+// The tests above ask whether the signpost is right when it fires. This block asks the question
+// nobody had asked: how much of the catalogue it is CAPABLE of naming. Measured by sweeping every
+// ordered pair of distinct services — B's genuine body sent to A — rather than by spot-checking the
+// service whose bug prompted the work.
+//
+// Before the `anyOfRequired` declarations: 12 of 22. Eight services declared `required: []` because
+// they accept alternative input forms, and `shape` read only that list, so their score was 0 forever
+// and they could never win. token-scan and wallet-audit were unreachable for a different reason
+// found by the same sweep — they share one schema object with tape-pulse.
+
+test('every fixture is a call the service itself would accept', () => {
+  // FIRST, because everything below is measured with these bodies. A sweep run on bodies that no
+  // service would serve produces a coverage number that means nothing and looks like a result.
+  assert.deepEqual(invalidFixtures(), [], 'a fixture no longer validates — fix the fixture, not the assertion');
+  assert.equal(Object.keys(GENUINE).length, SERVICES.length, 'a service without a fixture is a service nobody measured');
+});
+
+test('each of the eight services that declare no flat required list is reachable, one by one', () => {
+  // Asserted PER SERVICE rather than as a total, because a count of 19 can hide the fact that a
+  // particular service is still invisible — a partial fix reading as a whole one.
+  const reachable = coverageSummary().reachable;
+  const declaredAlternatives = ['chart-press', 'calldata-x', 'perp-gate', 'portfolio-gate', 'size-gate', 'lp-risk', 'risk-attest'];
+  for (const name of declaredAlternatives) {
+    assert.ok(reachable.has(name), `${name} can never be named by the signpost — it declares required:[] and nothing widened it`);
+  }
+});
+
+test('the services that were already reachable still are', () => {
+  const reachable = coverageSummary().reachable;
+  // Measured on the pre-change code, not assumed: these twelve could already be named.
+  for (const name of ['tape-pulse', 'poly-fill', 'poly-desk', 'options-desk', 'lp-desk', 'protocol-pulse',
+    'updown-pulse', 'loop-digest', 'exec-verify', 'options-risk', 'treasury-risk', 'event-vol']) {
+    assert.ok(reachable.has(name), `${name} used to be reachable and is not any more`);
+  }
+});
+
+test('the services a body genuinely cannot single out are named, and are exactly these', () => {
+  // An EQUALITY, so this list cannot quietly rot. If one of them becomes reachable the gate fails and
+  // somebody has to decide on purpose whether that was earned or is a false positive.
+  const reachable = coverageSummary().reachable;
+  const unreachable = SERVICES.map((s) => s.name).filter((n) => !reachable.has(n));
+  assert.deepEqual(unreachable, UNREACHABLE_BY_SHAPE,
+    'the set of services no body can single out has moved; see UNREACHABLE_BY_SHAPE for why each is on the list');
+});
+
+test('a correct call to ANY of the twenty-two stays silent, including the eight', () => {
+  // THE NEGATIVE THAT MATTERS MOST, and the one the older sweeps could not run. They synthesise a
+  // body from `required` and skip a service whose list is empty, so the eight were never tested —
+  // and three of them (chart-press, macro-sentry, portfolio-gate) were flagging their own correct
+  // calls in production. A signpost on a correct answer makes a right answer look wrong.
+  assert.deepEqual(noisyOnCorrectCalls(), [], 'a correct, servable call came back with a redirect notice');
+});
+
+// ── the declaration table cannot drift away from the schemas ─────────────────────────────────────
+// The alternatives live in routing.js keyed by service name, so that no field is added to a service
+// object and nothing can leak into the advertised inputSchema and trigger an OKX re-review. The
+// price of that choice is drift, and this is where it is paid.
+
+test('every declared key is a real property of that service', () => {
+  const bogus = [];
+  for (const [name, forms] of Object.entries(REQUIRED_ALTERNATIVES)) {
+    const s = byName(name);
+    assert.ok(s, `${name} is declared in the table and is not a service`);
+    const props = new Set(Object.keys(s.inputSchema?.properties || {}));
+    for (const form of forms) for (const k of form) if (!props.has(k)) bogus.push(`${name}.${k}`);
+  }
+  assert.deepEqual(bogus, [], 'a declared requirement names a key the service does not accept');
+});
+
+test('the table agrees with the schemas that already publish their own alternatives', () => {
+  // perp-gate publishes allOf[anyOf…] and portfolio-gate publishes anyOf in the inputSchema a buyer
+  // reads. Where the schema already states the fact, the table must state the same fact, or the
+  // signpost and the published listing would disagree about what the service needs.
+  for (const s of SERVICES) {
+    const sc = s.inputSchema || {};
+    const groups = [
+      ...(Array.isArray(sc.allOf) ? sc.allOf : []),
+      ...(Array.isArray(sc.anyOf) ? [{ anyOf: sc.anyOf }] : []),
+    ].map((g) => (g.anyOf || []).map((o) => (o.required || []).join('+')).filter(Boolean)).filter((g) => g.length);
+    if (!groups.length) continue;
+
+    const forms = requiredAlternatives(s);
+    assert.ok(forms.length, `${s.name} publishes alternatives in its schema but the table gives it none`);
+    // Every published option must appear in at least one declared form, and every declared form must
+    // satisfy every published group.
+    for (const group of groups) {
+      const options = group.map((g) => g.split('+'));
+      for (const form of forms) {
+        assert.ok(options.some((opt) => opt.every((k) => form.includes(k))),
+          `${s.name}: declared form [${form}] satisfies none of the published options [${group.join(' | ')}]`);
+      }
+      for (const opt of options) {
+        assert.ok(forms.some((form) => opt.every((k) => form.includes(k))),
+          `${s.name}: published option ${opt.join('+')} appears in no declared form`);
+      }
+    }
+  }
+});
+
+test('a service that declares no flat required list is never left out of the table', () => {
+  // The check that survives somebody adding a twenty-third service. Silence is the default for a
+  // service with an empty required list, and silence is exactly what nobody notices.
+  const missing = SERVICES
+    .filter((s) => !(s.inputSchema?.required || []).length)
+    .filter((s) => !(s.name in REQUIRED_ALTERNATIVES))
+    .map((s) => s.name);
+  assert.deepEqual(missing, [], 'declares required:[] and has no entry in REQUIRED_ALTERNATIVES — it can never be suggested');
+});
+
+test('a count of matched requirements outranks a vocabulary coincidence', () => {
+  // The ranking rule, stated as the case that motivated it. {symbol, notional, leverage} satisfies
+  // three of perp-gate's required keys and exactly one of chart-press's; ranking on the blended
+  // score alone gave it to chart-press, 3.18 to 3.10, on word overlap.
+  const body = { symbol: 'BTC', notional: 60000, leverage: 10 };
+  const perp = fitScore(byName('perp-gate'), body);
+  const chart = fitScore(byName('chart-press'), body);
+  assert.equal(perp.shape, 1, 'perp-gate should see a complete call');
+  assert.equal(chart.shape, 1, 'and so should chart-press — both are complete, which is the point');
+  assert.ok(perp.satisfied > chart.satisfied, 'perp-gate matched more required keys');
+  assert.ok(chart.score > perp.score, 'and still scores lower on the blend — so the blend cannot be the tie-break');
+  assert.equal(suggestService(byName('options-desk'), body, SERVICES).service, 'perp-gate',
+    'the service with more matched requirements must win');
 });
 
 test('the score separates hard evidence from weak evidence', () => {

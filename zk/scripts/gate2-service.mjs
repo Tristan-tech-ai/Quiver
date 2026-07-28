@@ -27,13 +27,13 @@ function run(cmd, args, opts = {}) {
 }
 
 // ---- 1. the engine hash has not moved -------------------------------------------------------
-const { _internal } = await import(new URL('../../hackathon/veritape/src/engine/proof.js', import.meta.url));
+const { _internal } = await load(import.meta.url, 'engine/proof.js');
 const EXPECTED_BUILD = 'q1-e1fa99d08887d6cc';
 record('engine hash unchanged', _internal.buildId() === EXPECTED_BUILD,
   `${_internal.buildId()} (expected ${EXPECTED_BUILD})`);
 
 // ---- 2. asking for a proof does not change the answer ---------------------------------------
-const { byName } = await import(new URL('../../hackathon/veritape/src/services.js', import.meta.url));
+const { byName } = await load(import.meta.url, 'services.js');
 const APPENDIX_C = { side: 'long', entryPrice: 64000, size: 1, leverage: 10, maintMarginRate: 0.0125 };
 const plain = await byName['perp-gate'].run({ ...APPENDIX_C });
 const withSnark = await byName['perp-gate'].run({ ...APPENDIX_C, snark: true });
@@ -63,6 +63,7 @@ else {
 import './src/app.js';
 import { byName } from './src/services.js';
 import { getProof } from './src/util/snark.js';
+import { load } from './service-root.mjs';
 const boot = Date.now() - Number(process.env.T0);
 // A buyer arrives some seconds into a container's life, not at millisecond zero. Measuring at zero
 // hides the whole effect, because then the import is in flight either way.

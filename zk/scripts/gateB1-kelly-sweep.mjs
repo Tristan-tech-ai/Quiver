@@ -19,10 +19,11 @@
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { load } from './service-root.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(__dirname, '..', 'build');
-const { sizeGate } = await import(new URL('../../hackathon/veritape/src/engine/sizeGate.js', import.meta.url));
+const { sizeGate } = await load(import.meta.url, 'engine/sizeGate.js');
 
 const SCALE = 1_000_000_000n;
 const S = Number(SCALE);

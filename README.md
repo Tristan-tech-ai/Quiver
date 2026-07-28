@@ -52,19 +52,43 @@ liquidation identity needed a division cleared through three factors of SCALE.
 
 | | |
 |---|---|
-| Circuit | [`zk/circuits/kelly.circom`](zk/circuits/kelly.circom) — **357 R1CS / 718 Plonk constraints**, zero private inputs (the first circuit, liquidation, is the older [`research/zk/circuits/liquidation.circom`](research/zk/circuits/liquidation.circom), where its build notes live) |
+| Circuit | [`zk/circuits/kelly.circom`](zk/circuits/kelly.circom) — **372 R1CS / 718 Plonk constraints**, zero private inputs (the first circuit, liquidation, is the older [`research/zk/circuits/liquidation.circom`](research/zk/circuits/liquidation.circom), where its build notes live) |
 | Statement | `f̂·b̂ = p̂·b̂ + S·p̂ − S²`, with the residual bounded by `2·|R| ≤ b̂`, derived from a public signal so a prover cannot widen it |
 | Proving | **547 ms**, zkey 2.2 MB (the liquidation circuit: 703 ms, 5.3 MB) |
 | Verifier | [`zk/build/KellyVerifier.sol`](zk/build/KellyVerifier.sol), 6,552 bytes deployed |
 | On chain cost | **273,118 gas** to accept · **573 gas** to reject a bent proof |
 
-Three gates, each able to fail, all runnable from a clone:
+Three gates, each able to fail:
 
 ```bash
 node zk/scripts/gateB0-kelly.mjs        # proves, verifies, and refuses all 5 perturbed signals
 node zk/scripts/gateB1-kelly-sweep.mjs  # 4,000 bets through the real engine; bound never violated
-node zk/scripts/gateB2-kelly-evm.mjs    # Solidity verifier in an EVM: accepts, then refuses 6 ways
+cd zk && npm install                    # solc + an in-process EVM, gate-only, never shipped
+node scripts/gateB2-kelly-evm.mjs       # Solidity verifier in an EVM: accepts, then refuses 6 ways
 ```
+
+The first two run against a fresh clone with no extra install. The third needs `zk/package.json`'s
+dependencies, which are deliberately **not** in the service manifest: `solc` and an in-process EVM
+rehearse a verifier, they never answer a request, and the thing that serves traffic should not carry
+them.
+
+**That paragraph is a correction.** An earlier version of this section said all three were "runnable
+from a clone", and none of them was. Every script under `zk/scripts` imported the engine as
+`../../hackathon/veritape/src/...`, which is a path in the author's working tree and does not exist in
+this repository, so all five gates — including `gate2` and `gate3`, cited elsewhere as re-runnable
+rehearsals of the on-chain registry — died with `ERR_MODULE_NOT_FOUND` for anyone who cloned it. The
+proving key and witness wasm were missing too: the repo shipped the verification key and the gate
+*results*, but not the artifacts needed to reproduce those results. Verifiability from a clone is the
+load-bearing claim of this whole project, and it was untested, so it drifted.
+
+```bash
+node zk/scripts/gate-clone-portability.mjs   # the check that was missing
+```
+
+It refuses two failure modes specifically: a local module that cannot be resolved, and a build
+artifact that is not in the checkout. It does not demand that every gate *pass*, because `gate3` talks
+to a live chain and a network failure is not a portability failure. Proven able to fail by pointing
+one gate back at the old path: it goes red on three counts and names the offending file.
 
 **Gate B1 failed the first time it ran, and that is the point of it.** 3,997 of 4,000 sampled bets
 blew the residual bound by a factor of about a thousand. The cause was not the circuit: `sizeGate`
@@ -75,6 +99,13 @@ when the engine handed back `round(M, 2)` for margin. The witness now recomputes
 precision from the snapped inputs, with a guard that refuses to certify at all when the result drifts
 past the six decimals the answer is published at. After the fix: **0 violations in 4,000, tightest
 case using 0.9997 of the bound** — tight rather than generous, which is what makes it worth proving.
+
+Those two constraint counts are now **read from the artifacts** by
+[`zk/scripts/circuit-facts.mjs`](zk/scripts/circuit-facts.mjs) rather than written down. They used to
+be literals: the gate recorded `plonkConstraints: 718` by hand, and this table said "357 R1CS", which
+is circom's *non-linear* count and not what the `.r1cs` file holds. The literal was right and the
+label was wrong, and neither was ever compared to the file it described, which is the only part that
+mattered.
 
 **Not yet shipped, stated plainly:** the live `size-gate` service does not serve these proofs and no
 Kelly verifier is deployed on chain. Both need either a deploy or gas, and neither is worth the risk

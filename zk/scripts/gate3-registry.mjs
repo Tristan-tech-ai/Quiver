@@ -15,6 +15,7 @@ import { EVM } from '@ethereumjs/evm';
 import { Common, Chain, Hardfork } from '@ethereumjs/common';
 import { keccak256 } from 'ethereum-cryptography/keccak.js';
 import { utf8ToBytes, bytesToHex, hexToBytes } from 'ethereum-cryptography/utils.js';
+import { load } from './service-root.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(__dirname, '..', 'build');
@@ -57,8 +58,8 @@ async function main() {
 
   // ---- 1. buy a risk number from the live engine, and take the proof it builds ----------------
   process.env.QUIVER_SIGNING_KEY = TEST_KEY;
-  const { byName } = await import(new URL('../../hackathon/veritape/src/services.js', import.meta.url));
-  const { getProof } = await import(new URL('../../hackathon/veritape/src/util/snark.js', import.meta.url));
+  const { byName } = await load(import.meta.url, 'services.js');
+  const { getProof } = await load(import.meta.url, 'util/snark.js');
   const answer = await byName['perp-gate'].run({
     side: 'long', entryPrice: 64000, size: 1, leverage: 10, maintMarginRate: 0.0125, snark: true,
   });

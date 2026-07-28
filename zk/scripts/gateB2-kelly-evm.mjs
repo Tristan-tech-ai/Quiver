@@ -15,6 +15,7 @@ import { EVM } from '@ethereumjs/evm';
 import { Common, Chain, Hardfork } from '@ethereumjs/common';
 import { keccak256 } from 'ethereum-cryptography/keccak.js';
 import { utf8ToBytes, bytesToHex, hexToBytes } from 'ethereum-cryptography/utils.js';
+import { load } from './service-root.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BUILD = path.join(__dirname, '..', 'build');
@@ -34,7 +35,7 @@ const record = (name, pass, detail) => {
 console.log(`GATE B2 — Kelly verifier in an EVM — ${new Date().toISOString()}\n`);
 
 // ---- 1. a proof from the real engine's numbers --------------------------------------------------
-const { sizeGate } = await import(new URL('../../hackathon/veritape/src/engine/sizeGate.js', import.meta.url));
+const { sizeGate } = await load(import.meta.url, 'engine/sizeGate.js');
 const p = 0.55, b = 1.2;
 const served = sizeGate({ winProb: p, winLossRatio: b });
 const pHat = toScaled(p), bHat = toScaled(b);

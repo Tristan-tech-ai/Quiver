@@ -1,0 +1,23 @@
+{
+  "name": "quiver-zk-gates",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Circuits and gates for Quiver's succinct-proof layer. Separate from the service manifest on purpose: solc and an in-process EVM are needed to REHEARSE a verifier, never to serve a request, and the running service must not carry them.",
+  "type": "commonjs",
+  "scripts": {
+    "facts": "node scripts/circuit-facts.mjs",
+    "gate:b0": "node scripts/gateB0-kelly.mjs",
+    "gate:b1": "node scripts/gateB1-kelly-sweep.mjs",
+    "gate:b2": "node scripts/gateB2-kelly-evm.mjs",
+    "gate:clone": "node scripts/gate-clone-portability.mjs"
+  },
+  "dependencies": {
+    "@ethereumjs/common": "^4.4.0",
+    "@ethereumjs/evm": "^3.1.0",
+    "@ethereumjs/util": "^9.1.0",
+    "circom2": "^0.2.23",
+    "circomlib": "^2.0.5",
+    "snarkjs": "^0.7.6",
+    "solc": "^0.8.26"
+  }
+}

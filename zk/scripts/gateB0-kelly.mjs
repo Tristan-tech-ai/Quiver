@@ -62,6 +62,10 @@ console.log(`  scaled: pHat ${enc.pHat}  bHat ${enc.bHat}  fHat ${enc.fHat}`);
 console.log(`  residual R = ${enc.R}  (tolerance 2|R| <= ${enc.bHat})\n`);
 record('the worked case has an exact residual', enc.R === 0n, `R = ${enc.R}`);
 
+// Sizes read from the artifacts, so the record below describes the circuit that was actually proved.
+const snarkjsInfo = (await import('snarkjs')).default ?? (await import('snarkjs'));
+enc.r1cs = (await snarkjsInfo.r1cs.info(path.join(BUILD, 'kelly.r1cs'))).nConstraints;
+
 // ---- 2. prove and verify ----------------------------------------------------------------------
 const wasm = path.join(BUILD, 'kelly_js', 'kelly.wasm');
 const zkey = path.join(BUILD, 'kelly_plonk.zkey');
@@ -121,7 +125,14 @@ console.log(`\n${'='.repeat(70)}`);
 console.log(`GATE B0: ${gate ? 'PASSED' : `FAILED — ${failed.map((f) => f.name).join('; ')}`}`);
 writeFileSync(path.join(BUILD, 'gateB0-kelly.json'), JSON.stringify({
   at: new Date().toISOString(), passed: gate, proveMs,
-  plonkConstraints: 718, publicSignals, residual: String(enc.R), checks: results,
+  // Read from the zkey, not written down. This line used to be the literal `718`. The literal
+  // happened to be right, but nothing compared it to the artifact, so it could have gone stale on
+  // the first edit to the circuit and the gate would still have reported it with a straight face.
+  ...(await import('./circuit-facts.mjs').then((m) => {
+    const f = m.plonkFacts(zkey);
+    return { plonkConstraints: f.nConstraints, r1csConstraints: enc.r1cs, domainSize: f.domainSize };
+  })),
+  publicSignals, residual: String(enc.R), checks: results,
 }, null, 2) + '\n', 'utf8');
 await globalThis.curve_bn128?.terminate();
 process.exit(gate ? 0 : 1);

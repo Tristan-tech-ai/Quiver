@@ -44,3 +44,48 @@ finding.
 - **V4**: building the DefiLlama reconstruction gate PER RESERVE, because comparing on the total
   produces a verifier that cannot fail: at a 10 bps aggregate band, 32 of 57 reserves could be zeroed
   and it would still read green.
+
+---
+
+## Post-deploy round
+
+## V6 — `gate:d3` instability is the data source, not the code
+
+Observed 15/1 then 10/6 on consecutive runs shortly after two agents edited the same adapter, which
+looked exactly like a merge defect. Re-run three times after the deploy: **0 failures, 0 failures, 0
+failures.**
+
+So the gate is correct and its dependency is not. It reads live dYdX archives whose depth and
+availability vary by the minute, and one of the two archive-serving operators is the only one deep
+enough for the historical path.
+
+**This is a real weakness in the gate rather than a curiosity.** A check whose red can mean either
+"the thing under test is broken" or "somebody else's server was busy" cannot be read as a binary. The
+codebase already has the right pattern in two places: `gate-clone-portability` separates a missing
+npm package from a broken path, and the `eth_getProof` work splits rate-limit HTML from a real
+verification failure and retries only the former. `gate:d3` should do the same, and until it does,
+its red is not evidence on its own.
+
+**Recorded as an open task rather than fixed here**, because the deploy was in flight and changing a
+gate mid-window is how a green becomes meaningless.
+
+## The deploy, for the record
+
+Went out at 17:20:59 UTC, 01:20 WITA, inside the agreed window.
+
+| | |
+|---|---|
+| dark | **11 seconds**, against a three-minute expectation |
+| services | 22, unchanged |
+| MCP tools | 9, unchanged |
+| paid path | 402, correct |
+| codeHash | `q1-e1fa99d08887d6cc`, unmoved, so no re-review |
+| changelog | matches the repo and carries the day's entry |
+| paper parts | 7/7 byte-identical |
+
+The one doubt named before pressing was `gate:d3`'s instability. It was resolved rather than waived:
+no attestation module is reachable from any served path, so the instability could not touch a request.
+V6 above now confirms the instability was never a defect at all.
+
+`proofStorage` reports itself `durable: false` with the instruction to set `QUIVER_PROOF_DIR`. That is
+correct: Phase A shipped switched off, pending a decision about a Railway volume.

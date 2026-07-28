@@ -78,10 +78,41 @@ Vega has the same problem at the same strikes. Identity B relates two small numb
 
 ---
 
+## The negative half is solved, measured
+
+That last sentence is an argument against **one** scale, not against fixed point.
+
+Give every quantity its own power-of-ten exponent, so each carries nine significant digits whatever
+its magnitude, and align the exponents when the two sides are compared. Over the same 4,000 surfaces:
+
+| encoding | surfaces kept | worst relative residual |
+|---|---|---|
+| shared 1e-9 grid | 3,956 of 4,000 | **6.077e-1** |
+| shared grid, gamma alone at 1e-18 | 3,973 | 2.237e-1 |
+| per-value exponent, 9 significant digits | **3,999** | **7.344e-9** |
+
+Eight orders of magnitude better, with no domain restriction at all, and 7.3e-9 is exactly what nine
+significant digits should give. The worst case is no longer a deep-OTM option with a vanishing gamma;
+it is an ordinary one at gamma 8.1e-3, which means the encoding stopped being the binding constraint.
+
+So the arithmetic is **solved**. What remains is ordinary circuit engineering:
+
+- each mantissa needs a range check plus a normalisation check that it sits in `[1e8, 1e9)`
+- exponent alignment needs `10^d` supplied as a witness and constrained to be a genuine power of ten,
+  which is a one-hot selector over a bounded exponent range rather than anything exotic
+- cost, and this is an **estimate rather than a measurement**: 600 to 800 R1CS on top of the current
+  1,103, so around 3,700 Plonk against the 4,096 ceiling. It would fit, narrowly, at domain 4,096
+
+**Not built.** `greeks.circom` still uses the shared grid and `gateB7-1` still fails, because building
+the encoding is the next piece of work and claiming it before it exists is the error this whole
+document was written to correct.
+
+---
+
 ## Where that leaves Tier 3
 
-Not "blocked on transcendentals". **Blocked on fixed-point representation of small greeks**, which is
-a different problem and a clearer one:
+Not "blocked on transcendentals", and no longer blocked on representation either, now that the
+per-value encoding above is measured. What is left is bounded circuit work:
 
 - it is arithmetic, not cryptography — no lookup arguments, no polynomial approximation of `erf`, no
   proven error bounds on a transcendental

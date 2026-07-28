@@ -7,6 +7,7 @@ import { paid } from './x402.js';
 import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
+import { suggestService, redirectLine } from './util/routing.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { getProof, verificationKey, warmProver } from './util/snark.js';
@@ -358,7 +359,7 @@ app.get('/diag/scan', async (req, res) => {
   const body = { ...req.query };
   if (body.usd) body.usd = Number(body.usd);
   const v = svc.validate(body);
-  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error) });
+  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error), routingNotice: suggestService(svc, req.body || {}, SERVICES) });
   try {
     res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` }));
   } catch (e) {
@@ -373,7 +374,7 @@ app.post('/diag/scanpost', async (req, res) => {
   const svc = byName[req.body?.svc];
   if (!svc) return res.status(400).json({ error: 'unknown svc' });
   const v = svc.validate(req.body?.body || {});
-  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error) });
+  if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error), routingNotice: suggestService(svc, req.body || {}, SERVICES) });
   try { res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` })); }
   catch (e) { res.status(500).json({ svc: svc.name, error: 'engine_error', detail: String(e.message || e).slice(0, 400) }); }
 });
@@ -488,11 +489,36 @@ for (const s of SERVICES) {
   })(async (req) => {
     const raw = (req.body && Object.keys(req.body).length) ? req.body : (req.query || {});
     const v = s.validate(raw);
-    if (v.error) { const err = new Error(`bad_input: ${refusalDetail(s, v.error)}`); err.status = 400; throw err; }
+    if (v.error) {
+      // A refusal that says what THIS service needs is true and was not enough: agent #5152's only two
+      // bad reviews came from a caller that read such a hint and still could not find the right shop.
+      // So the refusal now also names the service that fits, with the exact call to make.
+      const redirect = redirectLine(s, raw, SERVICES);
+      const err = new Error(`bad_input: ${refusalDetail(s, v.error)}${redirect ? ` | ${redirect}` : ''}`);
+      err.status = 400;
+      throw err;
+    }
     req.input = v;
     const ctx = { host: `${req.protocol}://${req.get('host')}` };
-    if (s.cacheKey) return cached(s.cacheKey(req.input), s.cacheTtl || config.cacheTtlMs, () => s.run(req.input, ctx));
-    return s.run(req.input, ctx);
+    const answer = s.cacheKey
+      ? await cached(s.cacheKey(req.input), s.cacheTtl || config.cacheTtlMs, () => s.run(req.input, ctx))
+      : await s.run(req.input, ctx);
+
+    // The harder case, and the one that actually cost the two half-stars: the call SUCCEEDED at the
+    // wrong shop. Nothing was refused, the numbers are correct, and they answer a question the caller
+    // did not ask. Attached as a SIBLING of `result` and `proof`, never inside either, so the content
+    // hash covers exactly what it covered before and every published proof keeps reproducing.
+    const misroute = answer && typeof answer === 'object' ? suggestService(s, raw, SERVICES) : null;
+    if (misroute) {
+      answer.routingNotice = {
+        note: `This answer is correct for ${s.name}, but the request looks like it was meant for ${misroute.service}.`,
+        because: misroute.because,
+        suggested: { service: misroute.service, endpoint: misroute.endpoint, price: misroute.price },
+        retry: misroute.retry,
+        disclaimer: 'Quiver does not reroute a paid call. You asked this endpoint and this endpoint answered; the signpost is here so a caller can tell a wrong shop from a wrong answer.',
+      };
+    }
+    return answer;
   });
   app.get(s.path, handler);   // unpaid GET probe -> 402 (was 404)
   app.post(s.path, handler);  // unpaid/empty POST -> 402 (was 400)

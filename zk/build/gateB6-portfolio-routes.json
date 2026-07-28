@@ -1,0 +1,39 @@
+{
+  "at": "2026-07-28T09:59:59.056Z",
+  "passed": true,
+  "legs": 11,
+  "routeA": {
+    "gas": "273118",
+    "proveMsEstimated": 5381,
+    "buildableToday": false
+  },
+  "routeB": {
+    "gas": "2947769",
+    "proveMsPerLeg": 747,
+    "proveMsSerial": 8217,
+    "proveMsParallel": 909,
+    "buildableToday": true
+  },
+  "gasByLegCount": [
+    {
+      "legs": 1,
+      "gas": "276369"
+    },
+    {
+      "legs": 3,
+      "gas": "806915"
+    },
+    {
+      "legs": 5,
+      "gas": "1345154"
+    },
+    {
+      "legs": 8,
+      "gas": "2145525"
+    },
+    {
+      "legs": 11,
+      "gas": "2947769"
+    }
+  ]
+}

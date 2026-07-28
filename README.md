@@ -112,6 +112,81 @@ Kelly verifier is deployed on chain. Both need either a deploy or gas, and neith
 while reviewers are testing. This is exactly what the paper said about the liquidation circuit before
 it shipped: built, and verifiable from a clone.
 
+### Answering the wrong question correctly
+
+Agent #5152 holds twelve on-chain reviews: ten at five stars and two at half a star. Both bad ones are
+from the same reviewer agent, and its own comments say what happened.
+
+> "Wrong endpoint: options-desk can't do Aave health checks. No deliverable."
+> "Delivered crypto options/vol data, not the Aave health check that was requested"
+
+It wanted a lending-protocol health check and called `options-desk`. Two other agents ran the same
+Aave task through `protocol-pulse` and scored it **5.0 and 4.8**, so the capability was there and
+working. The reviewer picked the wrong service out of twenty-two, and Quiver had no way to say so.
+Read it yourself: `onchainos agent feedback-list --agent-id 5152`.
+
+It failed twice, in two different ways:
+
+| | what happened | what could have helped |
+|---|---|---|
+| call 1 | body did not fit `options-desk`, so it was refused | the refusal said what `options-desk` needs. True, and useless: it never named the service that does Aave |
+| call 2 | body **did** fit, so it succeeded and returned a correct options surface | nothing. No refusal happened, so no refusal message could help |
+
+The second is the dangerous one. **A service that answers the wrong question correctly looks, from
+outside, exactly like a service that is wrong.**
+
+[`src/util/routing.js`](src/util/routing.js) closes both. It scores the request against all
+twenty-two services on two signals kept deliberately apart: *shape*, meaning which required keys the
+body carries, which is a fact about the service; and *words*, meaning vocabulary overlap, which is a
+guess and is weighted as one. A refusal now names the service that fits and gives the exact call to
+retry. A success that looks mis-aimed carries a `routingNotice` beside `result` and `proof` — never
+inside either, so the content hash is untouched and every published proof still reproduces.
+
+The case that took a second attempt to catch is call 2: the body satisfied `options-desk` completely
+*and* carried `protocol`, a key `options-desk` has never heard of and `protocol-pulse` requires. A
+foreign required key in an otherwise valid body is the signature of a mis-route, and the first version
+of the detector missed it entirely.
+
+```bash
+npm run gate:r   # replays both of MantaRay's calls and requires the signpost
+```
+
+Six checks. Two replay the reviews. The other four are the half that can fail: an ordinary options
+request must **not** be flagged, all twenty-two services must leave their own minimal valid requests
+alone, an empty body belongs to the validator rather than the signpost, and hard evidence must outrank
+weak evidence. Proven able to fail by a scripted revert: with the detector stubbed out, 2 of 6 go red.
+
+**Quiver never reroutes a paid call.** You asked this endpoint and this endpoint answered. The
+signpost exists so a caller can tell a wrong shop from a wrong answer, which is precisely the
+distinction the two half-stars failed to make.
+
+### Portfolio proofs: the wide circuit was the wrong question
+
+`portfolio-gate` reports the leg nearest liquidation, a minimum over legs. Proving a minimum inside
+one circuit forces every leg into one evaluation domain, and a leg **is** the liquidation circuit at
+1,301 constraints, so the ceremony file on hand caps it at three. The obvious answer was to fetch a
+bigger file. Both halves of that turned out to be wrong.
+
+The file is not big: 2^14 is **18.1 MB**, not the "gigabytes" an earlier draft of the plan claimed.
+But `zk/scripts/domain-scaling.mjs` measures proving at domain^1.01, so twelve legs would take about
+5.7 s and break the roadmap's own three-second abandon threshold. A bigger file moves the wall.
+
+So `zk/scripts/gateB6-portfolio-routes.mjs` measured the alternative: prove each leg separately and
+let a contract take the minimum on chain. A Plonk proof is constant size and constant verification
+cost whatever the circuit behind it, which is the fact the whole comparison turns on.
+
+| | one wide circuit | one proof per leg |
+|---|---|---|
+| gas (11 legs) | ~273,118 | **2,947,769** (10.8×) |
+| cost on X Layer at 0.02 gwei | 0.000005 OKB | **0.000059 OKB** |
+| proving | ~5.4 s, serial, unsplittable | 747 ms/leg, **~909 ms if parallel** |
+| buildable today | **no** — needs 2^14 | **yes** — with what is already on disk |
+
+The 10.8× gas that looked like the deciding trade is worth about five hundredths of a millicent on
+this chain. The contract picks the right leg, and one invalid leg reverts the whole call, because a
+minimum over whatever happened to verify is not a minimum. Nothing is deployed; `PortfolioMin.sol`
+exists only inside that test.
+
 ### Three more circuits: treasury, LP divergence, execution
 
 Tier 1 of [the completion plan](docs/phase-b-remaining-plan.md). The proof layer now covers **five of

@@ -24,8 +24,13 @@
 //                          match against a rate every asset shares would prove nothing), at every
 //                          power of ten from 1e-18 to 1e18, in both sign conventions and both
 //                          two's-complement readings — 104,932 candidate scalings. Zero matches.
-//                          §4.1's scan stopped at 0x830 and so never saw that 0x812/0x813/0x814 are
-//                          live at all; funding is not in those either.
+//                          What this sweep adds over §4.1's is CALLDATA SHAPE, not address range:
+//                          §4.1 scanned 0x800–0x830, which already contains every live precompile
+//                          (nothing above 0x814 answers anything). But 0x800/0x801/0x80f/0x813 only
+//                          answer an address+index shape and look DEAD to a scan sending a bare
+//                          uint32, so a single-shape scan under-reports what is there. Sweeping to
+//                          0x8ff additionally establishes the negative: there is nothing above
+//                          0x814 to find.
 //     marginTiers          0x…080a returns marginTableId (56 for BTC); NOTHING returns the table it
 //                          names. Confirmed by calling every live precompile with the tableId and
 //                          searching for the tier bounds. THIS MATTERS: perp-gate PREFERS notional

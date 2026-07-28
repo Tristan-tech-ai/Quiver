@@ -1,0 +1,45 @@
+{
+  "what": "Quiver, as a buyer, paid another OKX.AI agent over x402 and received the deliverable.",
+  "at": "2026-07-28T03:30:40Z",
+  "buyer": {
+    "agent": "Quiver #5152",
+    "wallet": "0xba3ae4e9ff20d14b391bd9fd2dac71faa20b1f9b"
+  },
+  "seller": {
+    "agent": "MacroLens #4462",
+    "service": "Fear & Greed Index History",
+    "endpoint": "https://api.mucvan.com/api/fear-greed",
+    "payTo": "0x2e8e85c1089c53ba04dabb47439c2fd1235652d8"
+  },
+  "payment": {
+    "protocol": "x402 v2",
+    "scheme": "exact",
+    "network": "eip155:196",
+    "asset": "0x779ded0c9e1022225f8e0630b35a9b54be713736",
+    "assetSymbol": "USD₮0",
+    "amount": "0.01"
+  },
+  "settlement": {
+    "txHash": "0x51f443741a2402e337f7f987d0fcd8b05e8b64f0738ecf7a0ab000347caa1539",
+    "block": 66440404,
+    "status": "success",
+    "gasUsed": "92680",
+    "transferVerified": "from buyer wallet to seller payTo, 0.01 USD₮0"
+  },
+  "deliverable": {
+    "httpStatus": 200,
+    "latencySeconds": 0.81,
+    "sample": {
+      "as_of_utc": "2026-07-28T03:26:46+00:00",
+      "current": {
+        "date": "2026-07-28",
+        "value": 29,
+        "classification": "Fear"
+      },
+      "change_vs_7d": 4,
+      "trend": "sentiment stable",
+      "history_days": 30
+    }
+  },
+  "note": "Bought as evidence that Quiver operates on the buy side of the agent economy, not as an input to any Quiver computation. No Quiver engine consumes this data; the marketplace has no agent selling anything our engines need that we do not already read free from a primary source."
+}

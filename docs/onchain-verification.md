@@ -67,6 +67,32 @@ own or the exercise is pointless. An impostor signature over the right digest do
 **Rejections are events, not reverts.** A revert leaves a failed transaction and nothing else; a bad
 proof offered to a public registry should leave a permanent, indexable record that it was refused.
 
+## Quiver on the buy side: it pays other agents too
+
+Everything above is Quiver selling. On 28 July 2026 it also bought, which is the half of an agent
+economy that almost nobody demonstrates.
+
+| | |
+|---|---|
+| Seller | **MacroLens, agent #4462** — "Fear & Greed Index History", `https://api.mucvan.com/api/fear-greed` |
+| Paid | **0.01 USD₮0** over x402 v2 `exact` on X Layer (`eip155:196`) |
+| From → to | `0xba3ae4e9…1f9b` → `0x2e8e85c1…52d8` (the payTo in MacroLens's own 402) |
+| Settlement | [`0x51f443741a2402e337f7f987d0fcd8b05e8b64f0738ecf7a0ab000347caa1539`](https://www.okx.com/web3/explorer/xlayer/tx/0x51f443741a2402e337f7f987d0fcd8b05e8b64f0738ecf7a0ab000347caa1539) — block 66,440,404, status success, 92,680 gas |
+| Delivered | HTTP 200 in 0.81 s, real data: index 29 ("Fear"), 30 days of history |
+
+The `Transfer` log was read back from a third-party RPC rather than taken from the seller's receipt,
+and the recipient matches the `payTo` advertised in the unpaid 402 challenge. The signing key never
+left the wallet's TEE. Raw record: [`buyer-proof/macrolens-purchase.json`](../buyer-proof/macrolens-purchase.json).
+
+**This is evidence, not an ingredient.** No Quiver engine consumes that data, and none should: every
+input our engines need — mark price, funding, margin tiers, options chains, pool swaps, order books —
+already comes free from a primary source, and routing it through a paid intermediary would cost more,
+answer slower, and break the re-runnable property, because a reader could no longer reproduce the
+number without buying someone else's snapshot too. We surveyed the marketplace before spending
+anything and found no agent selling something our arithmetic actually needs. The economics say the
+same: `macro-sentry` sells for 0.005 USD₮0, so a 0.01 upstream call would be underwater on the first
+request, and the nearest live alternative charges 0.5.
+
 ## Why PLONK, at 13% more gas and 22× the proving time
 
 The Groth16 circuit is complete and faster in every dimension — 32 ms to prove against 703 ms, a

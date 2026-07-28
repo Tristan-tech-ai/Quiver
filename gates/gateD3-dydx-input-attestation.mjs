@@ -177,9 +177,60 @@ test('open a signature-verified anchor on dYdX mainnet', async () => {
   console.log(`      funding: num_premiums ${fundingCtx.premiumStore.numPremiums}, ${fundingCtx.premiumStore.markets.length} markets with entries, tick ${fundingCtx.tickEpoch.duration}s / sample ${fundingCtx.sampleEpoch.duration}s, ${fundingCtx.proofBytes} B of proof over ${fundingCtx.valueBytes} B of value`);
 });
 
+// Is this exception somebody else's server, or is it our attestation being wrong?
+//
+// THE DIRECTION OF THE DEFAULT IS THE WHOLE DESIGN. An allowlist of things that are definitely
+// transport, and EVERYTHING ELSE COUNTS AS A REAL FAILURE. Written the other way round, as a list of
+// strings that mean "broken", the first unanticipated error message would be silently excused and the
+// gate would go quiet exactly when something new went wrong. An unrecognised error is not evidence of
+// innocence.
+//
+// The names below are matched only against transport-layer text. Nothing here can match a proof that
+// verifies against the wrong root, a value outside its bound, or a signature that does not check:
+// those carry our own vocabulary and fall through to `failures`.
+const UNAVAILABLE = [
+  /fetch failed/i,                       // undici, the usual shape of a dead or refused connection
+  /\b(ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|EPIPE|ECONNABORTED)\b/,
+  /\b(408|429|500|502|503|504)\b/,       // busy, rate-limited, or restarting: not a wrong answer
+  /timed? ?out/i,
+  /socket hang up/i,
+  /operation was aborted|AbortError/i,
+  /network|terminated|other side closed/i,
+  /(height|block).{0,30}(not available|is not available|pruned|too (old|low))/i,
+  /no (archive|rpc|endpoint).{0,20}(available|responded|reachable)/i,
+];
+const isUnavailable = (e) => {
+  const text = `${e?.name || ''} ${e?.message || ''} ${e?.cause?.code || ''} ${e?.cause?.message || ''}`;
+  return UNAVAILABLE.some((rx) => rx.test(text));
+};
+
+// The classifier is itself a claim, so it is tested rather than trusted. Both directions: a transport
+// error must be forgiven AND a verification error must not be. Half of this test is the half that
+// matters — without the second group, a classifier that returned `true` for everything would pass.
+test('the availability classifier can still call a real failure a failure', () => {
+  const transport = [
+    Object.assign(new Error('fetch failed'), { cause: { code: 'ECONNREFUSED' } }),
+    new Error('request to https://archive.example failed, reason: socket hang up'),
+    new Error('HTTP 503 Service Unavailable'),
+    new Error('height 12345678 is not available, lowest height is 20000000'),
+    Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }),
+  ];
+  const real = [
+    new Error('ICS-23 proof does not verify against the anchored app_hash'),
+    new Error('root mismatch: computed 0xdead… expected 0xbeef…'),
+    new Error('DIVERGENCE_EXCEEDS_BOUND'),
+    new Error('precommit signature failed to verify'),
+    new Error('perpetual 42 absent from the proven store'),
+    new Error('something nobody anticipated'),   // the default, and it must land on the strict side
+  ];
+  for (const e of transport) assert.equal(isUnavailable(e), true, `should be forgiven: ${e.message}`);
+  for (const e of real) assert.equal(isUnavailable(e), false, `MUST NOT be forgiven: ${e.message}`);
+});
+
 test('the indexer agrees with signed chain state across many markets', async () => {
   const results = [];
   const failures = [];
+  const unavailable = [];
   let i = 0;
   const worker = async () => {
     while (i < sample.length) {
@@ -195,13 +246,38 @@ test('the indexer agrees with signed chain state across many markets', async () 
           if (!r.ok) failures.push(`${ticker}/${q}: ${r.reason} rel=${r.relDiff} claimed=${claimed} proven=${r.proven}`);
           else results.push({ ticker, q, rel: r.relDiff, used: r.boundUsedPct });
         }
-      } catch (e) { failures.push(`${ticker}: PROOF ${e.message}`); }
+      } catch (e) {
+        // WHY THIS IS NOT JUST `failures.push`. This gate read 15/1 then 10/6 on consecutive runs and
+        // then 0/0/0 three times over, with no code change in between. It reads live dYdX archives
+        // whose depth and availability vary by the minute, and only one of the two archive-serving
+        // operators is deep enough for the historical path. So a red here could mean "the attestation
+        // is broken" OR "somebody else's server was busy", and a check with two meanings is not
+        // evidence. Same split the eth_getProof work makes between rate-limit HTML and a real
+        // verification failure, and the same one gate-clone-portability makes between a missing npm
+        // package and a broken path.
+        (isUnavailable(e) ? unavailable : failures).push(`${ticker}: ${isUnavailable(e) ? 'ARCHIVE' : 'PROOF'} ${e.message}`);
+      }
     }
   };
   await Promise.all(Array.from({ length: 5 }, worker));
 
   assert.deepEqual(failures, [], `every honest market must attest; got ${failures.length} failure(s):\n  ${failures.slice(0, 8).join('\n  ')}`);
-  assert.ok(results.length >= sample.length * 3 * 0.9, `expected ~${sample.length * 3} attestations, got ${results.length}`);
+
+  // AND NOW THE PART THAT KEEPS THE SPLIT FROM BECOMING AN EXCUSE. Forgiving unreachable archives is
+  // how a gate stops being able to fail: if every market were unreachable, `failures` would be empty
+  // and this test would report success having proven nothing. So the coverage floor is the real
+  // assertion, and it is stated in its own terms rather than left to be inferred from a count.
+  const attempted = sample.length * 3;
+  assert.ok(results.length >= attempted * 0.9,
+    `NOT ENOUGH COVERAGE TO CONCLUDE ANYTHING: ${results.length} of ~${attempted} attestations completed.\n`
+    + `  ${unavailable.length} market(s) were unreachable, which is tolerated individually but not in bulk.\n`
+    + `  This is a REFUSAL TO REPORT A VERDICT, not a claim that attestation is broken.\n`
+    + `  ${unavailable.slice(0, 5).join('\n  ')}`);
+
+  if (unavailable.length) {
+    console.log(`  note: ${unavailable.length} market(s) unreachable this run (archive depth varies); `
+      + `${results.length}/${attempted} attestations still completed, above the ${Math.ceil(attempted * 0.9)} floor.`);
+  }
 
   const oracle = results.filter((r) => r.q === 'oraclePrice');
   const statics = results.filter((r) => r.q !== 'oraclePrice');

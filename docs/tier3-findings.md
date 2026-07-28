@@ -1,4 +1,4 @@
-# Tier 3, re-examined: I was wrong about why it is blocked
+# Tier 3, re-examined: I was wrong about why it is blocked, and it is now unblocked
 
 **28 July 2026. Research, repo-only. Nothing built here is served, deployed, or on chain, and nothing
 touches `src/engine/`, so `q1-e1fa99d08887d6cc` does not move.**
@@ -78,34 +78,43 @@ Vega has the same problem at the same strikes. Identity B relates two small numb
 
 ---
 
-## The negative half is solved, measured
+## The negative half is solved, BUILT, and proved
 
 That last sentence is an argument against **one** scale, not against fixed point.
 
 Give every quantity its own power-of-ten exponent, so each carries nine significant digits whatever
-its magnitude, and align the exponents when the two sides are compared. Over the same 4,000 surfaces:
+its magnitude, and align the exponents when the two sides are compared. `zk/circuits/greeksfp.circom`
+does exactly that, and `gateB7-2` **passes**:
 
-| encoding | surfaces kept | worst relative residual |
+| | shared 1e-9 grid | per-value exponent |
 |---|---|---|
-| shared 1e-9 grid | 3,956 of 4,000 | **6.077e-1** |
-| shared grid, gamma alone at 1e-18 | 3,973 | 2.237e-1 |
-| per-value exponent, 9 significant digits | **3,999** | **7.344e-9** |
+| circuit | `greeks.circom` | `greeksfp.circom` |
+| size | 2,152 Plonk, domain 4,096 | **1,919 Plonk, domain 2,048** |
+| surfaces kept | 3,956 of 4,000, and only after excluding gamma under 1e-6 | **4,000 of 4,000, no exclusion** |
+| smallest gamma proved | ~1e-6 before the residual eats the answer | **7.2e-75** |
+| worst case uses | violates its own bound | **36.7% of an 8e-8 relative bound** |
+| sweep | **FAILS** | **PASSES** |
+| proof | — | verifies in 962 ms, refuses all 13 perturbed signals and a bent point |
 
-Eight orders of magnitude better, with no domain restriction at all, and 7.3e-9 is exactly what nine
-significant digits should give. The worst case is no longer a deep-OTM option with a vanishing gamma;
-it is an ordinary one at gamma 8.1e-3, which means the encoding stopped being the binding constraint.
+**The fix is cheaper than the thing it replaces.** That was not the plan; it is what measuring the
+alignment exponent turned up. gamma's own exponent ranges over [9, 55] across a real book, so a naive
+bound would have reserved a selector of hundreds of entries. Measured, the alignment exponent dE lands
+in **{30, 31, 32, 33, 34}** — five values — because the identity itself ties the exponents together.
+A 31-entry selector covers it with room to spare, and the circuit came out smaller than the fixed-grid
+one by dropping a whole doubling of the evaluation domain.
 
-So the arithmetic is **solved**. What remains is ordinary circuit engineering:
+One more bound had to be set by measurement rather than derivation. The first attempt used a relative
+2e-8, taken from a probe that reported a worst residual of 7.3e-9. The gate violated it at 146.9%: the
+probe's mantissa rounding differed from the encoder that shipped, in the corner where rounding pushes
+999999999.6 up to 1e9 and out of the normalisation window. **A bound belongs to the gate that enforces
+it, never to the probe that suggested it.** Now 8e-8, with the worst case at 36.7%.
 
-- each mantissa needs a range check plus a normalisation check that it sits in `[1e8, 1e9)`
-- exponent alignment needs `10^d` supplied as a witness and constrained to be a genuine power of ten,
-  which is a one-hot selector over a bounded exponent range rather than anything exotic
-- cost, and this is an **estimate rather than a measurement**: 600 to 800 R1CS on top of the current
-  1,103, so around 3,700 Plonk against the 4,096 ceiling. It would fit, narrowly, at domain 4,096
+### What is still not proved
 
-**Not built.** `greeks.circom` still uses the shared grid and `gateB7-1` still fails, because building
-the encoding is the next piece of work and claiming it before it exists is the error this whole
-document was written to correct.
+Nothing here evaluates N(d2), and that has not changed. Six of the eight measured identities are still
+unbuilt — theta, vanna and the two parity relations all involve signed quantities, and a field has no
+sign, so they need an offset encoding on top of this one. That is more of the same ordinary work, not
+a new obstacle.
 
 ---
 
@@ -141,6 +150,8 @@ until `erf` is provable. **That part of the original claim was right.**
 |---|---|
 | `zk/scripts/probe-black76-identities.mjs` | derives eight identities, measures all eight against the engine |
 | `zk/circuits/greeks.circom` | proves A and B; 1,103 R1CS / 2,152 Plonk / domain 4,096 |
-| `zk/scripts/gateB7-1-greeks-sweep.mjs` | runs the circuit's statement against the real engine; **fails, on purpose** |
+| `zk/scripts/gateB7-1-greeks-sweep.mjs` | the shared-grid statement against the real engine; **fails, on purpose** |
+| `zk/circuits/greeksfp.circom` | the same identity per-value; 1,065 R1CS / 1,919 Plonk / domain 2,048 |
+| `zk/scripts/gateB7-2-greeksfp-sweep.mjs` | 4,000 surfaces plus a real proof and its refusals; **passes** |
 
 Nothing is served. `options-risk` does not emit any of this and no verifier for it exists on chain.

@@ -8,6 +8,7 @@ import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
 import { suggestService, redirectLine } from './util/routing.js';
+import { repairBody, correctedExample } from './util/repair.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { getProof, verificationKey, warmProver } from './util/snark.js';
@@ -487,18 +488,33 @@ for (const s of SERVICES) {
     description: `${s.blurb}`,
     inputSchema: s.inputSchema,
   })(async (req) => {
-    const raw = (req.body && Object.keys(req.body).length) ? req.body : (req.query || {});
+    const sent = (req.body && Object.keys(req.body).length) ? req.body : (req.query || {});
+
+    // Repair the SHAPE before validating, and never the VALUES. An agent that nested its params under
+    // `params`, sent 64000 as a string, or wrote `Currency` has said what it meant clearly enough to
+    // act on; one that omitted the position size has not. See util/repair.js for the line and why it
+    // sits there. Every repair is reported back, because a silent coercion is how a caller gets billed
+    // for an answer about something they did not describe.
+    const { body: raw, repairs, missing } = repairBody(s, sent);
+
     const v = s.validate(raw);
     if (v.error) {
       // A refusal that says what THIS service needs is true and was not enough: agent #5152's only two
       // bad reviews came from a caller that read such a hint and still could not find the right shop.
-      // So the refusal now also names the service that fits, with the exact call to make.
+      // So a refusal now carries three things — what went wrong, the exact body that would work, and
+      // the service that fits if this is not it.
       const redirect = redirectLine(s, raw, SERVICES);
       const err = new Error(`bad_input: ${refusalDetail(s, v.error)}${redirect ? ` | ${redirect}` : ''}`);
       err.status = 400;
+      err.detail = {
+        repairsApplied: repairs.length ? repairs : undefined,
+        howToFix: correctedExample(s, raw, missing),
+        routingNotice: suggestService(s, raw, SERVICES) || undefined,
+      };
       throw err;
     }
     req.input = v;
+    req.repairs = repairs;
     const ctx = { host: `${req.protocol}://${req.get('host')}` };
     const answer = s.cacheKey
       ? await cached(s.cacheKey(req.input), s.cacheTtl || config.cacheTtlMs, () => s.run(req.input, ctx))
@@ -508,6 +524,11 @@ for (const s of SERVICES) {
     // wrong shop. Nothing was refused, the numbers are correct, and they answer a question the caller
     // did not ask. Attached as a SIBLING of `result` and `proof`, never inside either, so the content
     // hash covers exactly what it covered before and every published proof keeps reproducing.
+    if (repairs.length && answer && typeof answer === 'object') {
+      // Reported, never silent. A caller has to be able to see that the body they sent is not quite
+      // the body that was priced.
+      answer.inputRepairs = { applied: repairs, note: 'Your request was normalised before pricing. Shapes only: no value was supplied, defaulted or guessed.' };
+    }
     const misroute = answer && typeof answer === 'object' ? suggestService(s, raw, SERVICES) : null;
     if (misroute) {
       answer.routingNotice = {

@@ -66,8 +66,31 @@ npm package from a broken path, and the `eth_getProof` work splits rate-limit HT
 verification failure and retries only the former. `gate:d3` should do the same, and until it does,
 its red is not evidence on its own.
 
-**Recorded as an open task rather than fixed here**, because the deploy was in flight and changing a
-gate mid-window is how a green becomes meaningless.
+**RESOLVED, right after the deploy landed.** The gate now splits the two meanings apart. An allowlist
+of transport signatures (refused connections, 502/503/504, aborts, `height not available`, pruned
+archives) goes to an `unavailable` bucket; **everything else counts as a real failure**, so an error
+nobody anticipated lands on the strict side instead of being quietly excused. Written the other way
+round, as a list of strings meaning "broken", the first unfamiliar error would be forgiven and the
+gate would go silent exactly when something new went wrong.
+
+And the half that nearly got missed: forgiving unreachable archives is precisely how a verifier stops
+being able to fail, because if every market were unreachable the failure list would be empty and the
+test would report success having proven nothing. So the verdict now rests on a coverage floor that
+refuses to report any verdict at all below 90% of attempted attestations, and says so in those words
+rather than pretending attestation is broken.
+
+**Both halves were proven able to fail rather than asserted.** The classifier is tested in both
+directions, and one of its cases is an unrecognised message that must NOT be forgiven, so a
+classifier returning true for everything fails the test. The floor was proven load-bearing by a
+scripted revert: force every market to throw a transport error, which leaves the OLD assertion
+passing vacuously, and only the floor catches it, reporting `NOT ENOUGH COVERAGE TO CONCLUDE
+ANYTHING: 0 of ~120`. **Without that floor this fix would have made the gate strictly worse than the
+flaky version it replaced.**
+
+Gate now 17 of 17 with 0 failures, twice over. Full suite unchanged at 386 tests, 381 pass, 0 fail,
+matching the numbers taken at deploy time. `gates/` sits outside `src/engine/`, so the codeHash does
+not move and no re-review is triggered; the live service was re-checked mid-work and still serves
+`q1-e1fa99d08887d6cc`.
 
 ## The deploy, for the record
 

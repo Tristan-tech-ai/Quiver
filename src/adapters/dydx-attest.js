@@ -114,11 +114,30 @@ export const ATTESTABLE = {
 // Quantities the existing dydx.js adapter returns that CANNOT be attested, with the measured reason.
 // `fundingHourly` is the live gap: perp-gate consumes it and nothing here can vouch for it.
 export const NOT_ATTESTABLE = {
+  // The refusal stands. The REASON was wrong and is corrected here, because a refusal that gives a
+  // false reason is worse than one that gives none: it tells the next person not to look.
+  //
+  // The old text said the rate is "never committed under a key". Premium samples ARE committed:
+  // `PremSamples` in the perpetuals store returns a 2-op ICS-23 existence proof, ~675-807 B of value,
+  // verified live. And for the markets it covers, nextFundingRate reconstructs exactly as
+  // mean(premium samples, sint32 ppm) / 8 / 1e6, confirmed across five snapshots at 17/17, 17/17,
+  // 17/17, 17/17 and 19/19 markets.
+  //
+  // What actually blocks attestation is narrower and was found by measuring the rest of the book:
+  // only 17 to 22 of 296 markets carry premium samples at any instant, and 182 of the others sit at
+  // exactly 1.25e-5 per hour, which is 0.01% per 8h, the interest-rate term. Those are not stale
+  // values carried over; each settles a fresh hourly entry, checked through
+  // /v4/historicalFunding. So funding is premium PLUS interest, the reconstruction above covers only
+  // the premium half, and it was validated exclusively on markets where the interest half is
+  // dominated. A formula validated only where one of its terms vanishes has not been validated.
   fundingHourly:
-    'nextFundingRate is not a stored value. The perpetuals store holds PremSamples / PremVotes and a ' +
-    'cumulative funding_index inside the Perpetual; the hourly rate the indexer publishes is computed ' +
-    'at the hour boundary and never committed under a key. Searched the prices and perpetuals stores ' +
-    'by non-existence-proof neighbour walk; not found. Not found is not the same as not there.',
+    'nextFundingRate is attestable for the 17 to 22 markets that carry premium samples in the current '
+    + 'epoch, where it reconstructs exactly from PremSamples as mean(samples, sint32 ppm) / 8 / 1e6. '
+    + 'It is NOT attestable for the rest: 182 of 296 markets sit on the interest-rate term (1.25e-5/h, '
+    + 'i.e. 0.01% per 8h) with no premium samples to prove it from, and the interest parameter has not '
+    + 'been located in any store. Refused for all markets rather than for some, because a per-market '
+    + 'answer would attest the liquid names and quietly decline the illiquid ones, which is the '
+    + 'opposite of where a caller needs the guarantee.',
   orderbook:
     'dYdX documents the orderbook as in-memory per node and "not written to the blockchain or stored ' +
     'in the application state", so no depth is ever provable.',

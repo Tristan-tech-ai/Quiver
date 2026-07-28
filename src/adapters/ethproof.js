@@ -4,7 +4,7 @@
 // key K". Nothing more. Three separate links have to hold before that is worth anything, and each one
 // is a different kind of claim:
 //
-//   1. TRIE , keccak-chained nodes from R down to the leaf. Pure cryptography, no trust. (verifyMpt)
+//   1. TRIE. Keccak-chained nodes from R down to the leaf. Pure cryptography, no trust. (verifyMpt)
 //   2. HEADER. R is the stateRoot inside a header whose keccak256(rlp(header)) equals the reported
 //      blockHash. Also pure cryptography, and it is the link that stops an RPC handing back a stateRoot
 //      that belongs to no block at all. (headerHash)
@@ -26,7 +26,7 @@
 //   rpc.mevblocker.io                     head-1,000,000 (full archive) head-100,000 +
 //   eth.api.onfinality.io/public          head-256, refuses head-1024   head-100,000 +
 //   ethereum-rpc.publicnode.com           head-64,  refuses head-128    head-100,000 +
-//   arb1.arbitrum.io/rpc                  head-256, refuses head-1024   (n/a)
+//   arb1.arbitrum.io/rpc                  ~200-256, boundary MOVES        (n/a)
 //   mainnet.base.org                      shallow only, rate-limits hard after a few calls
 //   base-rpc.publicnode.com               REFUSES ("maximum proof window") at every depth tried
 //
@@ -35,14 +35,14 @@
 //   1. Serving eth_call or eth_getLogs does NOT imply serving eth_getProof, so this list is its own
 //      list and is not inherited from evmrpc.js / univ3.js. It is ORDERED BY MEASURED DEPTH, not by
 //      latency, because a fast node that refuses the height is worth nothing to an anchor.
-//   2. HEADERS survive at depth on every operator even where PROOFS do not, all three mainnet
+//   2. HEADERS survive at depth on every operator even where PROOFS do not: all three mainnet
 //      operators returned the identical blockHash at head-100,000. So the proof needs one archive
 //      node while the ROOT it is checked against stays corroborable by three. That asymmetry is the
 //      only reason multi-operator corroboration is available for a historical window at all.
 //
 //   • Header RLP reconstructs the blockHash with 21 fields on ethereum and base (through requestsHash)
 //     and 16 on arbitrum (through baseFeePerGas). The tail is OPTIONAL and version-dependent, so the
-//     encoder stops at the first absent field and REFUSES if the hash does not come out, it never
+//     encoder stops at the first absent field and REFUSES if the hash does not come out. It never
 //     guesses which fork it is talking to.
 import { keccak256, encodeRlp, decodeRlp, getBytes, hexlify } from 'ethers';
 
@@ -55,7 +55,9 @@ const PROOF_RPCS = {
     { url: 'https://ethereum-rpc.publicnode.com', operator: 'Allnodes (publicnode)', proofDepth: 64 },
   ],
   arbitrum: [
-    { url: 'https://arb1.arbitrum.io/rpc', operator: 'Offchain Labs', proofDepth: 256 },
+    // Measured twice on the same day at 256-ok and 256-refused: the node prunes as it advances, so
+    // the boundary MOVES. At ~0.25s blocks, 200 blocks is under a minute of history.
+    { url: 'https://arb1.arbitrum.io/rpc', operator: 'Offchain Labs', proofDepth: 200 },
   ],
   base: [
     // Kept because it does answer, and excluded from nothing, but it rate-limits within a handful of

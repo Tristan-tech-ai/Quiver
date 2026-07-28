@@ -128,10 +128,12 @@ template SignedGreeks(NB_M, NB_E, NB_R, CMIN, CMAX, DMIN, DMAX, EMIN, EMAX, RELA
     // instance per identity costs the same constraints with more indirection.
     signal dC;  dC <== (vegaE + d1E + d2E + 2) - (volgaE + sigE);
     signal dD;  dD <== (vegaE + d2E) - (vannaE + fE + dDiffE);
-    // NO "+3" here. The first version compensated for treating 730 as 7.3·10^2, but 730 appears as a
-    // literal on the left side already, so there was nothing to compensate. The sweep caught it as a
-    // residual off by a factor of exactly ten, which is the signature of a single wrong exponent.
-    signal dE_;  dE_ <== (vegaE + sigE + 2) - (thetaE + tE);
+    // NO constant offsets here, and it took two wrong attempts to see why. 730 and 100 are LITERALS on
+    // their own sides of the equation, already carried in the mantissa products. Writing "+3" for the
+    // 7.3e2 and "+2" for the 1e2 compensated for a scaling that was never applied, and each spurious
+    // term moved the residual by its own factor of ten. Derived at a terminal on one worked case rather
+    // than in my head the third time: dE = (Ve + Se) - (THe + Tme) gives a relative gap of exactly zero.
+    signal dE_;  dE_ <== (vegaE + sigE) - (thetaE + tE);
 
     // TWO multipliers per identity, not one. The alignment exponents were assumed non-negative and
     // MEASURED otherwise: dC lands in [7,10] but dD in [-10,-7] and dE in [-3,0]. A negative alignment

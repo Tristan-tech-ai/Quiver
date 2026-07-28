@@ -46,7 +46,7 @@ function encode(F, K, T, sg, type) {
 
   const dC = (V.e + D1.e + D2.e + 2) - (VO.e + S.e);
   const dD = (V.e + D2.e) - (VA.e + Fm.e + DD.e);
-  const dE = (V.e + S.e + 2) - (TH.e + Tm.e);
+  const dE = (V.e + S.e) - (TH.e + Tm.e);
   if ([dC, dD, dE].some((d) => d < DE_MIN || d > DE_MAX)) return { outOfDomain: true, dC, dD, dE };
 
   const [lC, rC] = p10(dC), [lD, rD] = p10(dD), [lE, rE] = p10(dE);

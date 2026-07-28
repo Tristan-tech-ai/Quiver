@@ -1,0 +1,18 @@
+{
+  "at": "2026-07-28T12:21:04.708Z",
+  "passed": true,
+  "samples": 4000,
+  "kept": 4000,
+  "outOfDomain": 0,
+  "signFails": 0,
+  "violations": 0,
+  "worstUsed": {
+    "volga": 0.351828,
+    "vanna": 0.299059,
+    "theta": 0.291604
+  },
+  "smallestMagnitude": 2.0097977032980937e-74,
+  "plonkConstraints": 3615,
+  "domainSize": 4096,
+  "proveMs": 1814
+}

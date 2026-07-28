@@ -138,11 +138,25 @@ Two things noted and NOT resolved, because guessing at them would be worse than 
 - `QUIVER_MISSION_CONTROL.md` records `soldCount 19` where the API now returns `salesCount 1761`.
   Those may be different counters rather than the same one having moved, and the field names differ.
   Not reconciled here.
-- 1,761 sales against the 315 inbound transfers measured on X Layer over 140,000 blocks. The usage
-  measurement counted value actually arriving at the payTo address; `salesCount` is OKX's own
-  lifetime counter and may include free, trial or MCP traffic that moves no money. **The trickle
-  conclusion rests on the on-chain count, which is the stricter of the two**, so the widening circuit
-  is still being built for single digits. But the gap is real and unexplained.
+- 1,761 sales against the 315 inbound transfers measured on X Layer over 140,000 blocks.
+
+**The second one resolved on the next look, and it went the opposite way from the worry.** 1,761 is a
+LIFETIME count, and the registry publishes when the lifetime started: `createdAt` 12 July 09:36, so
+16.6 days, so **4.43 sales an hour**. The on-chain measurement read 8.1 transfers an hour and was
+already stated as an upper bound because the payTo address receives things that are not sales.
+
+So the two are not in conflict. They are the same order of magnitude, and the looser number is the
+larger one, which is exactly the shape an upper bound should have. **Two independent counters, one
+kept by OKX and one read off the chain, and both say trickle.** At 4.43 an hour, assembling 100
+answers takes 22.6 hours and even 20 takes four and a half.
+
+That makes the case for building the widening circuit at n = 2, 3, 4 stronger rather than weaker, and
+it is the seller's own sales counter that is the lower of the two, not a figure of our choosing.
+
+One observation left standing without a conclusion: `lastOnlineTime` reads 27 July 10:42, two days
+back, while `onlineStatus` reads 1 and the service answers now. Those cannot both be describing the
+same thing. Not chased, because `onlineStatus` and the live 200s are the load-bearing signals and a
+guess about OKX's internal field would be worth less than the plain note that it looks odd.
 
 ## V7 — `portfolio-gate` not snapping its inputs is a non-issue, and the reason is worth keeping
 

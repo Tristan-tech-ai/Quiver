@@ -113,7 +113,7 @@ worse than one that does not, because nothing alerts on it.
 
 ```bash
 curl -s .../changelog | head -20
-curl -s .../paper/1 | head -5
+for i in 1 2 3 4 5 6 7; do curl -s .../paper/$i | head -1; done
 ```
 
 The changelog entry and the paper parts are static assets. The watchdog checks that the service works;

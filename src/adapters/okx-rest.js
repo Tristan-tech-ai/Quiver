@@ -75,8 +75,32 @@ export const recentPnl = (chain, address) =>
   getData(`/api/v6/dex/market/portfolio/recent-pnl?chainIndex=${idx(chain)}&walletAddress=${address}`);
 
 // OHLC candles (PROVEN: /api/v6/dex/market/candles → [[ts,o,h,l,c,vol,...],...]). bar e.g. 1m,5m,1H,4H,1D.
+// The unit letter is upper-cased before it goes upstream, and that is a bug fix rather than tidiness.
+//
+// The CEX path normalises through `mapBar()` in okx-market.js; this DEX path passed `bar` through
+// untouched, so a caller asking for `1h` got whatever OKX makes of a lowercase unit while the same
+// caller asking `1H` was served. chart-press then reported DATA_UNAVAILABLE and attributed it to an
+// upstream outage, which is a service telling a buyer something false about why it could not answer.
+//
+// HONEST LIMIT ON WHAT I VERIFIED. The asymmetry between the two paths is read directly from the
+// code and is certain. The upstream rejection of a lowercase unit is NOT something I could reproduce:
+// unkeyed, the x402 pay-gate answers 402 before any parameter is validated, so `1h` and `1H` are
+// indistinguishable from outside. That half rests on a keyed measurement reported as error 51000, and
+// the fix is written to be harmless either way — upper-casing a unit letter cannot break a bar code
+// that was already upper-case, which is every bar code the engines pass today.
+// `m` IS DELIBERATELY NOT TOUCHED, and this line is the whole reason this comment exists. The first
+// version of this fix upper-cased any trailing letters, which turned `15m` into `15M`. In OKX's
+// vocabulary `1m` is one MINUTE and `1M` is one MONTH, so a blanket case fix silently converts a
+// minute chart into a monthly one and every downstream number stays plausible. Caught by printing the
+// normaliser's output over a list of inputs before trusting it, which took one command.
+//
+// Only h, d and w are case-corrected, because those are unambiguous: OKX writes them upper-case and
+// has no lower-case meaning for any of them. The CEX table in okx-market.js is the reference and it
+// agrees: `15m` stays `15m`, `1h` becomes `1H`, `1d` becomes `1Dutc`.
+const normaliseBar = (bar) => String(bar || '1H').replace(/([hdw])$/, (u) => u.toUpperCase());
+
 export const candles = (chain, address, bar = '1H', limit = 48) =>
-  getData(`/api/v6/dex/market/candles?chainIndex=${idx(chain)}&tokenContractAddress=${address}&bar=${bar}&limit=${Math.min(limit, 300)}`);
+  getData(`/api/v6/dex/market/candles?chainIndex=${idx(chain)}&tokenContractAddress=${address}&bar=${normaliseBar(bar)}&limit=${Math.min(limit, 300)}`);
 
 // --- POST endpoints (GET returns "method not supported"); price-info takes a batch array ---
 export const priceInfo = (chain, address) =>

@@ -13,7 +13,7 @@ is the harder half of a claim we have already partly made.
 The plan I was carrying had a `QuiverPerpInputAttestor` on HyperEVM whose job was to read a precompile
 and record the answer. Writing it down next to the gas figures killed it.
 
-A precompile read costs **3,237 gas** in a  and **nothing at all** off chain, because
+A precompile read costs **3,237 gas** in a `STATICCALL` and **nothing at all** off chain, because
 `eth_call` is free. A contract that reads a precompile and stores the result is a contract that pays
 to write down something anybody could have read for free. It buys one thing only: a chain-committed
 record that somebody looked. That is worth very little.
@@ -87,7 +87,7 @@ precompile is **already warm and pays no 2,600-gas cold surcharge**. It changes 
 it is the difference between a number that was measured and a number that was measured correctly.
 
 And a sharper one, from the same measurement pass: **§4.4 of the research claims a gate
- was written and run. That file does not exist anywhere in the tree.** Its
+`gateD0-input-attest.mjs` was written and run. That file does not exist anywhere in the tree.** Its
 reported bound of 1e-3 is also breached by honest data. A0 through A3 below must therefore treat §4.4
 as an unverified claim rather than as prior work.
 

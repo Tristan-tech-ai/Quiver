@@ -113,6 +113,37 @@ V6 above now confirms the instability was never a defect at all.
 `proofStorage` reports itself `durable: false` with the instruction to set `QUIVER_PROOF_DIR`. That is
 correct: Phase A shipped switched off, pending a decision about a Railway volume.
 
+## V8 — the OKX listing read fresh, and the one-star fear did not come true
+
+Read from the registry itself rather than from any note: `agent service-list --agent-id 5152`, at
+07:25 WITA on 29 July, hours after the deploy.
+
+| | |
+|---|---|
+| services listed | **22 of 22**, `total: 22` |
+| every endpoint | points at `quiver-production-c3a8.up.railway.app`, matching the live service |
+| `approvalStatus` | 4 |
+| `onlineStatus` / `status` | 1 / 1 |
+| `securityRate` | **4.33** |
+| `salesCount` | 1,761 |
+| name and description | unchanged, so no re-review was triggered by anything done today |
+
+**The rating is 4.33, not one star.** The reviewer whose agent handed out a one-star without reading
+the input contract did not sink the listing, and the buyer defence shipped today exists so the next
+one has to work harder to be wrong: an unknown MCP tool name now answers with the full list of nine,
+and a mis-routed body gets told which service it actually wanted.
+
+Two things noted and NOT resolved, because guessing at them would be worse than leaving them open:
+
+- `QUIVER_MISSION_CONTROL.md` records `soldCount 19` where the API now returns `salesCount 1761`.
+  Those may be different counters rather than the same one having moved, and the field names differ.
+  Not reconciled here.
+- 1,761 sales against the 315 inbound transfers measured on X Layer over 140,000 blocks. The usage
+  measurement counted value actually arriving at the payTo address; `salesCount` is OKX's own
+  lifetime counter and may include free, trial or MCP traffic that moves no money. **The trickle
+  conclusion rests on the on-chain count, which is the stricter of the two**, so the widening circuit
+  is still being built for single digits. But the gap is real and unexplained.
+
 ## V7 — `portfolio-gate` not snapping its inputs is a non-issue, and the reason is worth keeping
 
 Reported as a defect: `perp-gate` snaps its inputs onto the 1e-9 grid at `services.js:313` and

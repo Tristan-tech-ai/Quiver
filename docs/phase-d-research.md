@@ -526,7 +526,7 @@ These have no clean answer and I did not find one.
 
 | source | services | why nothing works |
 |---|---|---|
-| **Deribit** | `options-desk` | Not a chain. No signature, and no field in the response envelope where one could go. No oracle publishes per-instrument mark IV or DVOL. The option chain is 373 KB, which is 7x past any published zkTLS benchmark. A TEE attests the fetch and not the truth. |
+| **Deribit** | `options-desk` | Not a chain. No signature, and no field in the response envelope where one could go. No oracle publishes per-instrument mark IV or DVOL. The option chain is 373 KB DECODED but **37,377 bytes on the wire** under gzip, measured with curl on 28 Jul 2026, and HTTP compresses before TLS encrypts. The "7x past any published zkTLS benchmark" claim is RETRACTED: size is not the binding constraint. What remains is the semantic objection. A TEE attests the fetch and not the truth. |
 | **DefiLlama** | `protocol-pulse` | Not a chain. `/protocol/aave` is 10.2 MB, and TVL is a **derived, methodology-dependent aggregate**, so even a perfect proof of transport would prove DefiLlama said it, never that it is right. Two protocols can disagree on the same TVL legitimately. |
 | **Polymarket** | `poly-fill`, `poly-desk`, `updown-pulse` | Order book state is off-chain by design. The `hash` field has no signer. Resolution is on chain; the book is not. |
 | **OKX Web3 DEX (keyed)** | `tape-pulse`, `token-scan`, `wallet-audit`, `loop-digest`, `chart-press` | Worst case. Unsigned, **and** the buyer cannot re-fetch without their own HMAC credentials, so even the weak "go look yourself" fallback is unavailable. |

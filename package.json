@@ -31,7 +31,9 @@
     "gate:e": "node --test gates/gateE-ethproof-anchor.mjs",
     "gate:e-revert": "node gates/gateE-revert.mjs",
     "preflight": "node gates/preflight.mjs",
-    "watchdog": "node gates/watchdog.mjs"
+    "watchdog": "node gates/watchdog.mjs",
+    "gate:f": "node --test gates/gateF-tvl-reconstruct.mjs",
+    "gate:f-revert": "node gates/gateF-revert.mjs"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

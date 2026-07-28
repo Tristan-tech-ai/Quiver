@@ -82,8 +82,16 @@ export function repairBody(service, raw) {
   }
 
   // ---- 3. aliases --------------------------------------------------------------------------------
+  // `known.has(alias)` is the guard that matters and it was missing. Three services declare an alias
+  // key as their OWN property — chart-press and perp-gate have `symbol`, updown-pulse has `coin` —
+  // and today those do not fire only because the canonical they map to is not also a property there.
+  // That is luck, not design. The day `currency` is added to perp-gate, a caller's `symbol` would be
+  // silently moved, the ECHOED INPUTS would change, and with them the contentHash of a request that
+  // used to work. A published proof would stop reproducing, which is the one failure this whole
+  // project exists to make impossible.
   for (const [alias, canonical] of Object.entries(ALIASES)) {
     if (alias === canonical) continue;
+    if (known.has(alias)) continue;                 // this service means something by that word
     if (alias in body && !(canonical in body) && known.has(canonical)) {
       body[canonical] = body[alias];
       delete body[alias];

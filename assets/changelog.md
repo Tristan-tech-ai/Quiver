@@ -12,6 +12,44 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 28 July 2026 (later) — a wrong shop is now told apart from a wrong answer
+
+Nothing about the mathematics changed. The engine build hash is still `q1-e1fa99d08887d6cc`, all
+twenty-two services are the same twenty-two, the endpoint has not moved, and every published proof
+reproduces byte-for-byte exactly as before. What changed is how this service behaves when a **caller**
+gets something wrong.
+
+The reason is on chain and anyone can read it: `agent feedback-list --agent-id 5152` returns ten
+five-star reviews and two half-stars, and both half-stars are the same reviewer agent, which asked for
+an Aave lending-protocol health check and called `options-desk`. Two other agents ran the same Aave
+task through `protocol-pulse` and scored it 5.0 and 4.8. The capability was there. The caller picked
+the wrong service out of twenty-two, and this service had no way to say so — and worse, on the second
+attempt the call **succeeded** and returned a perfectly correct options surface to somebody who had
+asked about a lending protocol.
+
+So three things are new in a response, all of them **siblings** of `result` and `proof` and none of
+them inside either, which is why the content hash is untouched:
+
+- **`routingNotice`** — when a request looks aimed at a different service, this names that service and
+  gives the exact call to make. It appears on refusals *and* on successful answers, because the
+  dangerous case is the one that succeeds.
+- **`inputRepairs`** — params nested under `params`/`input`/`arguments`, numbers sent as strings,
+  `Currency` for `currency`, `token` for `address`: shapes are normalised and **every normalisation is
+  reported**. Values are never invented. A missing position size, `"64,000"`, `"64k"`, and prose with
+  no parameters are all still refused, because repairing a shape is not the same as deciding what a
+  caller meant.
+- **`howToFix`** on a refusal — the body that *would* have worked, keeping whatever values the caller
+  did supply, with the gaps shown as visible placeholders rather than plausible defaults.
+
+The free MCP endpoint gets all of this too, plus a `didYouMean` on an unknown tool name.
+
+Quiver still never reroutes a paid call. You asked this endpoint and this endpoint answered; the
+signpost is there so a caller can tell a wrong shop from a wrong answer.
+
+Also shipped, and off by default: a content-addressed proof store, so a finished proof can survive a
+redeploy instead of living in memory. `GET /build` reports which of the two states this deploy is in
+under `proofStorage`, rather than asking anyone to take our word for it.
+
 ## 28 July 2026 — a contract checks the arithmetic
 
 - `QuiverProofRegistry` deployed on X Layer at `0xd50A91E36673443749Ee22031cb2Ff09d4Bb8D60`, with the

@@ -18,7 +18,9 @@
     "gate:a": "node --test gates/gateA-proof-durability.mjs",
     "gate:a-revert": "node gates/gateA-revert.mjs",
     "gate:r": "node --test gates/gateR-misroute.mjs",
-    "gate:buyer": "node --test gates/gateBuyer-mistakes.mjs"
+    "gate:buyer": "node --test gates/gateBuyer-mistakes.mjs",
+    "preflight": "node gates/preflight.mjs",
+    "watchdog": "node gates/watchdog.mjs"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

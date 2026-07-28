@@ -56,50 +56,106 @@ const live = async (fn) => { try { return await fn(); } catch (e) { skipped++; r
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 test('T10.1 the two precompiles are what the bound assumes: 0x807 is the oracle, 0x80E is the touch', async () => {
+  // SANDWICH, WITH THE CHAIN'S OWN LAG ACCOUNTED FOR. A naive comparison measures skew rather than
+  // the precompile. But an `api -> chain -> api` sandwich is not enough either: the block a chain
+  // read returns is ~1 s OLDER than the moment we asked for it (block timestamp vs fetch time,
+  // p10/p50/p90 all 1.00-1.01 s, measured over 471 snapshots). So the block can predate the FIRST
+  // API read, and then a mismatch is guaranteed whenever the oracle refreshed in the last second —
+  // which is exactly what made an earlier version of this test fail on a third of the universe at
+  // random. Padding ~1.5 s before the chain read pushes the block timestamp inside the two API
+  // reads, which is what makes "unmoved across the block we read" mean anything at all.
+  //
+  // The pad is MEASURED, not chosen. Exact-match rate on sandwich-stable rows against the pad:
+  //     0 ms -> 89.58%    1500 ms -> 82.86%    3000 ms -> 99.21%    4500 ms -> 100.00%
+  // (the count of "stable" rows falls as the pad grows — the honest cost of a longer window). The
+  // effective delay is worse than the ~1 s block lag alone because a HyperCore oracle refresh only
+  // reaches the EVM at the next block, so the two stack. 4 s sits past the knee.
+  const LAG_PAD_MS = 4000;
   const r = await live(async () => {
-    const res = await fetch('https://api.hyperliquid.xyz/info', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
-    });
-    const [meta, ctxs] = await res.json();
-    const idx = meta.universe.map((u, i) => ({ u, i })).filter(({ u }) => !u.isDelisted).slice(0, 60).map(({ i }) => i);
-    const snap = await readSnapshot({ indices: idx });
-    return { meta, ctxs, snap, idx };
+    const idxOf = (meta) => meta.universe.map((u, i) => ({ u, i })).filter(({ u }) => !u.isDelisted).slice(0, 60).map(({ i }) => i);
+    const api = async () => {
+      const res = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+      });
+      return res.json();
+    };
+    const rounds = [];
+    let meta = null, idx = null;
+    for (let k = 0; k < 3; k++) {
+      const [m, ctxs0] = await api();
+      if (!meta) { meta = m; idx = idxOf(meta); }
+      await new Promise((s) => setTimeout(s, LAG_PAD_MS));
+      const chain = await readSnapshot({ indices: idx });
+      const [, ctxs] = await api();
+      rounds.push({ ctxs0, chain, ctxs });
+    }
+    return { meta, idx, rounds };
   });
   if (r._transport) { console.log(`      SKIP (transport): ${r._transport}`); return; }
-  let checked = 0, oracleExact = 0, midConsistent = 0, midChecked = 0;
-  for (const i of r.idx) {
-    const v = r.snap.values.get(i), c = r.ctxs[i], u = r.meta.universe[i];
-    if (!v || v.oracle == null || !c) continue;
+  let stable = 0, oracleExact = 0, midStable = 0, midConsistent = 0;
+  for (const round of r.rounds) for (const i of r.idx) {
+    const a = round.chain.values.get(i);
+    const c0 = round.ctxs0[i], c = round.ctxs[i], u = r.meta.universe[i];
+    if (!a || !c || !c0 || a.oracle == null) continue;
     const scale = 10 ** (6 - u.szDecimals);
-    checked++;
-    if (String(Math.round(Number(c.oraclePx) * scale)) === String(v.oracle)) oracleExact++;
-    if (v.bid != null && v.ask != null && c.midPx != null) {
-      midChecked++;
-      const mid = (Number(v.bid) + Number(v.ask)) / 2 / scale;
-      if (Math.abs(mid - Number(c.midPx)) / Number(c.midPx) < 1e-5) midConsistent++;
+    if (c0.oraclePx === c.oraclePx) {                     // unmoved across the block we read
+      stable++;
+      if (String(Math.round(Number(c.oraclePx) * scale)) === String(a.oracle)) oracleExact++;
+    }
+    if (a.bid != null && a.ask != null && c.midPx != null && c0.midPx === c.midPx) {
+      midStable++;
+      // EXACT equality is the wrong bar here and measuring it would be self-deception. The chain
+      // read is ~1s behind wall clock (block timestamp vs fetch time: p50 1.01s, measured), and a
+      // liquid book moves a tick inside a second — so the residual disagreement is one tick of book
+      // movement, not a wrong register. Scored in units of the book's own spread: measured p50
+      // 0.009 spreads, and within ONE spread on 98.9% of 622 stable reads. The control that makes
+      // this discriminating rather than lax: a genuinely different register (the oracle) sits ~9.9
+      // bps from the mid, which is well over one spread for a typical ~6 bps book.
+      const mid = (Number(a.bid) + Number(a.ask)) / 2, spread = Number(a.ask) - Number(a.bid);
+      if (spread > 0 && Math.abs(mid - Number(c.midPx) * scale) <= spread) midConsistent++;
     }
   }
-  console.log(`      0x807 == published oraclePx on ${oracleExact}/${checked}; mid(0x80E) == published midPx on ${midConsistent}/${midChecked}`);
-  assert.ok(checked >= 20, `too few assets read to conclude anything (${checked})`);
-  // Reads are seconds apart over unsigned HTTPS, so a fast mover can legitimately differ. The bar is
-  // that the great majority agree EXACTLY — a wrong precompile would agree essentially never.
-  assert.ok(oracleExact / checked >= 0.75, `0x807 is not the oracle price: only ${oracleExact}/${checked} exact`);
-  assert.ok(midConsistent / midChecked >= 0.4, `0x80E is not the top of book: mid agrees on only ${midConsistent}/${midChecked}`);
+  console.log(`      sandwich-stable: 0x807 == published oraclePx EXACTLY on ${oracleExact}/${stable}; mid(0x80E) within one spread of published midPx on ${midConsistent}/${midStable}`);
+  assert.ok(stable >= 15, `too few sandwich-stable assets to conclude anything (${stable})`);
+  assert.ok(midStable >= 10, `too few sandwich-stable books to conclude anything (${midStable})`);
+  // The bar comes from the measured DISTRIBUTION, not from one lucky sample — setting a threshold
+  // off a four-round probe is the same error as calling one block a measurement. Over 18 rounds at
+  // this pad the pooled rate is 97.31% and the per-round rate is bimodal: 15 rounds at exactly
+  // 1.000, three at 0.737 / 0.842 / 0.846 when a market-wide oracle refresh straddles the window.
+  // Pooling three rounds puts the floor near 0.83 even with a bad one; 0.80 clears it, and a wrong
+  // register would score near ZERO, so this still fails loudly for the reason it exists.
+  assert.ok(oracleExact / stable >= 0.80, `0x807 is not the oracle price: only ${oracleExact}/${stable} exact`);
+  assert.ok(midConsistent / midStable >= 0.9, `0x80E is not the top of book: mid within one spread on only ${midConsistent}/${midStable}`);
 });
 
 test('T10.2 impact prices bracket the touch from outside — the inequality the whole bound rests on', async () => {
+  // POOLED OVER TIME, deliberately. The residual violations are the ~1s chain lag during a price
+  // move, and a move is MARKET-WIDE — so on a single snapshot the failures are correlated across
+  // assets and 80 of them do not average anything out. Measured over 471 tape snapshots x 80 assets:
+  // a single snapshot's pass rate has a floor of 0.575, while pooling five snapshots 5 s apart lifts
+  // the floor to 0.838. Pooling is what makes this test stable; a bigger single snapshot is not.
+  const ROUNDS = 5, SPACING_MS = 5000;
   const r = await live(async () => {
-    const res = await fetch('https://api.hyperliquid.xyz/info', {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
-    });
-    const [meta, ctxs] = await res.json();
+    const api = async () => {
+      const res = await fetch('https://api.hyperliquid.xyz/info', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ type: 'metaAndAssetCtxs' }),
+      });
+      return res.json();
+    };
+    const [meta] = await api();
     const idx = meta.universe.map((u, i) => ({ u, i })).filter(({ u }) => !u.isDelisted).slice(0, 80).map(({ i }) => i);
-    return { meta, ctxs, snap: await readSnapshot({ indices: idx }), idx };
+    const rounds = [];
+    for (let k = 0; k < ROUNDS; k++) {
+      if (k) await new Promise((s) => setTimeout(s, SPACING_MS));
+      const [, ctxs] = await api();
+      rounds.push({ ctxs, snap: await readSnapshot({ indices: idx }) });
+    }
+    return { meta, rounds, idx };
   });
   if (r._transport) { console.log(`      SKIP (transport): ${r._transport}`); return; }
   let n = 0, bidOk = 0, askOk = 0;
-  for (const i of r.idx) {
-    const v = r.snap.values.get(i), c = r.ctxs[i], u = r.meta.universe[i];
+  for (const round of r.rounds) for (const i of r.idx) {
+    const v = round.snap.values.get(i), c = round.ctxs[i], u = r.meta.universe[i];
     if (!v || v.bid == null || v.ask == null || !c?.impactPxs) continue;
     const scale = 10 ** (6 - u.szDecimals);
     const ib = Number(c.impactPxs[0]) * scale, ia = Number(c.impactPxs[1]) * scale;
@@ -107,12 +163,14 @@ test('T10.2 impact prices bracket the touch from outside — the inequality the 
     if (ib <= Number(v.bid) + 1e-6) bidOk++;
     if (ia >= Number(v.ask) - 1e-6) askOk++;
   }
-  console.log(`      impact_bid <= best_bid on ${bidOk}/${n}; impact_ask >= best_ask on ${askOk}/${n} (point-in-time, ~1s of skew)`);
-  assert.ok(n >= 30, `too few assets carry impactPxs to conclude (${n})`);
-  // Measured 97-98% at a point read; the residual is what `margin` exists for. If this ever fell
-  // near 50% the inequality would be wrong and the bound unsound in principle, not just in margin.
-  assert.ok(bidOk / n >= 0.9, `impact_bid <= best_bid holds only ${bidOk}/${n} — the bound's premise is broken`);
-  assert.ok(askOk / n >= 0.9, `impact_ask >= best_ask holds only ${askOk}/${n} — the bound's premise is broken`);
+  console.log(`      pooled over ${ROUNDS} snapshots ${SPACING_MS / 1000}s apart: impact_bid <= best_bid on ${bidOk}/${n} (${(100 * bidOk / n).toFixed(1)}%); impact_ask >= best_ask on ${askOk}/${n} (${(100 * askOk / n).toFixed(1)}%)`);
+  assert.ok(n >= 150, `too few asset-samples carry impactPxs to conclude (${n})`);
+  // The bar separates "the premise holds, with a lag artefact" from "the premise is wrong". Honest
+  // floor measured at 0.838; a premise that did not hold — impact inside the touch — would score
+  // near 0.5 or below. 0.75 sits between the two with room on both sides, so this can fail without
+  // failing spuriously. Pooled rate over the whole tape: 98.12% bid, 97.79% ask.
+  assert.ok(bidOk / n >= 0.75, `impact_bid <= best_bid holds only ${bidOk}/${n} — the bound's premise is broken`);
+  assert.ok(askOk / n >= 0.75, `impact_ask >= best_ask holds only ${askOk}/${n} — the bound's premise is broken`);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
@@ -135,19 +193,43 @@ test('T10.3 SOUNDNESS: every hour the module attests really did settle at exactl
 });
 
 test('T10.4 the bound brackets the venue premium, and the worst honest case fits inside the margin', () => {
-  let worst = 0n, worstRow = null, exceed = 0;
-  for (const r of FULL) {
+  // Scored over EVERY hour in the fixture, not just the well-covered one. Scoring only the hour the
+  // margin was fitted on would be a check that cannot fail — and it matters here, because the
+  // calibration's own leave-one-out found the residual is NOT stable hour to hour: a margin fitted
+  // on the full hour alone was exceeded on the other hour, whose worst residual was 3.59x the
+  // in-sample worst. That is why the shipped margin is fitted across all observed hours, and why
+  // the write-up calls it the weak half rather than "validated".
+  const raw = rows.filter((r) => r.meanUB - r.meanLB < ONE / 100n);
+  let worst = 0n, worstRow = null, exceed = 0, bracketedRaw = 0;
+  const perHour = new Map();
+  for (const r of raw) {
     const P = parseDecimal(r.premium);
     const below = r.meanLB - P, above = P - r.meanUB;
     const res = below > 0n ? below : (above > 0n ? above : 0n);
+    if (res === 0n) bracketedRaw++;
     if (res > worst) { worst = res; worstRow = r; }
     if (res > MARGIN) exceed++;
+    const cur = perHour.get(r.hour) ?? 0n;
+    if (res > cur) perHour.set(r.hour, res);
   }
   const usage = MARGIN > 0n ? Number(worst) / Number(MARGIN) : 0;
+  console.log(`      raw bound (no margin) already contained the published premium on ${bracketedRaw}/${raw.length}`);
+  for (const [h, w] of [...perHour.entries()].sort((a, b) => a[0] - b[0])) console.log(`        hour ${new Date(h).toISOString().slice(11, 16)} worst residual ${bps(w).toFixed(3)} bps`);
   console.log(`      margin ${bps(MARGIN).toFixed(3)} bps; worst honest asset-hour uses ${(100 * usage).toFixed(2)}% of it` +
     (worstRow ? ` (${worstRow.coin})` : ''));
-  console.log(`      asset-hours exceeding the margin: ${exceed}/${FULL.length}`);
+  console.log(`      asset-hours exceeding the margin: ${exceed}/${raw.length}`);
+  assert.ok(raw.length >= 200, `too few fixture rows to score the margin (${raw.length})`);
+  assert.ok(perHour.size >= 2, 'the fixture covers only one hour, so the margin cannot be scored out of sample at all');
   assert.equal(exceed, 0, `${exceed} honest asset-hours fell outside the calibrated bound`);
+  if (MARGIN === 0n) {
+    // The strongest outcome available: the RAW bound, with no allowance at all, already contained
+    // the venue's own hourly premium on every asset-hour. Per-sample violations exist (~2% of
+    // samples) but they do not survive averaging over the hour, which is the only level the clamp
+    // is applied at. Nothing to saturate, so the saturation check would be vacuous rather than lax.
+    assert.equal(worst, 0n, 'margin is zero but a residual was measured');
+    console.log('      margin is ZERO: the raw bound contained every honest hourly premium unaided');
+    return;
+  }
   // A margin nothing comes near is not calibrated, it is padding. Saturation is what a real bound
   // looks like — the same standard gateF applies to its quantity band.
   assert.ok(usage > 0.02, `the margin is ${(1 / Math.max(usage, 1e-9)).toFixed(0)}x larger than anything honest needs — padding, not calibration`);
@@ -246,6 +328,9 @@ test('T10.10 the arithmetic is exact and rounds the safe way', () => {
   assert.ok(-acc.meanLB >= ONE / 3n, 'mean rounded inward');
   assert.throws(() => sampleBound({ oracle: 100n, bid: 110n, ask: 105n }), FundingBoundError, 'a crossed book was accepted');
   assert.throws(() => parseDecimal('1e-4'), FundingBoundError, 'scientific notation silently accepted');
+  assert.throws(() => parseDecimal(''), FundingBoundError, 'empty string parsed as a number');
+  assert.throws(() => parseDecimal('0.0000000000000000001'), FundingBoundError, 'a 19th significant decimal was silently truncated');
+  assert.equal(parseDecimal('0.00040000000000000000'), -BAND_LO, 'trailing zeros past 18 decimals must be fine');
   assert.equal(parseDecimal('-0.0004'), BAND_LO);
   assert.equal(parseDecimal('0.0006'), BAND_HI);
   assert.equal(parseDecimal(PINNED_RATE_STR), PINNED_RATE);
@@ -281,11 +366,17 @@ test('T10.12 the bound is TIGHT: no better bound exists from (oracle, best bid, 
   assert.ok(Math.abs(pA - lb) < 1e-9, `deep book did not attain the lower bound: ${pA} vs ${lb}`);
   assert.ok(Math.abs(pB - ub) < 1e-9, `thin book did not attain the upper bound: ${pB} vs ${ub}`);
   assert.ok(pA < pB, 'the two books are not separated at all');
-  // and the forced case: oracle inside the touch pins the premium at 0 for EVERY book
+  // and the forced case: with the oracle INSIDE the touch (bid 999 <= 1000 <= ask 1001) the premium
+  // is 0 for EVERY book consistent with that touch, whatever the depth behind it.
   const inside = sampleBound({ oracle: 1000n, bid: 999n, ask: 1001n });
   assert.equal(inside.lb, 0n); assert.equal(inside.ub, 0n);
-  for (const book of [deep, thin, { bids: [[999, 0.001], [500, 1e6]], asks: [[1001, 0.001], [2000, 1e6]] }]) {
-    const p = premium(vwap(book.bids, NOTIONAL) ?? 999, vwap(book.asks, NOTIONAL) ?? 1001, 1000);
+  const insideBooks = [
+    { bids: [[999, 1e6]], asks: [[1001, 1e6]] },                          // all depth at the touch
+    { bids: [[999, 0.001], [500, 1e6]], asks: [[1001, 0.001], [2000, 1e6]] }, // dust at the touch
+    { bids: [[999, 3], [998, 3], [990, 1e6]], asks: [[1001, 3], [1002, 3], [1010, 1e6]] },
+  ];
+  for (const book of insideBooks) {
+    const p = premium(vwap(book.bids, NOTIONAL), vwap(book.asks, NOTIONAL), 1000);
     assert.ok(Math.abs(p) < 1e-12, `oracle inside the touch did not force premium 0: ${p}`);
   }
   console.log('      oracle inside the touch forces premium 0 for every book tried — zero-width, not a bound');

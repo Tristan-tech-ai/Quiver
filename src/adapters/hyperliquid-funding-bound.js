@@ -97,14 +97,14 @@ const ceilDiv = (a, b) => (a + b - 1n) / b;            // a >= 0, b > 0
 export function parseDecimal(s) {
   if (typeof s === 'bigint') return s;
   let str = String(s).trim();
-  if (!/^[+-]?\d*(\.\d*)?$/.test(str)) throw new FundingBoundError(`not a plain decimal: ${JSON.stringify(s)}`);
+  // at least one digit, no exponent: `1e-4` must be refused rather than silently mis-read
+  if (!/^[+-]?(\d+(\.\d*)?|\.\d+)$/.test(str)) throw new FundingBoundError(`not a plain decimal: ${JSON.stringify(s)}`);
   const neg = str.startsWith('-');
   if (neg || str.startsWith('+')) str = str.slice(1);
   const [a = '0', b = ''] = str.split('.');
-  if (b.length > 18) {
-    // keep exactness: refuse rather than silently truncate a number we were asked to verify
-    if (!/0*$/.test(b.slice(18))) throw new FundingBoundError(`more than 18 decimals: ${s}`);
-  }
+  // keep exactness: refuse rather than silently truncate a number we were asked to verify.
+  // (`/0*$/` would match the empty string and so never fire — the anchor on both ends is load-bearing.)
+  if (b.length > 18 && !/^0*$/.test(b.slice(18))) throw new FundingBoundError(`more than 18 significant decimals: ${s}`);
   const frac = (b + '0'.repeat(18)).slice(0, 18);
   const v = BigInt(a || '0') * ONE + BigInt(frac || '0');
   return neg ? -v : v;

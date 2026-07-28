@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-07-28T17:06:10.925Z",
+  "tape": {
+    "path": "tape.jsonl",
+    "ticks": 1333,
+    "from": "2026-07-28T15:13:50.011Z",
+    "to": "2026-07-28T17:04:50.006Z"
+  },
+  "marginFixed": "58325968489398",
+  "marginBps": 0.583,
+  "worstResidualAllHoursFixed": "29162984244699",
+  "multiplier": 2,
+  "leaveOneOut": {
+    "fittedOnHour": "2026-07-28T16:00:00.000Z",
+    "inSampleWorstFixed": "8122204573055",
+    "trialMarginFixed": "16244409146110",
+    "heldOutOfSample": false,
+    "outOfSampleRatio": 3.5905256980901115
+  },
+  "hoursObserved": 2,
+  "validation": [
+    {
+      "hour": 1785250800000,
+      "n": 177,
+      "exceedTrialMargin": 1,
+      "worstResidual": "29162984244699",
+      "usageOfTrialMargin": 1.7952628490450557
+    }
+  ],
+  "note": "margin widens the premium bound on both sides, never narrows it. Fitted as 2x the worst hourly residual across EVERY hour observed. A leave-one-out fit on a single hour did NOT hold out of sample, so one hour is not enough to calibrate this and the shipped margin is not proven sufficient for an unseen hour."
+}

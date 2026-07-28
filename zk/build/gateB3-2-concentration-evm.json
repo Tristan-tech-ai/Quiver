@@ -1,0 +1,25 @@
+{
+  "at": "2026-07-28T06:12:34.330Z",
+  "passed": true,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "proveMs": 564,
+  "acceptGas": "277332",
+  "rejectGas": "573",
+  "verifierBytes": 8098,
+  "servedHhi": 0.4667,
+  "certifiedHhi": 0.46675,
+  "publicSignals": [
+    "0",
+    "1000000000",
+    "8",
+    "640000000",
+    "210000000",
+    "105000000",
+    "45000000",
+    "0",
+    "0",
+    "0",
+    "0",
+    "466750000"
+  ]
+}

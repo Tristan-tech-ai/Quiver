@@ -1,0 +1,21 @@
+{
+  "at": "2026-07-28T07:04:46.924Z",
+  "passed": true,
+  "samples": 4000,
+  "kept": 3595,
+  "diverged": 0,
+  "outOfDomain": 405,
+  "violations": 0,
+  "feeViolations": 0,
+  "tightestRatio": 0.7996848869417713,
+  "tightestFeeRatio": 1,
+  "widestGapToServed": 2.9802322387695312e-8,
+  "worst": {
+    "x": 7180.474728328974,
+    "y": 1871.2405782419155,
+    "dx": 156.24198111917323,
+    "fee": 0.0001,
+    "servedOut": 39.84585103,
+    "residual": "3665793831632"
+  }
+}

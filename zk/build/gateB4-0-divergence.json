@@ -1,0 +1,18 @@
+{
+  "at": "2026-07-28T07:04:44.081Z",
+  "passed": true,
+  "proveMs": 585,
+  "plonkConstraints": 887,
+  "domainSize": 1024,
+  "publicSignals": [
+    "0",
+    "0",
+    "8000000000",
+    "5000000000",
+    "4000000000",
+    "2000000000",
+    "800000000"
+  ],
+  "residual": "0",
+  "rootResidual": "0"
+}

@@ -112,6 +112,74 @@ Kelly verifier is deployed on chain. Both need either a deploy or gas, and neith
 while reviewers are testing. This is exactly what the paper said about the liquidation circuit before
 it shipped: built, and verifiable from a clone.
 
+### Three more circuits: treasury, LP divergence, execution
+
+Tier 1 of [the completion plan](docs/phase-b-remaining-plan.md). The proof layer now covers **five of
+the twenty-two services** and five of the nine that have a deterministic path. Every size below is
+read from the artifact by `node zk/scripts/circuit-facts.mjs`, not written down.
+
+| service | circuit | R1CS | Plonk | prove (warm) | accept gas | reject gas |
+|---|---|---|---|---|---|---|
+| `perp-gate` | liquidation | 667 | 1,301 | — | 468,459 (on chain) | — |
+| `size-gate` | [kelly](zk/circuits/kelly.circom) | 372 | 718 | 328 ms | 273,118 | 573 |
+| `treasury-risk` | [concentration](zk/circuits/concentration.circom) | 451 | 834 | 346 ms | 277,332 | 573 |
+| `lp-risk` | [divergence](zk/circuits/divergence.circom) | 463 | 887 | 345 ms | 273,088 | 573 |
+| `exec-verify` | [constantproduct](zk/circuits/constantproduct.circom) | 671 | 1,293 | **697 ms** | 276,476 | 573 |
+
+Nine gates, three per circuit, all runnable from a clone (the EVM ones after `cd zk && npm install`):
+
+```bash
+node zk/scripts/gateB3-1-concentration-sweep.mjs   # 4,000 treasury books through the real engine
+node zk/scripts/gateB4-1-divergence-sweep.mjs      # 4,000 price ratios, 1/100x to 100x
+node zk/scripts/gateB5-1-constantproduct-sweep.mjs # 3,595 pools across seven orders of magnitude
+node zk/scripts/gate-clone-portability.mjs         # and the check that all of the above still run for you
+```
+
+**A square root is proven, not computed.** `lp-risk` rests on `IL = 2√r/(1+r) − 1`, and circuits do
+not take roots. So `s` arrives as a witness, the circuit forces `s² = r·S` and pins it non-negative so
+the other root cannot be substituted, and the identity then cross-multiplies to
+`L̂·(S + r̂) = 2·S·ŝ` with no division left. The gate refuses a wrong root, and refuses the negative
+root offered as a field element, because that second one is the whole reason the bit decomposition is
+there.
+
+**Every bound is tight, because a loose bound is not evidence.** The concentration circuit shipped
+with `2|R| ≤ 4S` on a derivation that counted two rounding sources. The sweep put the worst of 4,000
+real books at a quarter of it, and the derivation was simply wrong: `Σŵ²` is computed *from* the
+snapped weights, so weight rounding changes which book is described rather than how well the identity
+holds for it. The bound is now `S`, and the worst case uses 0.9986 of it — which upgrades the claim
+from "near the right index" to "the correctly rounded Herfindahl index of the published shares".
+Measured, then tightened, in that order.
+
+**What the three sweeps caught.** All three failed at least once, which is the only reason their green
+results are worth anything:
+
+- `toScaled` in the shared kit read `BigInt(Math.round(snap(x) * 1e9))` — **the exact scaled product
+  its own comment warned against**. Harmless for a probability; at an AMM reserve of 8.03e8 the double
+  has a granularity of 128, so the encoder was off by up to sixty-four grid steps. Now assembled from
+  the decimal string, exact at any magnitude.
+- The constant-product encoder computed `y − x·y/(x+in)` where the engine computes
+  `(y·in)/(x+in)`. Algebraically identical, numerically not: the first cancels two large numbers to
+  leave a small one. **Third appearance of this defect class**, after a display-rounded margin and a
+  display-rounded Kelly fraction, and the same fix each time — use what the engine uses, arranged how
+  the engine arranges it.
+- The agreement guard refused 455 of 3,595 pools at a flat, suspiciously round **5.0 grid steps** that
+  did not move when the encoder changed twice. 5e-9 is exactly half of 1e-8, and `honestOut` is served
+  as `round(honestOut, 8)`. A constant gap that survives two encoder fixes is not the encoder.
+
+**Latency, against the 500 ms bar.** Three circuits prove warm in 328 to 346 ms. `constantproduct`
+takes 697 ms and is **over**, because 1,293 Plonk constraints force a 2,048-point evaluation domain
+where the others fit 1,024. It came down from 1,553 by dropping two comparators that were implied by
+constraints already present and by narrowing the fee-residual window from 66 bits to 34. Getting under
+1,024 would mean cutting another 270, and 55% of what remains is six 62-bit range decompositions that
+are load-bearing for soundness; narrowing them to fit would cap reserves at about 4.5M tokens, and the
+sweep already reports 405 of 4,000 pools outside the current 2^62 domain. So it stays at 697 ms and is
+reported rather than hidden. **None of it is on the request path** — the live service answers in 275
+to 348 ms p50, measured, because a proof is built behind the response and not inside it
+(`node zk/scripts/latency.mjs --live`).
+
+**Not shipped:** no endpoint serves any of these three, and no verifier for them is deployed. Both
+need a deploy, and deploys wait while judging runs.
+
 ### The proof now outlives the process
 
 Until this week the proof store was a `Map`. A redeploy cleared it, and a second replica would answer

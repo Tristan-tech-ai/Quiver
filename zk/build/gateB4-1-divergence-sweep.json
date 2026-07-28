@@ -1,0 +1,18 @@
+{
+  "at": "2026-07-28T07:04:44.391Z",
+  "passed": true,
+  "samples": 4000,
+  "kept": 3999,
+  "diverged": 1,
+  "idViolations": 0,
+  "rootViolations": 0,
+  "tightestIdentityRatio": 0.9604002819620026,
+  "tightestRootRatio": 0.9460532819918618,
+  "widestGapToServed": 5.000000000165983e-7,
+  "worst": {
+    "ratio": 91.74244527120464,
+    "servedPct": -79.3445,
+    "certifiedPct": -79.34445729999999,
+    "residual": "45975535717"
+  }
+}

@@ -28,14 +28,15 @@ const SCRIPTS = path.dirname(fileURLToPath(import.meta.url));
 const ZK = path.join(SCRIPTS, '..');
 
 // Artifacts a reader must find in the checkout, not just in the author's build directory.
-const REQUIRED_ARTIFACTS = [
-  'build/kelly.r1cs',
-  'build/kelly_plonk.zkey',
-  'build/kelly_vk.json',
-  'build/kelly_js/kelly.wasm',
-  'build/kelly_js/witness_calculator.cjs',
-  'circuits/kelly.circom',
-];
+const CIRCUITS = ['kelly', 'concentration', 'divergence', 'constantproduct'];
+const REQUIRED_ARTIFACTS = CIRCUITS.flatMap((c) => [
+  `build/${c}.r1cs`,
+  `build/${c}_plonk.zkey`,
+  `build/${c}_vk.json`,
+  `build/${c}_js/${c}.wasm`,
+  `build/${c}_js/witness_calculator.cjs`,
+  `circuits/${c}.circom`,
+]);
 
 const results = [];
 const record = (name, pass, detail) => {
@@ -46,9 +47,15 @@ const record = (name, pass, detail) => {
 console.log(`GATE: clone portability — ${new Date().toISOString()}\n`);
 
 // ---- 1. the artifacts are actually in the checkout ------------------------------------------------
+// A list that is accidentally empty checks nothing and reports PASS, which is how a verifier stops
+// being able to fail. This one built itself with a template literal inside a shell heredoc, came out
+// as six commas, and duly reported success against zero artifacts. So the count is asserted first.
+record('the artifact list is not empty', REQUIRED_ARTIFACTS.length === CIRCUITS.length * 6,
+  `${REQUIRED_ARTIFACTS.length} paths across ${CIRCUITS.length} circuits`);
+
 const missing = REQUIRED_ARTIFACTS.filter((f) => !existsSync(path.join(ZK, f)));
 record('every artifact a gate needs is present in this checkout',
-  missing.length === 0,
+  REQUIRED_ARTIFACTS.length > 0 && missing.length === 0,
   missing.length ? `missing: ${missing.join(', ')}` : `${REQUIRED_ARTIFACTS.length} artifacts found`);
 
 // ---- 2. no script hardcodes the author's directory layout -----------------------------------------
@@ -66,7 +73,12 @@ record("no gate hardcodes the author's working-tree path",
 
 // ---- 3. each gate gets past module and artifact resolution ---------------------------------------
 // Run with cwd at the repo root, which is where a reader would be standing.
-const GATES = ['gateB0-kelly.mjs', 'gateB1-kelly-sweep.mjs', 'gateB2-kelly-evm.mjs', 'gate2-service.mjs', 'gate3-registry.mjs'];
+// DISCOVERED, not listed. A hardcoded array is how coverage stops growing without anyone noticing:
+// three new circuits landed with nine new gates and a fixed list would have checked none of them.
+const SELF = path.basename(fileURLToPath(import.meta.url));
+const GATES = readdirSync(SCRIPTS)
+  .filter((f) => /^gate.*.mjs$/.test(f) && f !== SELF)
+  .sort();
 const REPO_ROOT = path.join(ZK, '..');
 
 console.log('\nRunning each gate from the repository root:');

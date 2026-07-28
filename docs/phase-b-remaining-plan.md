@@ -34,6 +34,9 @@ instrument before using it three more times is the whole reason this section is 
 
 ---
 
+> **DONE, 28 July 2026.** All three built, nine gates passed, nothing deployed. Results and the three
+> defects the sweeps caught are in the README. Tier 2 (portfolio-gate) was approved at n <= 3 legs.
+
 ## Tier 1 — build these, in this order
 
 Each rests on an identity the engine **already self-checks**, which is why they are tractable: the

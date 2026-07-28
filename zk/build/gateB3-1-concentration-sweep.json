@@ -1,0 +1,18 @@
+{
+  "at": "2026-07-28T07:04:42.288Z",
+  "passed": true,
+  "samples": 4000,
+  "kept": 4000,
+  "violations": 0,
+  "diverged": 0,
+  "slackViolations": 0,
+  "tightestRatio": 0.998578168,
+  "headroomFactor": 1.0014238564847133,
+  "widestGapToServed": 0.000049991000000026986,
+  "worst": {
+    "assets": 6,
+    "served": 0.3762,
+    "certified": 0.376173673,
+    "residual": "-499289084"
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "at": "2026-07-28T15:23:15.710Z",
+  "passed": true,
+  "circuit": "portfoliogate",
+  "legs": 3,
+  "nearest": 1,
+  "proveMs": 1772,
+  "publicSignals": 28,
+  "worked": [
+    {
+      "leg": 0,
+      "side": "short",
+      "servedPrice": 184.16,
+      "certifiedPrice": 184.158415842,
+      "gapToServedPrice": 0.0015841579999857913,
+      "servedPct": 18.812,
+      "exactPct": 18.811881188387098,
+      "residual": "-168000000000000000000",
+      "tolerance": "404000000000000000000",
+      "boundUsed": 0.8316831683168316
+    },
+    {
+      "leg": 1,
+      "side": "long",
+      "servedPrice": 57889.45,
+      "certifiedPrice": 57889.447236181,
+      "gapToServedPrice": 0.0027638190003926866,
+      "servedPct": 9.548,
+      "exactPct": 9.547738693467188,
+      "residual": "142500000000000000",
+      "tolerance": "1507500000000000000",
+      "boundUsed": 0.1890547263681592
+    },
+    {
+      "leg": 2,
+      "side": "long",
+      "servedPrice": 2816.9,
+      "certifiedPrice": 2816.901408451,
+      "gapToServedPrice": 0.0014084509998610883,
+      "servedPct": 11.972,
+      "exactPct": 11.97183098590625,
+      "residual": "5880000000000000000",
+      "tolerance": "20120000000000000000",
+      "boundUsed": 0.584493041749503
+    }
+  ],
+  "nearTieGapPoints": 0.000010050251560755896
+}

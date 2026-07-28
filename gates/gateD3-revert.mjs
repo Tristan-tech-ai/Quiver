@@ -6,13 +6,26 @@
 // while doing it. Nothing caught that, because nothing tried to make it fail.
 //
 // So this script removes one load-bearing check at a time, reruns the gate, and requires it to go RED
-// each time — then restores the file and requires GREEN. Four separate defects are injected, because
+// each time — then restores the file and requires GREEN. Eight separate defects are injected, because
 // a gate can easily be sensitive to one thing and blind to the rest:
 //
 //   1. the proto3 zero-omission in the vote encoder  — the exact historical defect
 //   2. the divergence comparison itself              — makes every claim "agree"
 //   3. the no-proof-path refusal                     — lets an unprovable quantity through
 //   4. the ticker cross-check                        — attests one market against another's proof
+//
+// and four that break the FUNDING recomputation specifically. Funding is the newest thing this module
+// claims and the one with the most arithmetic in it, so "it matched 24 of 24 on mainnet" is exactly
+// the kind of evidence that hides a defect in a branch mainnet does not reach:
+//
+//   5. the sint32 zigzag decode of premium samples   — the wire type that made this look impossible,
+//                                                      reinstated as the plain int32 read it was
+//   6. the default-funding term                      — silently correct on 114 markets, wrong on 182
+//   7. the funding-context height binding            — lets inputs proven at one height be reused
+//                                                      against another anchor, which no per-key root
+//                                                      check can see because each proof is valid
+//   8. the direction of integer truncation           — Math.floor instead of trunc-toward-zero: right
+//                                                      on every positive rate, wrong on every negative
 //
 //   node gates/gateD3-revert.mjs        (npm run gate:d3-revert)
 import { readFileSync, writeFileSync, copyFileSync, rmSync } from 'node:fs';
@@ -47,12 +60,36 @@ const MUTATIONS = [
     '  if (normTicker(perp.ticker) !== want) {',
     '  if (false) { // SCRIPTED REVERT: id mapping trusted blindly',
   ],
+  [
+    'the sint32 zigzag decode of premium samples (the wire type that made funding look impossible)',
+    '      if (h.wire === 2) for (const u of uvarints(h.bytes)) premiums.push(Number(zigzag(u)));',
+    '      if (h.wire === 2) for (const u of uvarints(h.bytes)) premiums.push(Number(BigInt.asIntN(32, u))); // SCRIPTED REVERT: plain int32, not sint32',
+  ],
+  [
+    'the default-funding term in the funding rule',
+    '  const rawPpm = premiumPpm + defaultFundingPpm;',
+    '  const rawPpm = premiumPpm; // SCRIPTED REVERT: the term that IS the rate for 182 of 296 markets',
+  ],
+  [
+    'the funding-context height binding',
+    '  if (ctx.appHash !== anchor.appHash) {',
+    '  if (false) { // SCRIPTED REVERT: funding inputs accepted from any height',
+  ],
+  [
+    'the direction of integer truncation in AvgInt32',
+    '  const premiumPpm = Number(sum / BigInt(paddedTo));   // Go integer division: truncates toward zero',
+    '  const premiumPpm = Math.floor(Number(sum) / paddedTo); // SCRIPTED REVERT: floor, not trunc-toward-zero',
+  ],
 ];
 
 function runGate() {
   const r = spawnSync(process.execPath, ['--test', join(ROOT, 'gates', 'gateD3-dydx-input-attestation.mjs')], {
-    cwd: ROOT, encoding: 'utf8', timeout: 600_000,
-    env: { ...process.env, GATE_D3_MARKETS: '10' }, // fewer markets: this run is about failing, not the bound
+    cwd: ROOT, encoding: 'utf8', timeout: 900_000,
+    // Fewer markets and one tick height: these runs are about whether the gate can FAIL, not about
+    // re-deriving the bounds. The tick ticker list is left alone on purpose — it is the mix that
+    // covers both the premium term and the default-funding term, and trimming it is exactly how
+    // mutation 6 would stop being caught.
+    env: { ...process.env, GATE_D3_MARKETS: '10', GATE_D3_TICK_HEIGHTS: '1' },
   });
   const out = `${r.stdout || ''}${r.stderr || ''}`;
   const pass = Number((out.match(/^# pass (\d+)$/m) || out.match(/^ℹ pass (\d+)$/m) || [])[1] ?? -1);

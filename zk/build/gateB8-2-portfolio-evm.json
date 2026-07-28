@@ -1,0 +1,17 @@
+{
+  "at": "2026-07-28T15:25:07.256Z",
+  "passed": true,
+  "circuit": "portfoliogate",
+  "legs": 3,
+  "publicSignals": 28,
+  "acceptGas": "292748",
+  "rejectGas": "573",
+  "gasPerLeg": 97582.66666666667,
+  "deployedBytes": 11530,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "comparison": {
+    "liquidationOneLegGas": "273118",
+    "perLegRouteElevenLegsGas": "2947769",
+    "threeSeparateVerifiesGas": "819354"
+  }
+}

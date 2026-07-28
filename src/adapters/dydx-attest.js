@@ -47,6 +47,39 @@
 //     manipulated oracle is attested with full force. Attestation is provenance, never truth.
 //
 // ============================================================================================
+// FUNDING IS NOT STORED, AND IS ATTESTED ANYWAY
+// ============================================================================================
+// The funding rate is the one quantity here that is RECOMPUTED rather than read. dYdX commits no
+// funding-rate key; it commits every input to one, and the aggregation over them is deterministic
+// integer arithmetic. So steps 1-7 above cover the INPUTS, and the rate follows from them by a rule
+// transcribed from `MaybeProcessNewFundingTickEpoch`. See the FUNDING section further down for the
+// arithmetic and `FUNDING_CAVEATS` for what a green gate still does not say — chiefly that the
+// premium samples originate in each validator's in-memory orderbook, so this proves the chain applied
+// its own rule to its own committed inputs and never that those inputs describe a real book.
+//
+// ============================================================================================
+// WHAT THIS DISAGREES WITH IN PHASE_D_RESEARCH.md §4.2, AND WITH PHASE_D_FUNDING.md §3
+// ============================================================================================
+//   * PHASE_D_FUNDING.md §3 gives the PREDICTED rate as
+//         nextFundingRate = sum(PremSamples[perp]) / NumPremiums / 8e6
+//     and reports it at 18 of 18 markets, worst relative error 2.7e-14. The formula is INCOMPLETE:
+//     it omits `default_funding_ppm`. Measured here across all 296 dYdX markets at one anchored
+//     height, that formula reproduces 102 of 296 — and every one of those 102 is a market where BOTH
+//     terms are zero, so it reproduces nothing but zeros. 182 markets carry default_funding_ppm = 100
+//     and publish exactly 1.25e-5 per hour with no premium samples at all; the omitting formula
+//     returns 0 for every one of them. With the term restored: 284 of 296 at the same instant, the
+//     residual 12 being the sampled markets and a snapshot-height difference, not a formula error.
+//     The 18/18 is explained rather than contradicted: the markets that carry premium samples are the
+//     majors, and every one of them has default_funding_ppm = 0, so the missing term vanished across
+//     the whole sample it was validated on. PHASE_D_FUNDING.md names that exact failure mode in its
+//     own account of the refusal this code replaces — "a formula validated only where one of its
+//     terms vanishes has not been validated" — and then reintroduces it one section later.
+//     The TICK rule in the same document is correct and already contains the term.
+//   * PHASE_D_FUNDING.md's 144-of-144 covered 12 markets, all with default_funding_ppm = 0, so the
+//     default-funding branch of the tick rule was unexercised there. gateD3 now asserts coverage of
+//     both branches rather than hoping the sample happens to have it.
+//
+// ============================================================================================
 // WHAT THIS DISAGREES WITH IN PHASE_D_RESEARCH.md §4.2
 // ============================================================================================
 //   * The perpetuals-store key prefix is `Perp:`, NOT `Perpetual:`. `Perpetual:` + be4(0) returns a
@@ -67,7 +100,7 @@
 //     identical from all three providers. §4.2's title is correct; the doubt cast on it was not.
 //
 // Nothing in this file is served, deployed, or on chain. It lives outside src/engine/.
-import { verifyStoreProof, pbFields, pbFirst, zigzag, uvarintEnc } from './ics23.js';
+import { verifyStoreProof, pbFields, pbFirst, zigzag, uvarintEnc, uvarints } from './ics23.js';
 import { createHash, createPublicKey, verify as ed25519Verify } from 'node:crypto';
 
 // Three independently operated public endpoints. Measured 2026-07-28: all three serve ICS-23 proofs
@@ -79,7 +112,18 @@ export const DYDX_RPCS = [
   'https://dydx-ops-rpc.kingnodes.com',
   'https://dydx-dao-rpc.polkachu.com',
 ];
+// Attesting a REALIZED funding tick means pinning a height about an hour in the past, and block
+// retention is not state retention. Measured 2026-07-28 at tick height 99,349,592: publicnode reports
+// 3M blocks of history and still answers `proof is unexpectedly empty; ensure height has not been
+// pruned`, while these two serve the proof. Nine other public endpoints were tried and none answered
+// at all (DNS failure, HTML error pages, or timeouts), so this list is two entries because two is what
+// exists, not because two was chosen. MIN_CORROBORATORS is 2, so both must be up or the module refuses.
+export const DYDX_ARCHIVE_RPCS = [
+  'https://dydx-ops-rpc.kingnodes.com',
+  'https://dydx-dao-rpc.polkachu.com',
+];
 export const DYDX_INDEXER = 'https://indexer.dydx.trade/v4/perpetualMarkets';
+export const DYDX_HISTORICAL_FUNDING = 'https://indexer.dydx.trade/v4/historicalFunding';
 export const DYDX_CHAIN_ID = 'dydx-mainnet-1';
 
 // A proof needs the header at H+1 to exist, so never query the tip. 3 blocks is ~4 s on dYdX.
@@ -97,8 +141,21 @@ export const KEYS = {
   price: (marketId) => Buffer.concat([Buffer.from('Price:'), be4(marketId)]),
   perpetual: (perpetualId) => Buffer.concat([Buffer.from('Perp:'), be4(perpetualId)]),
   liqTier: (tierId) => Buffer.concat([Buffer.from('LiqTier:'), be4(tierId)]),
+  // Singletons, no id suffix. `PremSamples` holds EVERY market's premium samples in one value under
+  // one key, which is why a single proof covers the whole book and no market's entry can be dropped
+  // without breaking that proof.
+  premiumSamples: () => Buffer.from('PremSamples'),
+  perpetualsParams: () => Buffer.from('Params'),
+  epochInfo: (name) => Buffer.concat([Buffer.from('Info:'), Buffer.from(name)]),
 };
-export const STORES = { price: 'prices', perpetual: 'perpetuals', liqTier: 'perpetuals' };
+export const STORES = {
+  price: 'prices', perpetual: 'perpetuals', liqTier: 'perpetuals',
+  premiumSamples: 'perpetuals', perpetualsParams: 'perpetuals', epochs: 'epochs',
+};
+export const EPOCH_FUNDING_TICK = 'funding-tick';
+export const EPOCH_FUNDING_SAMPLE = 'funding-sample';
+/** dYdX quotes funding on an 8-hour convention: the indexer publishes `fundingPpm / 8e6` per hour. */
+export const FUNDING_PPM_PER_HOURLY = 8e6;
 
 // ---------------------------------------------------------------- quantity registry
 //
@@ -109,40 +166,79 @@ export const ATTESTABLE = {
   maintenanceMarginRate: { source: 'perpetuals/LiqTier:<tierId>', note: 'initial_margin_ppm x maintenance_fraction_ppm / 1e12' },
   initialMarginRate: { source: 'perpetuals/LiqTier:<tierId>', note: 'initial_margin_ppm / 1e6' },
   maxLeverage: { source: 'perpetuals/LiqTier:<tierId>', note: '1e6 / initial_margin_ppm' },
+  // The two funding rows. Neither rate is STORED — both are RECOMPUTED from stored inputs, every one
+  // of which carries its own ICS-23 existence proof rooting into the same signed app_hash. `source`
+  // therefore lists the whole input set, because that is what the attestation actually covers.
+  fundingHourly: {
+    source: 'perpetuals/PremSamples + perpetuals/Perp:<perpetualId>',
+    note: '(sum(premiums, sint32 ppm) / num_premiums + default_funding_ppm) / 8e6 — the running '
+      + 'prediction over the partial epoch, which is the number the indexer publishes as '
+      + 'nextFundingRate and the only funding number perp-gate consumes. Float division, matching '
+      + 'the indexer\'s own non-integer output.',
+  },
+  fundingTickHourly: {
+    source: 'perpetuals/PremSamples + perpetuals/Params + perpetuals/Perp:<perpetualId> '
+      + '+ perpetuals/LiqTier:<tierId> + epochs/Info:funding-tick + epochs/Info:funding-sample',
+    note: 'MaybeProcessNewFundingTickEpoch, transcribed: clamp(AvgInt32(pad0(premiums, '
+      + 'max(num_premiums, tickDur/sampleDur))) + default_funding_ppm, +/- clampFactor x (IM - MM)) '
+      + '/ 8e6. Pure integer arithmetic. Equals the venue\'s PUBLISHED realized rate only when the '
+      + 'anchor is pinned at effectiveAtHeight-1; at any other height it is the rate the epoch would '
+      + 'settle at if the tick fired now, which the venue has not published and nothing can check. '
+      + 'proveMarket therefore only exposes it when proveFunding reports tickEpochComplete, and '
+      + 'attest refuses it with NOT_IN_PROOF otherwise rather than returning a comparable-looking '
+      + 'number that is not comparable to anything.',
+  },
 };
 
 // Quantities the existing dydx.js adapter returns that CANNOT be attested, with the measured reason.
-// `fundingHourly` is the live gap: perp-gate consumes it and nothing here can vouch for it.
+//
+// `fundingHourly` USED TO LIVE HERE. It moved to ATTESTABLE when the recomputation below was wired
+// in, which is the whole point of this change: the rate is not stored, and that was never the
+// obstacle, because every INPUT to it is a store key carrying an ICS-23 existence proof and the
+// aggregation is deterministic. The wire type `repeated sint32` was the actual obstacle. Nothing is
+// left here as a placeholder — an entry in this object is a refusal that is currently true.
 export const NOT_ATTESTABLE = {
-  // The refusal stands. The REASON was wrong and is corrected here, because a refusal that gives a
-  // false reason is worse than one that gives none: it tells the next person not to look.
-  //
-  // The old text said the rate is "never committed under a key". Premium samples ARE committed:
-  // `PremSamples` in the perpetuals store returns a 2-op ICS-23 existence proof, ~675-807 B of value,
-  // verified live. And for the markets it covers, nextFundingRate reconstructs exactly as
-  // mean(premium samples, sint32 ppm) / 8 / 1e6, confirmed across five snapshots at 17/17, 17/17,
-  // 17/17, 17/17 and 19/19 markets.
-  //
-  // What actually blocks attestation is narrower and was found by measuring the rest of the book:
-  // only 17 to 22 of 296 markets carry premium samples at any instant, and 182 of the others sit at
-  // exactly 1.25e-5 per hour, which is 0.01% per 8h, the interest-rate term. Those are not stale
-  // values carried over; each settles a fresh hourly entry, checked through
-  // /v4/historicalFunding. So funding is premium PLUS interest, the reconstruction above covers only
-  // the premium half, and it was validated exclusively on markets where the interest half is
-  // dominated. A formula validated only where one of its terms vanishes has not been validated.
-  fundingHourly:
-    'SUPERSEDED, and left here as a pointer rather than a refusal. The rate is not stored, which is '
-    + 'true and was never the obstacle: every INPUT to it is a store key carrying an ICS-23 existence '
-    + 'proof, and the aggregation is deterministic integer arithmetic. Recomputing it from those '
-    + 'inputs reproduces the venue exactly: 144 of 144 funding ticks integer-exact across 12 markets, '
-    + '30 of 30 again on a second independent archive, and nextFundingRate itself 18 of 18 at a worst '
-    + 'relative error of 2.7e-14, end to end from a signed CometBFT header through a verified proof. '
-    + 'The gap that made it look impossible was one wire type: `premiums` is repeated SINT32, so a '
-    + 'plain int32 read returns roughly -2x the true value. This entry stays until the recomputation '
-    + 'path is wired in, so that nobody reads a stale refusal as a finding. See PHASE_D_FUNDING.md.',
   orderbook:
-    'dYdX documents the orderbook as in-memory per node and "not written to the blockchain or stored ' +
-    'in the application state", so no depth is ever provable.',
+    'dYdX documents the orderbook as in-memory per node and "not written to the blockchain or stored '
+    + 'in the application state", so no depth is ever provable. This is also the ceiling on what the '
+    + 'funding attestation means: the premium samples that ARE provable come from each validator\'s '
+    + 'MemClob via GetPricePremium, so a verified funding rate proves the chain applied its own rule '
+    + 'to its own committed inputs, never that those inputs describe a real book.',
+};
+
+// ---------------------------------------------------------------- what the funding proof does NOT say
+//
+// Stated as data rather than prose so the gate can assert they are still here. Every one of these is
+// a limit that survives a fully green gate run.
+export const FUNDING_CAVEATS = {
+  premiumProvenance:
+    'dYdX\'s premium comes from k.MemClob.GetPricePremium — each validator\'s IN-MEMORY orderbook, '
+    + 'which the protocol documents as never written to application state. Proposers sample their '
+    + 'local book, submit MsgAddPremiumVotes, and the chain medians across the proposers of that '
+    + 'minute. So a verified funding rate establishes that the chain applied its own rule correctly '
+    + 'to its own committed inputs. It does NOT establish that those inputs describe a real book: a '
+    + 'validator set that collectively misreported would produce a rate that verifies perfectly. '
+    + 'Attestation is provenance, never truth.',
+  clampBranchUnexercised:
+    'The clamp in the tick rule is transcribed from source, not observed. For BTC (IM 20,000 ppm, '
+    + 'maintenance fraction 600,000 ppm, clamp factor 6,000,000 ppm) the bound works out to '
+    + '+/- 48,000 ppm per hour against realized rates of order 100 ppm, so it has never been seen '
+    + 'binding on mainnet in any measurement here. gateD3 exercises the branch with a SYNTHETIC '
+    + 'input, which proves the code clamps; it does not prove the transcription matches dYdX at the '
+    + 'bound, because no on-chain observation reaches it. The same applies to the integer rounding '
+    + 'inside the bound: every real liquidity tier divides exactly, so the truncation is unexercised.',
+  voteToSampleStage:
+    'One stage below this: each premium SAMPLE is itself the median of validator votes in PremVotes, '
+    + 'which is also provable. That stage is NOT verified here. PHASE_D_FUNDING.md reproduces it on '
+    + '8 of 22 markets, with the cause identified (votes arriving in block H are applied before the '
+    + 'end-of-block sample computation, so PremVotes read at H-1 is missing one block of votes) and '
+    + 'no fix applied. The attestation therefore starts at the sample, not at the vote.',
+  realizedNeedsTickHeight:
+    'fundingTickHourly equals a number the venue actually published only when the anchor is pinned at '
+    + 'effectiveAtHeight-1 for that tick. That needs an archive provider — measured, dYdX\'s own '
+    + 'publicnode endpoint prunes application state and refuses the proof at a height one hour back '
+    + 'while still reporting 3M blocks of history. At a live anchor the tick rule returns a '
+    + 'hypothetical, and the module labels it as one rather than comparing it to anything.',
 };
 
 // ---------------------------------------------------------------- exact decimal helpers
@@ -335,16 +431,57 @@ export const TRUST = {
   SIGNED: 'ics23-verified-against-a-2/3-validator-signed-app_hash-corroborated-by-N-independent-rpcs',
   // The weaker label, returned when signature checking was explicitly disabled by the caller.
   CORROBORATED: 'ics23-verified-against-an-app_hash-corroborated-by-N-independent-rpcs',
-  // What this would be with a weak-subjectivity checkpoint pinning the validator set. Never returned.
+  // The strongest label, and it is now REACHABLE — `openAnchor({ checkpoint: true })` returns it.
+  //
+  // Returned if and ONLY if the app_hash every ICS-23 proof roots into is byte-identical to the
+  // app_hash a DIFFERENT chain's validators independently committed to, read out of that chain's own
+  // IAVL store with its own ICS-23 proof (src/adapters/ibc-checkpoint.js). All six clauses in
+  // `verifyAnchorCheckpoint` must hold — exact height, exact app_hash, matching next_validators_hash,
+  // >=2 independently operated counterparty providers agreeing byte-for-byte, inside the client's
+  // trusting period, client not frozen. Anything short of that throws; nothing downgrades silently.
+  //
+  // What it is NOT: freshness is still unattested, and nothing says the oracle price is correct. It
+  // moves the forgery cost from "operate a web server" to ">1/3 of dYdX staked power, slashably, on
+  // chain". Trust priced in stake, not zero trust.
   CHECKPOINTED: 'ics23-verified-against-a-signed-app_hash-anchored-to-a-trusted-checkpoint',
 };
 
 /**
  * Pin one height and obtain the app_hash for it from several independent providers.
  * Every proof in an attestation roots into THIS app_hash, so one anchor covers a whole batch.
+ *
+ * `height` pins a PAST block instead of tracking the tip. That is what a realized funding tick needs
+ * — the samples for an hour exist only at `effectiveAtHeight - 1`, before the tick clears them — and
+ * it changes nothing about the checks: the same header hash, validator-set hash, 2/3 signature and
+ * cross-provider corroboration all run against the pinned height. Pass DYDX_ARCHIVE_RPCS with it;
+ * the default list contains a pruning node that will simply drop out of the corroborator count.
+ *
+ * `checkpoint` closes the circularity described in the header of this file. Pass `true` (or an options
+ * object for `readCheckpointFor`) and the anchor is instead pinned to a height that ANOTHER chain's
+ * validators have independently committed to, verified against that chain's own ICS-23 proof, and
+ * `trust` becomes TRUST.CHECKPOINTED. It CHOOSES the height — `consensus_state(H).root` is
+ * `header[H].app_hash`, so the anchor must sit at H-1 — and passing an incompatible `height` alongside
+ * it is an error rather than a silent override. If the checkpoint cannot be obtained, corroborated,
+ * or matched, this THROWS: a caller that asked for a checkpoint and quietly received a merely-signed
+ * anchor is exactly the failure mode the checkpoint exists to remove.
  */
-export async function openAnchor({ rpcs = DYDX_RPCS, timeoutMs = 15000, checkValidatorSet = true } = {}) {
+export async function openAnchor({ rpcs = DYDX_RPCS, timeoutMs = 15000, checkValidatorSet = true, height: pinnedHeight = null, checkpoint = null } = {}) {
   const t0 = Date.now();
+  if (pinnedHeight !== null && !(Number.isInteger(pinnedHeight) && pinnedHeight > 0)) {
+    throw new Error(`dydx-attest: pinned height must be a positive integer, got ${pinnedHeight}`);
+  }
+  // Dynamic import: ibc-checkpoint.js consumes this module's CometBFT helpers, so a static import here
+  // would close a cycle. Loading it lazily keeps the dependency one-directional at module scope.
+  let ibc = null, checkpointRead = null;
+  if (checkpoint) {
+    ibc = await import('./ibc-checkpoint.js');
+    checkpointRead = await ibc.readCheckpointFor(checkpoint === true ? {} : checkpoint);
+    const want = ibc.anchorHeightFor(checkpointRead);
+    if (pinnedHeight !== null && pinnedHeight !== want) {
+      throw new Error(`dydx-attest: a checkpoint pins the anchor to height ${want} (checkpointed dYdX height ${checkpointRead.dydxHeight}), but height ${pinnedHeight} was also requested — refusing to silently override either`);
+    }
+    pinnedHeight = want;
+  }
   const statuses = await Promise.allSettled(rpcs.map((r) => jrpc(r, 'status', {}, timeoutMs).then((s) => ({ rpc: r, s }))));
   const live = statuses.filter((x) => x.status === 'fulfilled').map((x) => x.value);
   if (live.length < MIN_CORROBORATORS) {
@@ -353,7 +490,11 @@ export async function openAnchor({ rpcs = DYDX_RPCS, timeoutMs = 15000, checkVal
   for (const { rpc, s } of live) {
     if (s.node_info.network !== DYDX_CHAIN_ID) throw new Error(`dydx-attest: ${rpc} reports chain ${s.node_info.network}, expected ${DYDX_CHAIN_ID}`);
   }
-  const height = Math.min(...live.map(({ s }) => Number(s.sync_info.latest_block_height))) - PROOF_LAG;
+  const tipHeight = Math.min(...live.map(({ s }) => Number(s.sync_info.latest_block_height))) - PROOF_LAG;
+  if (pinnedHeight !== null && pinnedHeight > tipHeight + PROOF_LAG) {
+    throw new Error(`dydx-attest: pinned height ${pinnedHeight} is ahead of the chain tip ${tipHeight + PROOF_LAG}`);
+  }
+  const height = pinnedHeight ?? tipHeight;
 
   // app_hash for the state AFTER block `height` appears in the header of block height+1.
   const commits = await Promise.allSettled(live.map(({ rpc }) => jrpc(rpc, 'commit', { height: String(height + 1) }, timeoutMs).then((c) => ({ rpc, c }))));
@@ -402,9 +543,10 @@ export async function openAnchor({ rpcs = DYDX_RPCS, timeoutMs = 15000, checkVal
     }
   }
 
-  return {
+  const anchor = {
     chainId: header.chain_id,
     height,                                 // the height the proofs are taken at
+    pinned: pinnedHeight !== null,          // false = tracking the tip, true = a chosen past block
     headerHeight: Number(header.height),    // height+1, where app_hash lives
     appHash: header.app_hash,
     blockHash: computedBlockHash,
@@ -417,11 +559,46 @@ export async function openAnchor({ rpcs = DYDX_RPCS, timeoutMs = 15000, checkVal
     trust: signatures ? TRUST.SIGNED : TRUST.CORROBORATED,
     signaturesVerified: !!signatures?.achieved,
     signatures,                              // { verified, failed, absent, powerFraction, twoThirds }
+    checkpoint: null,
+    // Which dYdX operators can actually serve an ICS-23 STATE proof at this height. `corroborators`
+    // above counts providers that served a HEADER, and those are different windows on the same node:
+    // measured, every dYdX endpoint serves `commit` two days deep while only one serves state there.
+    // Filled in only on the checkpointed path, where the anchor deliberately moves off the tip.
+    proofDepth: null,
     _header: header,
     _commit: commit,
     _validators: validatorSet,
     ms: Date.now() - t0,
   };
+
+  // TRUST.CHECKPOINTED is set HERE and nowhere else. Every clause is in verifyAnchorCheckpoint, and
+  // it throws rather than returning a weaker label.
+  if (checkpointRead) {
+    anchor.checkpoint = ibc.verifyAnchorCheckpoint(anchor, checkpointRead);
+    anchor.trust = TRUST.CHECKPOINTED;
+    anchor.proofDepth = await ibc.probeProofDepth({ height: anchor.height, timeoutMs });
+
+    // A checkpointed anchor is ALWAYS off the tip — the counterparty's newest stored height is minutes
+    // to hours behind — and `proveKey` defaults to `primary`, which is whichever provider answered
+    // `status` first. Measured: publichode prunes application state to ~100 blocks while still serving
+    // headers millions deep, so leaving `primary` alone turns every checkpointed attestation into
+    // `code 7 proof is unexpectedly empty` on a node that is behaving perfectly normally. Reorder to
+    // the providers that were just MEASURED to serve a state proof at this exact height.
+    //
+    // This does not weaken anything: `proveKey` still requires the proof to root into the anchored
+    // app_hash, which is now the checkpointed one. A provider here is a byte carrier, not an authority
+    // — and that is precisely what a checkpoint buys, because the root no longer comes from whoever
+    // hands over the bytes.
+    const proving = new Set(anchor.proofDepth.endpoints.filter((e) => e.served).map((e) => e.url));
+    const ordered = [...anchor.providers].sort((a, b) => (proving.has(b) ? 1 : 0) - (proving.has(a) ? 1 : 0));
+    if (!proving.has(ordered[0])) {
+      throw new Error(`dydx-attest: checkpointed at height ${anchor.height}, but none of the corroborating providers (${anchor.providers.join(', ')}) can serve an ICS-23 state proof there — ${anchor.proofDepth.endpoints.map((e) => `${e.operator}:${e.served ? 'ok' : e.detail}`).join('; ')}. The checkpoint is valid and the state is unreachable; refusing rather than reporting a proof failure as a chain disagreement.`);
+    }
+    anchor.providers = ordered;
+    anchor.primary = ordered[0];
+    anchor.ms = Date.now() - t0;
+  }
+  return anchor;
 }
 
 /**
@@ -448,7 +625,29 @@ export async function proveKey(anchor, store, key, { timeoutMs = 15000, rpc } = 
   if (appRootHex !== anchor.appHash) {
     throw new Error(`dydx-attest: proof roots to ${appRootHex} but the anchored app_hash at height ${anchor.height} is ${anchor.appHash}`);
   }
-  return { value, storeRoot: storeRoot.toString('hex').toUpperCase(), bytes, depth };
+  return { value, storeRoot: storeRoot.toString('hex').toUpperCase(), bytes, depth, rpc: endpoint };
+}
+
+/**
+ * `proveKey` against every corroborating provider in turn, returning the first that answers.
+ *
+ * THIS DOES NOT WEAKEN THE CLAIM, and the reason is the app_hash comparison inside `proveKey`:
+ * whoever serves the bytes, the proof must still hash to the anchor's signature-verified app_hash. A
+ * provider here is a byte carrier, not an authority, and a lying one is caught by the same check that
+ * catches an honest one serving the wrong height. What it buys is liveness. Measured 2026-07-28: at a
+ * height one hour back, publicnode answers `proof is unexpectedly empty; ensure height has not been
+ * pruned` while kingnodes and polkachu both serve it, and even at the tip publicnode's state window
+ * is short enough that a lagging peer in the corroboration set can push the anchored height outside
+ * it. Pinning one provider turns a routine pruning window into a false refusal.
+ */
+export async function proveKeyAny(anchor, store, key, { timeoutMs = 15000 } = {}) {
+  const rpcs = anchor.providers?.length ? anchor.providers : [anchor.primary];
+  let firstErr = null;
+  for (const rpc of rpcs) {
+    try { return await proveKey(anchor, store, key, { timeoutMs, rpc }); }
+    catch (e) { firstErr ??= e; }
+  }
+  throw firstErr ?? new Error(`dydx-attest: no provider served ${store}/${Buffer.from(key).toString('latin1')}`);
 }
 
 // ---------------------------------------------------------------- protobuf value decoders
@@ -496,7 +695,300 @@ export function decodeLiquidityTier(buf) {
   };
 }
 
+// ================================================================================================
+// FUNDING — the rate is not stored, and does not need to be
+// ================================================================================================
+//
+// dYdX never commits a funding rate to a key. It commits every INPUT to one, and the aggregation
+// over those inputs is deterministic integer arithmetic with no floats and no external data. So the
+// rate is recomputable from state that carries an ICS-23 existence proof, which is a strictly
+// stronger position than a stored rate would be: there is nothing to trust an operator about.
+//
+// THE ONE WIRE TYPE THAT MADE THIS LOOK IMPOSSIBLE. `MarketPremiums.premiums` is declared
+// `repeated sint32`, i.e. ZIGZAG encoded. Read as a plain int32 varint every sample comes back as
+// roughly -2x its true value, and the recomputed rate lands at +737 where the venue published -369.
+// A constant factor of two with a flipped sign is the fingerprint. `decodePremiumStore` below is the
+// only place that decision is made, and `zigzag` is applied to every element.
+//
+// WHAT IS TRANSCRIBED, AND FROM WHERE. `x/perpetuals/keeper/perpetual.go`,
+// `MaybeProcessNewFundingTickEpoch`:
+//
+//     premiumPpm = AvgInt32( pad0( PremSamples[perp], max(NumPremiums, tickDur/sampleDur) ) )
+//     fundingPpm = clamp( premiumPpm + DefaultFundingPpm,
+//                         +/- FundingRateClampFactorPpm/1e6 * (InitialMarginPpm - MaintenanceMarginPpm) )
+//
+// `RemovedTailSampleRatioPpm` is 0 on mainnet, so the documented tail-trimming is a no-op and the
+// combine is a plain average. `AvgInt32` is Go integer division, which truncates TOWARD ZERO — the
+// same direction BigInt division truncates in JS, and NOT the same direction as Math.floor for a
+// negative sum. Funding is negative about as often as positive, so using Math.floor here would be
+// wrong on half the rows and right on the other half, which is the shape of bug that survives a
+// casual check. Every division below is BigInt.
+//
+// THE TERM THAT IS EASY TO DROP. `DefaultFundingPpm` is per-perpetual and lives in the Perpetual
+// object. Measured 2026-07-28 across all 296 dYdX markets: 114 have it at 0 and 182 have it at 100,
+// and those 182 are exactly the markets whose published rate sits at 1.25e-5 with no premium samples
+// at all. A formula that omits the term reproduces 102 of 296 markets — every one of them a market
+// where both terms are zero. See T2_DYDX_FUNDING_WIRED.md; this corrects PHASE_D_FUNDING.md.
+
+/**
+ * dydxprotocol.perpetuals.PremiumStore {
+ *   repeated MarketPremiums all_market_premiums = 1;
+ *   uint32 num_premiums = 2;
+ * }
+ * dydxprotocol.perpetuals.MarketPremiums { uint32 perpetual_id = 1; repeated sint32 premiums = 2; }
+ *
+ * One key holds every market's samples, so a single proof covers the whole book and no market's
+ * entry can be removed without breaking that proof. A market with no entry has genuinely contributed
+ * no premium this epoch; the chain's own rule pads it with zeros, and so does this.
+ */
+export function decodePremiumStore(buf) {
+  const fs = pbFields(buf);
+  const markets = [];
+  for (const f of fs) {
+    if (f.field !== 1) continue;
+    if (f.wire !== 2) throw new Error(`dydx-attest: PremiumStore.all_market_premiums has wire type ${f.wire}`);
+    const g = pbFields(f.bytes);
+    const premiums = [];
+    for (const h of g) {
+      if (h.field !== 2) continue;
+      // sint32 -> zigzag, ALWAYS. Both encodings occur: proto3 packs repeated scalars by default
+      // (wire 2), but a single-element field can arrive unpacked (wire 0) and both must decode alike.
+      if (h.wire === 2) for (const u of uvarints(h.bytes)) premiums.push(Number(zigzag(u)));
+      else if (h.wire === 0) premiums.push(Number(zigzag(h.varint)));
+      else throw new Error(`dydx-attest: MarketPremiums.premiums has wire type ${h.wire}`);
+    }
+    // perpetual_id 0 (BTC) is a proto3 default and is therefore ABSENT from the wire, not zero-valued.
+    const idField = pbFirst(g, 1);
+    if (idField && idField.wire !== 0) throw new Error('dydx-attest: MarketPremiums.perpetual_id is not a varint');
+    markets.push({ perpetualId: Number(idField?.varint ?? 0n), premiums });
+  }
+  const nf = pbFirst(fs, 2);
+  if (nf && nf.wire !== 0) throw new Error('dydx-attest: PremiumStore.num_premiums is not a varint');
+  return { markets, numPremiums: Number(nf?.varint ?? 0n) };
+}
+
+/** dydxprotocol.perpetuals.Params { funding_rate_clamp_factor_ppm=1; premium_vote_clamp_factor_ppm=2; min_num_votes_per_sample=3 } */
+export function decodePerpetualsParams(buf) {
+  const fs = pbFields(buf);
+  const clamp = Number(pbFirst(fs, 1)?.varint ?? 0n);
+  if (!(clamp > 0)) throw new Error('dydx-attest: perpetuals Params has no funding_rate_clamp_factor_ppm — refusing rather than assuming a default');
+  return {
+    fundingRateClampFactorPpm: clamp,
+    premiumVoteClampFactorPpm: Number(pbFirst(fs, 2)?.varint ?? 0n),
+    minNumVotesPerSample: Number(pbFirst(fs, 3)?.varint ?? 0n),
+  };
+}
+
+/**
+ * dydxprotocol.epochs.EpochInfo {
+ *   name=1; next_tick=2; duration=3; current_epoch=4; current_epoch_start_block=5;
+ *   is_initialized=6; fast_forward_next_tick=7
+ * }
+ * The tick and sample durations are read from state rather than hardcoded as 3600 and 60, because a
+ * governance change to either silently changes the padding target and therefore every rate.
+ */
+export function decodeEpochInfo(buf) {
+  const fs = pbFields(buf);
+  const name = pbFirst(fs, 1)?.bytes?.toString('utf8') ?? null;
+  const duration = Number(pbFirst(fs, 3)?.varint ?? 0n);
+  if (!name) throw new Error('dydx-attest: EpochInfo has no name');
+  if (!(duration > 0)) throw new Error(`dydx-attest: epoch "${name}" has no positive duration`);
+  return {
+    name,
+    nextTick: Number(pbFirst(fs, 2)?.varint ?? 0n),
+    duration,
+    currentEpoch: Number(pbFirst(fs, 4)?.varint ?? 0n),
+    currentEpochStartBlock: Number(pbFirst(fs, 5)?.varint ?? 0n),
+    isInitialized: Number(pbFirst(fs, 6)?.varint ?? 0n) === 1,
+  };
+}
+
+/**
+ * The tick rule, pure. Every argument is required and validated; there are no defaults, because a
+ * default here is an invented input and the whole claim is that no input is invented.
+ *
+ * Returns ppm on dYdX's 8-hour convention. Divide by FUNDING_PPM_PER_HOURLY for the hourly rate.
+ */
+export function fundingTickPpm({
+  premiums, numPremiums, defaultFundingPpm,
+  initialMarginPpm, maintenanceFractionPpm, fundingRateClampFactorPpm,
+  tickDurationSec, sampleDurationSec,
+}) {
+  const req = { numPremiums, defaultFundingPpm, initialMarginPpm, maintenanceFractionPpm, fundingRateClampFactorPpm, tickDurationSec, sampleDurationSec };
+  for (const [k, v] of Object.entries(req)) {
+    if (!Number.isInteger(v)) throw new Error(`dydx-attest: fundingTickPpm needs an integer ${k}, got ${v}`);
+  }
+  if (!Array.isArray(premiums) || premiums.some((p) => !Number.isInteger(p))) throw new Error('dydx-attest: premiums must be an array of integers');
+  if (!(tickDurationSec > 0) || !(sampleDurationSec > 0)) throw new Error('dydx-attest: epoch durations must be positive');
+  if (!(initialMarginPpm > 0) || !(maintenanceFractionPpm > 0) || !(fundingRateClampFactorPpm > 0)) {
+    throw new Error('dydx-attest: margin and clamp parameters must be positive');
+  }
+  if (numPremiums < 0) throw new Error('dydx-attest: num_premiums is negative');
+
+  const minRequired = Math.ceil(tickDurationSec / sampleDurationSec);
+  const paddedTo = Math.max(numPremiums, minRequired);
+  if (premiums.length > paddedTo) {
+    throw new Error(`dydx-attest: ${premiums.length} premium samples exceed the padding target ${paddedTo} — the store is inconsistent, refusing`);
+  }
+  // pad0 then AvgInt32. The zeros contribute nothing to the sum, so padding IS the divisor.
+  let sum = 0n;
+  for (const p of premiums) sum += BigInt(p);
+  const premiumPpm = Number(sum / BigInt(paddedTo));   // Go integer division: truncates toward zero
+
+  const maintenanceMarginPpm = Number((BigInt(initialMarginPpm) * BigInt(maintenanceFractionPpm)) / 1000000n);
+  const clampBound = Number((BigInt(fundingRateClampFactorPpm) * BigInt(initialMarginPpm - maintenanceMarginPpm)) / 1000000n);
+  if (clampBound < 0) throw new Error('dydx-attest: negative funding clamp bound — maintenance margin exceeds initial margin');
+
+  const rawPpm = premiumPpm + defaultFundingPpm;
+  const ppm = Math.max(-clampBound, Math.min(clampBound, rawPpm));
+  return { premiumPpm, rawPpm, clampBound, ppm, clamped: ppm !== rawPpm, paddedTo, minRequired, sampleCount: premiums.length, sumPpm: Number(sum) };
+}
+
+/**
+ * The running prediction over the PARTIAL epoch — the number the indexer publishes as
+ * `nextFundingRate`, which is the only funding number `dydx.js` returns and perp-gate consumes.
+ *
+ * Two differences from the tick rule, both measured rather than assumed:
+ *   * the divisor is `num_premiums`, NOT the padded `max(num_premiums, tickDur/sampleDur)`. Mid-epoch
+ *     num_premiums is well under 60, and using the padded target reproduces nothing.
+ *   * the division is FLOAT, not integer. The indexer's own output is non-integer ppm
+ *     (BTC 304.55263157894736 ppm at one snapshot), which is what settles it.
+ * The `+ defaultFundingPpm` term is shared with the tick rule and is not optional; see the header.
+ */
+export function nextFundingPpm({ premiums, numPremiums, defaultFundingPpm }) {
+  if (!Array.isArray(premiums) || premiums.some((p) => !Number.isInteger(p))) throw new Error('dydx-attest: premiums must be an array of integers');
+  if (!Number.isInteger(numPremiums) || numPremiums < 0) throw new Error(`dydx-attest: num_premiums must be a non-negative integer, got ${numPremiums}`);
+  if (!Number.isInteger(defaultFundingPpm)) throw new Error(`dydx-attest: default_funding_ppm must be an integer, got ${defaultFundingPpm}`);
+  if (premiums.length && numPremiums === 0) {
+    throw new Error('dydx-attest: premium samples exist but num_premiums is 0 — inconsistent store, refusing rather than dividing by zero');
+  }
+  let sum = 0;
+  for (const p of premiums) sum += p;
+  return { sumPpm: sum, sampleCount: premiums.length, ppm: numPremiums > 0 ? sum / numPremiums + defaultFundingPpm : defaultFundingPpm };
+}
+
+/**
+ * Prove the four MARKET-INDEPENDENT funding inputs once per anchor: the premium store, the module
+ * params, and both epoch infos. Every one must verify; a missing key is a refusal, never a default.
+ *
+ * The result carries the anchor's app_hash so it cannot be silently reused against another anchor —
+ * mixing inputs proven at two heights is exactly the forgery `proveKey`'s root check exists to stop,
+ * and it would slip past that check if the mixing happened at this layer instead.
+ */
+export async function proveFundingContext(anchor, { timeoutMs = 15000 } = {}) {
+  const [ps, pr, te, se] = await Promise.all([
+    proveKeyAny(anchor, STORES.premiumSamples, KEYS.premiumSamples(), { timeoutMs }),
+    proveKeyAny(anchor, STORES.perpetualsParams, KEYS.perpetualsParams(), { timeoutMs }),
+    proveKeyAny(anchor, STORES.epochs, KEYS.epochInfo(EPOCH_FUNDING_TICK), { timeoutMs }),
+    proveKeyAny(anchor, STORES.epochs, KEYS.epochInfo(EPOCH_FUNDING_SAMPLE), { timeoutMs }),
+  ]);
+  const premiumStore = decodePremiumStore(ps.value);
+  const params = decodePerpetualsParams(pr.value);
+  const tickEpoch = decodeEpochInfo(te.value);
+  const sampleEpoch = decodeEpochInfo(se.value);
+  if (tickEpoch.name !== EPOCH_FUNDING_TICK) throw new Error(`dydx-attest: epochs/Info:${EPOCH_FUNDING_TICK} decodes to name "${tickEpoch.name}"`);
+  if (sampleEpoch.name !== EPOCH_FUNDING_SAMPLE) throw new Error(`dydx-attest: epochs/Info:${EPOCH_FUNDING_SAMPLE} decodes to name "${sampleEpoch.name}"`);
+  return {
+    premiumStore, params, tickEpoch, sampleEpoch,
+    height: anchor.height, appHash: anchor.appHash,
+    proofBytes: ps.bytes + pr.bytes + te.bytes + se.bytes,
+    valueBytes: ps.value.length + pr.value.length + te.value.length + se.value.length,
+    proofs: { premSamples: ps.bytes, params: pr.bytes, tickEpoch: te.bytes, sampleEpoch: se.bytes },
+  };
+}
+
+/**
+ * Recompute both funding rates for one market from proven state, and REFUSE if anything is missing.
+ *
+ * `perp` and `tier` may be supplied by a caller that has already proven them (proveMarket does), in
+ * which case no extra queries are made; otherwise they are proven here. The ticker cross-check is
+ * repeated even when the Perpetual is handed in, because attesting one market's funding against
+ * another market's premiums is the failure this whole path has to make impossible.
+ */
+export async function proveFunding(anchor, { ticker, perpetualId, fundingCtx, perp, tier, timeoutMs = 15000 }) {
+  const want = normTicker(ticker);
+  const ctx = fundingCtx ?? await proveFundingContext(anchor, { timeoutMs });
+  if (ctx.appHash !== anchor.appHash) {
+    throw new Error(`dydx-attest: funding inputs were proven under app_hash ${ctx.appHash} but the anchor is ${anchor.appHash} — refusing to mix heights`);
+  }
+  let extraBytes = 0;
+  let p = perp;
+  if (!p) {
+    const pp = await proveKeyAny(anchor, STORES.perpetual, KEYS.perpetual(perpetualId), { timeoutMs });
+    p = decodePerpetual(pp.value); extraBytes += pp.bytes;
+  }
+  if (normTicker(p.ticker) !== want) {
+    throw new Error(`dydx-attest: Perp:${perpetualId} is ticker "${p.ticker}" on chain, not "${want}" — refusing to attest funding for the wrong market`);
+  }
+  let t = tier;
+  if (!t) {
+    const tp = await proveKeyAny(anchor, STORES.liqTier, KEYS.liqTier(p.liquidityTier), { timeoutMs });
+    t = decodeLiquidityTier(tp.value); extraBytes += tp.bytes;
+  }
+
+  const entry = ctx.premiumStore.markets.find((m) => m.perpetualId === p.id);
+  const premiums = entry ? entry.premiums : [];
+
+  const tick = fundingTickPpm({
+    premiums,
+    numPremiums: ctx.premiumStore.numPremiums,
+    defaultFundingPpm: p.defaultFundingPpm,
+    initialMarginPpm: t.initialMarginPpm,
+    maintenanceFractionPpm: t.maintenanceFractionPpm,
+    fundingRateClampFactorPpm: ctx.params.fundingRateClampFactorPpm,
+    tickDurationSec: ctx.tickEpoch.duration,
+    sampleDurationSec: ctx.sampleEpoch.duration,
+  });
+  const next = nextFundingPpm({ premiums, numPremiums: ctx.premiumStore.numPremiums, defaultFundingPpm: p.defaultFundingPpm });
+
+  // Is the tick rule's output a SETTLED rate or a hypothetical? It is settled exactly when the epoch
+  // is complete — one sample round per sample-epoch for the whole tick epoch — which is a fact read
+  // out of proven state, not a guess about where the anchor is. Mid-epoch the same arithmetic returns
+  // the rate the hour WOULD settle at if the tick fired now, which the venue has never published and
+  // nothing can check, so `proveMarket` withholds it from the attestable surface rather than offering
+  // a number that looks comparable to a published one and is not.
+  const expectedRounds = ctx.tickEpoch.duration / ctx.sampleEpoch.duration;
+  const tickEpochComplete = Number.isInteger(expectedRounds) && ctx.premiumStore.numPremiums === expectedRounds;
+
+  return {
+    ticker: p.ticker,
+    perpetualId: p.id,
+    fundingHourly: next.ppm / FUNDING_PPM_PER_HOURLY,
+    fundingTickHourly: tick.ppm / FUNDING_PPM_PER_HOURLY,
+    tickEpochComplete,
+    ppm: { next: next.ppm, tick: tick.ppm, premium: tick.premiumPpm, raw: tick.rawPpm, defaultFunding: p.defaultFundingPpm, clampBound: tick.clampBound },
+    clamped: tick.clamped,
+    // `sampled:false` means this market contributed no premium this epoch, which is a real state and
+    // not a missing input: the PremiumStore value is proven in full, so an absent entry is committed.
+    sampled: !!entry,
+    sampleCount: premiums.length,
+    numPremiums: ctx.premiumStore.numPremiums,
+    paddedTo: tick.paddedTo,
+    premiums,
+    epoch: {
+      tickDurationSec: ctx.tickEpoch.duration,
+      sampleDurationSec: ctx.sampleEpoch.duration,
+      currentTickEpoch: ctx.tickEpoch.currentEpoch,
+      tickEpochStartBlock: ctx.tickEpoch.currentEpochStartBlock,
+      sampleEpochStartBlock: ctx.sampleEpoch.currentEpochStartBlock,
+    },
+    proofBytes: ctx.proofBytes + extraBytes,
+    trust: anchor.trust,
+    height: anchor.height,
+    appHash: anchor.appHash,
+  };
+}
+
 // ---------------------------------------------------------------- indexer side
+
+/** The funding ticks the venue itself published, each with the exact block height it executed at. */
+export async function fetchHistoricalFunding(ticker, { limit = 5, timeoutMs = 15000 } = {}) {
+  const res = await fetch(`${DYDX_HISTORICAL_FUNDING}/${normTicker(ticker)}?limit=${limit}`, { signal: AbortSignal.timeout(timeoutMs) });
+  if (!res.ok) throw new Error(`dydx indexer historicalFunding ${res.status}`);
+  const j = await res.json();
+  if (!Array.isArray(j?.historicalFunding)) throw new Error('dydx-attest: unexpected historicalFunding shape');
+  return j.historicalFunding;
+}
 
 export async function fetchIndexerMarkets({ timeoutMs = 15000 } = {}) {
   const res = await fetch(DYDX_INDEXER, { signal: AbortSignal.timeout(timeoutMs) });
@@ -522,8 +1014,12 @@ const normTicker = (s) => {
  * `perpetualId` is taken from the indexer's `clobPairId`. That mapping is an ASSUMPTION, so it is
  * VERIFIED rather than trusted: the on-chain ticker must equal the ticker the caller asked about, and
  * the whole attestation is refused if it does not.
+ *
+ * `fundingCtx` is opt-in and adds the two funding rates to `proven`. It is opt-in because the four
+ * funding inputs are market-INDEPENDENT: proving them once per anchor and passing the result in costs
+ * four queries for a whole batch, while folding them into this function would cost four per market.
  */
-export async function proveMarket(anchor, { ticker, perpetualId, timeoutMs = 15000 }) {
+export async function proveMarket(anchor, { ticker, perpetualId, fundingCtx = null, timeoutMs = 15000 }) {
   const want = normTicker(ticker);
   const perpProof = await proveKey(anchor, STORES.perpetual, KEYS.perpetual(perpetualId), { timeoutMs });
   const perp = decodePerpetual(perpProof.value);
@@ -539,18 +1035,29 @@ export async function proveMarket(anchor, { ticker, perpetualId, timeoutMs = 150
     throw new Error(`dydx-attest: MarketPrice under Price:${perp.marketId} reports id ${price.id}`);
   }
   const tier = decodeLiquidityTier(tierProof.value);
+  const proven = {
+    oraclePrice: price.price,
+    maintenanceMarginRate: tier.maintenanceMarginRate,
+    initialMarginRate: tier.initialMarginRate,
+    maxLeverage: tier.maxLeverage,
+  };
+  let funding = null;
+  if (fundingCtx) {
+    funding = await proveFunding(anchor, { ticker, perpetualId, fundingCtx, perp, tier, timeoutMs });
+    proven.fundingHourly = funding.fundingHourly;
+    // Withheld unless the epoch is complete: see proveFunding. An incomplete epoch's tick output is a
+    // hypothetical, and offering it here would let a caller compare it to a published realized rate
+    // and get a verdict that means nothing. `attest` then refuses it with NOT_IN_PROOF.
+    if (funding.tickEpochComplete) proven.fundingTickHourly = funding.fundingTickHourly;
+  }
   return {
     ticker: perp.ticker,
     perp,
     tier,
-    proven: {
-      oraclePrice: price.price,
-      maintenanceMarginRate: tier.maintenanceMarginRate,
-      initialMarginRate: tier.initialMarginRate,
-      maxLeverage: tier.maxLeverage,
-    },
-    proofBytes: perpProof.bytes + priceProof.bytes + tierProof.bytes,
-    proofs: { perp: perpProof.bytes, price: priceProof.bytes, tier: tierProof.bytes },
+    funding,
+    proven,
+    proofBytes: perpProof.bytes + priceProof.bytes + tierProof.bytes + (funding ? funding.proofBytes : 0),
+    proofs: { perp: perpProof.bytes, price: priceProof.bytes, tier: tierProof.bytes, funding: funding ? funding.proofBytes : 0 },
   };
 }
 
@@ -560,7 +1067,7 @@ export async function proveMarket(anchor, { ticker, perpetualId, timeoutMs = 150
  * Returns a verdict object and never throws for data reasons. `ok:false` with a `reason` is a REFUSAL
  * and must be treated as one — there is deliberately no "probably fine" branch.
  */
-export async function attest({ ticker, perpetualId, quantity, claimed, bound, anchor, market, timeoutMs = 15000 }) {
+export async function attest({ ticker, perpetualId, quantity, claimed, bound, anchor, market, fundingCtx = null, timeoutMs = 15000 }) {
   const base = { quantity, ticker: normTicker(ticker), claimed, bound };
 
   if (NOT_ATTESTABLE[quantity]) {
@@ -578,7 +1085,7 @@ export async function attest({ ticker, perpetualId, quantity, claimed, bound, an
 
   let m = market;
   try {
-    if (!m) m = await proveMarket(anchor, { ticker, perpetualId, timeoutMs });
+    if (!m) m = await proveMarket(anchor, { ticker, perpetualId, fundingCtx, timeoutMs });
   } catch (e) {
     return { ...base, ok: false, status: 'REFUSED', reason: 'PROOF_FAILED', detail: e.message };
   }
@@ -607,14 +1114,19 @@ export async function attest({ ticker, perpetualId, quantity, claimed, bound, an
 
 /**
  * Attest a whole `dydxContext()` result: every field the existing adapter returns, each either
- * ATTESTED or REFUSED with a reason. `fundingHourly` is always refused, on purpose — perp-gate uses
- * it and nothing here can vouch for it, and a silent omission would read as coverage.
+ * ATTESTED or REFUSED with a reason.
+ *
+ * `fundingHourly` used to be an unconditional refusal here. It is now recomputed from proven state
+ * like the rest, which is the point of the change — but only when a `fundingCtx` is supplied, because
+ * fabricating one silently would cost four extra proofs per market and hide that cost. Without one
+ * the field refuses with NOT_IN_PROOF, which is a refusal that names its own cause rather than
+ * pretending funding is unprovable.
  */
-export async function attestContext({ symbol, context, anchor, bounds, perpetualId, timeoutMs = 15000 }) {
+export async function attestContext({ symbol, context, anchor, bounds, perpetualId, fundingCtx = null, timeoutMs = 15000 }) {
   const ticker = normTicker(symbol);
   const fields = { markPx: 'oraclePrice', maintMarginRate: 'maintenanceMarginRate', maxLeverage: 'maxLeverage', fundingHourly: 'fundingHourly' };
   let market = null, marketError = null;
-  try { market = await proveMarket(anchor, { ticker, perpetualId, timeoutMs }); } catch (e) { marketError = e.message; }
+  try { market = await proveMarket(anchor, { ticker, perpetualId, fundingCtx, timeoutMs }); } catch (e) { marketError = e.message; }
 
   const out = {};
   for (const [ctxKey, quantity] of Object.entries(fields)) {
@@ -623,7 +1135,7 @@ export async function attestContext({ symbol, context, anchor, bounds, perpetual
       out[ctxKey] = { quantity, ok: false, status: 'REFUSED', reason: 'PROOF_FAILED', detail: marketError, claimed };
       continue;
     }
-    out[ctxKey] = await attest({ ticker, perpetualId, quantity, claimed, bound: bounds?.[quantity], anchor, market, timeoutMs });
+    out[ctxKey] = await attest({ ticker, perpetualId, quantity, claimed, bound: bounds?.[quantity], anchor, market, fundingCtx, timeoutMs });
   }
   const attested = Object.values(out).filter((v) => v.ok).length;
   return { ticker, fields: out, attested, total: Object.keys(fields).length, trust: anchor.trust, chain: { height: anchor.height, appHash: anchor.appHash, corroborators: anchor.corroborators } };

@@ -63,6 +63,21 @@ export function uvarintEnc(n) {
 /** proto3 sint32/sint64 zigzag decode. */
 export const zigzag = (u) => (u >> 1n) ^ -(u & 1n);
 
+/**
+ * Decode a PACKED repeated-varint field body into its raw unsigned varints.
+ *
+ * A packed field's bytes are a bare varint stream, NOT tag/value pairs, so running `pbFields` over
+ * them reads the first value as a tag and produces confident nonsense. Callers still have to apply
+ * the right interpretation on top: `sint32` means every element goes through `zigzag`, and skipping
+ * that is what turns dYdX's premium samples into roughly -2x their true value.
+ */
+export function uvarints(buf) {
+  const out = [];
+  let i = 0;
+  while (i < buf.length) { const [v, n] = uvarint(buf, i); i = n; out.push(v); }
+  return out;
+}
+
 /** First field with this number, or undefined. */
 export const pbFirst = (fs, field) => fs.find((f) => f.field === field);
 

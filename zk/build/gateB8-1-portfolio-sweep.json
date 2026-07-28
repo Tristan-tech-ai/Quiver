@@ -1,0 +1,82 @@
+{
+  "at": "2026-07-28T15:23:18.020Z",
+  "passed": true,
+  "circuit": "portfoliogate",
+  "samples": 1500,
+  "raw": {
+    "kept": 681,
+    "refused": 819,
+    "byLegCount": {
+      "1": 333,
+      "2": 204,
+      "3": 144
+    },
+    "ms": 953,
+    "boundViolations": 0,
+    "calcRejections": 0,
+    "orderingDisagreements": 0,
+    "refusalReasons": {
+      "qHat exceeds the circuit's bound": 316,
+      "certified distance diverges past the 3dp the engine ranks on": 21,
+      "a leg is already past liquidation": 331,
+      "the engine named no unambiguous nearest leg": 142,
+      "certified price diverges past the 2dp the engine publishes": 9
+    },
+    "worstBoundUsed": 0.9992838097016196,
+    "worstSeenPrice": 0.005837820004671812,
+    "worstSeenPct": 0.010165745856353547,
+    "worstBound": {
+      "residual": "-35375819011965514881380",
+      "tolerance": "70802345977222492372620"
+    },
+    "priceGuard": {
+      "bound": 0.005,
+      "worst": 0.004997366000000003,
+      "fractionUsed": 0.9994732000000006
+    },
+    "distanceGuard": {
+      "bound": 0.0005,
+      "worst": 0.000499782789265879,
+      "fractionUsed": 0.9995655785317581
+    },
+    "divergenceRefusals": 30
+  },
+  "snapped": {
+    "kept": 694,
+    "refused": 806,
+    "byLegCount": {
+      "1": 335,
+      "2": 210,
+      "3": 149
+    },
+    "ms": 945,
+    "boundViolations": 0,
+    "calcRejections": 0,
+    "orderingDisagreements": 0,
+    "refusalReasons": {
+      "qHat exceeds the circuit's bound": 316,
+      "certified distance diverges past the 3dp the engine ranks on": 14,
+      "a leg is already past liquidation": 334,
+      "the engine named no unambiguous nearest leg": 142
+    },
+    "worstBoundUsed": 0.9985377566536056,
+    "worstSeenPrice": 0.004997366000000003,
+    "worstSeenPct": 0.007718140929537043,
+    "worstBound": {
+      "residual": "80104055681469026085156",
+      "tolerance": "160442717659312816689391"
+    },
+    "priceGuard": {
+      "bound": 0.005,
+      "worst": 0.004997366000000003,
+      "fractionUsed": 0.9994732000000006
+    },
+    "distanceGuard": {
+      "bound": 0.0005,
+      "worst": 0.000499782818382144,
+      "fractionUsed": 0.999565636764288
+    },
+    "divergenceRefusals": 14
+  },
+  "finding": "services.js grid-snaps every perp-gate input onto the 1e-9 grid and does NOT do it for portfolio-gate; both arms measured here."
+}

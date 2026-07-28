@@ -23,6 +23,8 @@
     "gate:d-hl-revert": "node gates/gateD-hl-revert.mjs",
     "gate:d3": "node --test gates/gateD3-dydx-input-attestation.mjs",
     "gate:d3-revert": "node gates/gateD3-revert.mjs",
+    "gate:d3c": "node --test gates/gateD3c-dydx-checkpoint.mjs",
+    "gate:d3c-revert": "node gates/gateD3c-revert.mjs",
     "gate:d4": "node --test gates/gateD4-no-false-attestation.mjs",
     "gate:d4-revert": "node gates/gateD4-revert.mjs",
     "gate:div": "node --test gates/gateDiv-disclosure.mjs",
@@ -33,7 +35,10 @@
     "preflight": "node gates/preflight.mjs",
     "watchdog": "node gates/watchdog.mjs",
     "gate:f": "node --test gates/gateF-tvl-reconstruct.mjs",
-    "gate:f-revert": "node gates/gateF-revert.mjs"
+    "gate:f-revert": "node gates/gateF-revert.mjs",
+    "gate:t10": "node --test gates/gateT10-hl-premium-bound.mjs",
+    "gate:t10-revert": "node gates/gateT10-revert.mjs",
+    "calibrate:t10": "node gates/calibrate-hl-premium-bound.mjs"
   },
   "dependencies": {
     "@coinbase/x402": "^2.1.0",

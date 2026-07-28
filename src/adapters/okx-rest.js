@@ -82,12 +82,15 @@ export const recentPnl = (chain, address) =>
 // caller asking `1H` was served. chart-press then reported DATA_UNAVAILABLE and attributed it to an
 // upstream outage, which is a service telling a buyer something false about why it could not answer.
 //
-// HONEST LIMIT ON WHAT I VERIFIED. The asymmetry between the two paths is read directly from the
-// code and is certain. The upstream rejection of a lowercase unit is NOT something I could reproduce:
-// unkeyed, the x402 pay-gate answers 402 before any parameter is validated, so `1h` and `1H` are
-// indistinguishable from outside. That half rests on a keyed measurement reported as error 51000, and
-// the fix is written to be harmless either way — upper-casing a unit letter cannot break a bar code
-// that was already upper-case, which is every bar code the engines pass today.
+// THE LIMIT THIS COMMENT USED TO RECORD IS NOW CLOSED. It said the upstream rejection of a lowercase
+// unit was not something I could reproduce, because unkeyed the x402 pay-gate answers 402 before any
+// parameter is validated, so `1h` and `1H` look identical from outside. A keyed measurement against
+// `/api/v6/dex/market/candles` on 28 July settled it: `bar=1H` returns `code:"0"` with rows, and the
+// same call with `bar=1h` returns `code:51000`, a parameter error, with none. The asymmetry between
+// the two paths was always certain from the code; the upstream half is now measured too.
+//
+// Confirmed live after the fix shipped: on the deployed service, 1H, 1h, 4H, 4h, 15m, 1D and 1d all
+// return a chart from `okx-dex` for a token with history. Before it, `1h` returned DATA_UNAVAILABLE.
 // `m` IS DELIBERATELY NOT TOUCHED, and this line is the whole reason this comment exists. The first
 // version of this fix upper-cased any trailing letters, which turned `15m` into `15M`. In OKX's
 // vocabulary `1m` is one MINUTE and `1M` is one MONTH, so a blanket case fix silently converts a
@@ -97,7 +100,10 @@ export const recentPnl = (chain, address) =>
 // Only h, d and w are case-corrected, because those are unambiguous: OKX writes them upper-case and
 // has no lower-case meaning for any of them. The CEX table in okx-market.js is the reference and it
 // agrees: `15m` stays `15m`, `1h` becomes `1H`, `1d` becomes `1Dutc`.
-const normaliseBar = (bar) => String(bar || '1H').replace(/([hdw])$/, (u) => u.toUpperCase());
+// Exported so the regression lock in test/cexMarket.test.mjs can assert it directly. It was a private
+// const, which meant the only way to check it was to reach OKX with a key, and a rule nothing can
+// test is a rule that drifts.
+export const normaliseBar = (bar) => String(bar || '1H').replace(/([hdw])$/, (u) => u.toUpperCase());
 
 export const candles = (chain, address, bar = '1H', limit = 48) =>
   getData(`/api/v6/dex/market/candles?chainIndex=${idx(chain)}&tokenContractAddress=${address}&bar=${normaliseBar(bar)}&limit=${Math.min(limit, 300)}`);

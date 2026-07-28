@@ -39,8 +39,31 @@ export const trades = (chain, address, limit = config.tapeLimit) =>
 export const advancedInfo = (chain, address) =>
   getData(`/api/v6/dex/market/token/advanced-info?chainIndex=${idx(chain)}&tokenContractAddress=${address}`);
 
-export const holders = (chain, address) =>
-  getData(`/api/v6/dex/market/holders?chainIndex=${idx(chain)}&tokenContractAddress=${address}`);
+// GONE FROM THE UPSTREAM API, measured 28 July 2026 rather than assumed.
+//
+// `/api/v6/dex/market/holders` returns HTTP 404 with `{"code":404,"error_message":"Not Found"}`, and
+// so does every plausible neighbour: `/token/holders`, `/token-holders`, `/holder-list`,
+// `/top-holders`. That is specifically a ROUTING miss and not an auth gate, because the other v6
+// market routes answer differently when called the same way — `/token/advanced-info` returns a 402
+// x402 challenge and `/price-info` answers on POST. A 404 across five spellings while its siblings
+// respond is a route that was removed or renamed to something not guessable from the old name.
+//
+// This export has NO CALL SITES anywhere in `src/`. Every engine that reports a holder count reads
+// `price.holders` out of the price-info response instead: `tokenScan.js:125`, `chartPress.js:141`,
+// `tapePulse.js:208`. So nothing is degrading silently today; this is dead code pointing at a dead
+// route, and the only real risk is that somebody wires it up later and discovers the 404 in
+// production.
+//
+// It therefore fails FAST and by name rather than being deleted. Deleting it would lose the
+// measurement; leaving it would hand the next caller an opaque upstream error. If OKX republishes
+// holder data under a new path, replace the throw with the new route and delete this comment.
+export const holders = async (chain, address) => {
+  throw new Error(
+    'okx holders: /api/v6/dex/market/holders returns 404 upstream (measured 2026-07-28, along with '
+    + '/token/holders, /token-holders, /holder-list and /top-holders). No replacement route is known. '
+    + 'Holder counts currently come from price-info via `price.holders`, not from here.'
+  );
+};
 
 export const portfolioOverview = (chain, address, timeFrame = 4) =>
   getData(`/api/v6/dex/market/portfolio/overview?chainIndex=${idx(chain)}&walletAddress=${address}&timeFrame=${timeFrame}`);

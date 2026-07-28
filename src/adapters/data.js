@@ -21,6 +21,9 @@ const backend = pick();
 export const trades = (chain, address, limit) => backend.trades(chain, address, limit);
 export const priceInfo = (chain, address) => backend.priceInfo(chain, address);
 export const clusterOverview = (chain, address) => backend.clusterOverview(chain, address);
+// The REST backend's holders route is 404 upstream as of 28 July 2026 and now throws by name; see
+// okx-rest.js for what was measured. The CLI backend takes a different path and is left alone. Kept
+// rather than deleted so the next caller is told why, instead of meeting a 404.
 export const holders = (chain, address) => backend.holders(chain, address);
 export const advancedInfo = (chain, address) => backend.advancedInfo(chain, address);
 export const bundleInfo = (chain, address) => backend.bundleInfo(chain, address);

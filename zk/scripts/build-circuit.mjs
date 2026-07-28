@@ -52,10 +52,17 @@ console.log(`  ${'r1cs constraints'.padEnd(34)}${info.nConstraints}`);
 // Plonk needs roughly (constraints + public) rounded up to a power of two, and each R1CS constraint
 // can expand into more than one Plonk gate, so compare against the R1CS count with headroom rather
 // than pretending the two are the same number.
-if (info.nConstraints * 2 > PTAU_CEILING) {
-  console.error(`\nREFUSING: ~${info.nConstraints * 2} Plonk constraints will not fit hez_final_12's ${PTAU_CEILING}.`);
+// The R1CS-to-Plonk expansion is not a fixed factor. It is close to 2x for a comparator-heavy circuit
+// and close to 1x for a chain of multiplications, and both shapes exist here. So refuse only what
+// cannot fit under ANY expansion, and warn in the band between. The 2x guess turned away a probe
+// circuit that fitted comfortably, which is a guard being wrong in the expensive direction.
+if (info.nConstraints > PTAU_CEILING) {
+  console.error(`\nREFUSING: ${info.nConstraints} R1CS constraints cannot fit hez_final_12's ${PTAU_CEILING} however they expand.`);
   console.error('Shrink the circuit or fetch a larger powers-of-tau file deliberately, not as a side effect of a build.');
   process.exit(1);
+}
+if (info.nConstraints * 2 > PTAU_CEILING) {
+  console.log(`  ${'note'.padEnd(34)}may not fit: expands to between ${info.nConstraints} and ${info.nConstraints * 2} Plonk against a ${PTAU_CEILING} ceiling`);
 }
 
 // 3. plonk setup + exports

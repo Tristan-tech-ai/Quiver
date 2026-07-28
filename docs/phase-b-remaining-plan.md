@@ -21,9 +21,11 @@ Read from the artifacts by `node zk/scripts/circuit-facts.mjs`, not written down
 
 The powers-of-tau file on hand is `hez_final_12`, which caps a circuit at **4,096 Plonk constraints**.
 That leaves room for roughly three liquidation circuits or five Kelly circuits, and it is the single
-fact that ranks everything below. Going past it means fetching a larger Hermez file, which is a
-download in the gigabytes and a decision about disk, not a coding problem — but it is also not
-something to do speculatively.
+fact that ranks everything below. Going past it means fetching a larger Hermez file, and the first draft of
+this document called that "a download in the gigabytes". **That was wrong by three orders of
+magnitude**, measured by asking the ceremony bucket for its Content-Length: 2^13 is 9.1 MB, 2^14 is
+18.1 MB, and 2^16 is 72.1 MB. The download was never the obstacle. What the obstacle actually is, is
+below.
 
 A note on how that table came to exist. `gateB0-kelly.mjs` recorded `plonkConstraints: 718` as a
 literal, and the README quoted "357 R1CS", which is circom's *non-linear* count and not what the
@@ -106,9 +108,32 @@ it is not what the service does; the account-mode book that was used to test it 
 whale books are larger. So this is the first place where the roadmap's Phase C stops being an
 abstraction: aggregating per-leg proofs is the actual answer, not a wider circuit.
 
-**Recommendation**: do not build it blind. Either accept `n ≤ 3` as an explicitly labelled partial
-capability, or fetch a larger ptau first. That is a call for Tristan, and it is the only item in this
-document that needs one.
+**A bigger ceremony file moves this wall rather than removing it**, and that was measured after the
+fact rather than assumed. `node zk/scripts/domain-scaling.mjs` times three real domains and fits an
+exponent: 1,024 → 342 ms, 2,048 → 770 ms, 4,096 → 1,392 ms, so proving grows as domain^1.01, near
+perfectly linear. Carried forward:
+
+| ptau | MB | legs | est. prove | |
+|---|---|---|---|---|
+| 2^12 | 4.6 | 3 | 1.4 s | measured |
+| 2^13 | 9.1 | 6 | 2.8 s | just inside the roadmap 3 s threshold |
+| 2^14 | 18.1 | 12 | 5.7 s | past it |
+| 2^16 | 72.1 | 50 | 23.1 s | far past it |
+
+So the ceiling that matters is not the ceremony file, it is the roadmap own abandon condition:
+"abandon a given circuit if its constraint count makes proving slower than 3 seconds". A twelve-leg
+circuit fails that, and a twelve-leg book is not unusual: portfolio-gate own tests use books of 1, 1,
+2, 4 and 11 positions.
+
+**An alternative nobody has tested.** Proving a minimum INSIDE one circuit is what forces every leg
+into the same domain. Proving each leg separately and letting a contract pick the minimum on chain
+may be far cheaper: n independent proofs parallelise across cores, and comparing n numbers in
+Solidity costs almost nothing. It trades one big proof for n small ones plus n verifications, so
+whether it wins depends on gas, and nobody has measured it. Worth measuring before either building
+wide or waiting for Phase C.
+
+**Recommendation**: n ≤ 3, explicitly labelled, is APPROVED and is what to build. Test the on-chain
+minimum idea before assuming a wider circuit is the only route.
 
 ---
 

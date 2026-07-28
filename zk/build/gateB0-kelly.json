@@ -1,7 +1,7 @@
 {
-  "at": "2026-07-28T07:04:40.682Z",
+  "at": "2026-07-28T09:49:26.899Z",
   "passed": true,
-  "proveMs": 394,
+  "proveMs": 420,
   "plonkConstraints": 718,
   "r1csConstraints": 372,
   "domainSize": 1024,

@@ -1,0 +1,17 @@
+{
+  "at": "2026-07-28T12:49:48.530Z",
+  "passed": true,
+  "samples": 4000,
+  "kept": 3970,
+  "tooSmall": 30,
+  "signSplit": 0,
+  "outOfDomain": 0,
+  "violations": 0,
+  "worstUsed": {
+    "price": 0.614915,
+    "delta": 0.6666666666666666
+  },
+  "plonkConstraints": 2255,
+  "domainSize": 4096,
+  "proveMs": 1723
+}

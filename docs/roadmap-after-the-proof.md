@@ -31,6 +31,13 @@ interesting work is.
 
 ## Phase A — the proof outlives the process (2 weeks)
 
+> **Status, 28 July 2026 — built, not shipped.** A content-addressed store, five gates, and a scripted
+> revert that proves those gates go red without it: `npm run gate:a`, `npm run gate:a-revert`, both
+> runnable from a clone. It is **off unless `QUIVER_PROOF_DIR` is set**, and the live service does not
+> set it, so everything the next paragraph says in the present tense is still true of the deployment.
+> Turning it on is a deploy, and deploys wait while judging runs. See the README's post-deadline
+> section.
+
 The proof store is a `Map` in memory. A redeploy clears it; a second replica would answer 404 for a
 proof the first one built. That is fine for a demonstration and unacceptable for anything a contract
 depends on.
@@ -47,6 +54,12 @@ from any instance; a test kills the process between build and fetch and the fetc
 ---
 
 ## Phase B — circuits for the rest of the deterministic catalogue (3 months)
+
+> **Status, 28 July 2026 — one of six done, not shipped.** `size-gate` has a circuit: 357 R1CS / 718
+> Plonk constraints, 547 ms to prove, 273,118 gas to verify and 573 to refuse. Three gates run from a
+> clone (`zk/scripts/gateB{0,1,2}-kelly*.mjs`). Gate B1 failed on its first run and found a real
+> defect, described in the README. No Kelly verifier is deployed and the live `size-gate` does not
+> serve proofs. The remaining five are unstarted.
 
 Six of the twenty-two engines rest on a closed-form identity that a circuit can state. In rough order
 of how much a buyer would pay to have it proven rather than re-run:
@@ -82,6 +95,18 @@ T1. A circuit that proves *nearly* the served answer is worse than none.
 ---
 
 ## Phase C — one proof for a thousand answers (2 months, after B)
+
+> **Status, 28 July 2026 — not started, and the two-month estimate assumes a toolchain we do not have.**
+> This was checked rather than recalled. `snarkjs@0.7.6` exposes `plonk: setup, fullProve, prove,
+> verify, exportSolidityCallData` and nothing else: there is no aggregation or recursion primitive in
+> the library this project is built on, and none of Halo2, Nova, or plonky2 is installed. Verifying a
+> BN254 Plonk proof *inside* a BN254 circuit means emulating a pairing over a non-native field, which
+> is millions of constraints against the 718 the Kelly circuit uses, and the largest powers-of-tau
+> file on hand is `hez_final_12` (2^12) at 4.8 MB against the tens of gigabytes such a circuit would
+> need. So Phase C is not "the next circuit, but bigger". It is a change of proving stack, and the
+> honest reading of the two months is that it is the estimate for the *work*, not for the *learning*.
+> The cheaper thing to measure first is whether anyone batches: the abandon condition below is a
+> measurement, and it has not been taken.
 
 Every proof today costs its own transaction. An agent polling risk in a loop cannot put each answer on
 chain, and does not want to.

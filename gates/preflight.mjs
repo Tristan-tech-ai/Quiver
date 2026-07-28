@@ -108,6 +108,39 @@ for (const s of SERVICES) {
 }
 check('the routing signpost stays silent on correct calls', noisy.length === 0, noisy.join(', ') || `${SERVICES.length} services quiet`);
 
+// Any service that builds a Plonk proof must snap its inputs onto the grid the circuit works over,
+// or the proof certifies an identity a few 1e-6 away from the one the answer reports.
+//
+// WHY IT LIVES IN PREFLIGHT rather than in `test/`. It belongs to deploy time: the way this invariant
+// breaks is somebody wiring a proof onto a second service and shipping it. Preflight is the one thing
+// that always runs before `railway up`, and a gate in `gates/` with its own npm script is a gate that
+// quietly stops being run, which already happened once here.
+//
+// It reads the handlers themselves rather than sweeping the source file, so moving code between files
+// cannot make it silently stop matching. The distinction it turns on is easy to get backwards:
+//   proofEnvelope(...)              the ordinary signed-response wrapper. Nearly every service.
+//   env.proof / buildInBackground   an actual Plonk proof built off-request. This is the trigger.
+//
+// `portfolio-gate` was reported as a defect for never snapping. It emits no zk proof at all, so there
+// was nothing for a buyer to receive; `zk/circuits/portfoliogate.circom` is gated under `zk/` and
+// reaches no served path. The moment that changes, this check is what says so.
+const EMITS_ZK = /env\.proof|buildInBackground/;
+const SNAPS = /gridSnapFields\s*\(/;
+const handlers = SERVICES.map((s) => ({ name: s.name, body: String(s.run || '') }));
+const emitting = handlers.filter((h) => EMITS_ZK.test(h.body)).map((h) => h.name).sort();
+// Asserted first: a stringify that returned "[native code]" or empty bodies would find nothing and
+// report success over nothing, which is how a check stops being able to fail.
+check('the proof-emitting services are actually visible to this check',
+  emitting.length > 0,
+  emitting.length ? `found ${emitting.join(', ')}` : `NOTHING MATCHED across ${handlers.length} handlers — this check proved nothing`);
+check('every service that builds a zk proof snaps its inputs onto that grid first',
+  handlers.every((h) => !EMITS_ZK.test(h.body) || SNAPS.test(h.body)),
+  handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map((h) => h.name).join(', ')
+    || `${emitting.join(', ')} snap; the other ${handlers.length - emitting.length} build no proof`);
+check('the proof-emitting set is the one that has been checked',
+  emitting.length === 1 && emitting[0] === 'perp-gate',
+  `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
+
 // ── 4. the new code paths actually run ───────────────────────────────────────────────────────────
 // A 500 discovered in production is the failure this deploy is supposed to avoid, so every MCP tool is
 // called here with a body that exercises repair, and none of them may throw.

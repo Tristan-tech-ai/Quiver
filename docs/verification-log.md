@@ -112,3 +112,37 @@ V6 above now confirms the instability was never a defect at all.
 
 `proofStorage` reports itself `durable: false` with the instruction to set `QUIVER_PROOF_DIR`. That is
 correct: Phase A shipped switched off, pending a decision about a Railway volume.
+
+## V7 — `portfolio-gate` not snapping its inputs is a non-issue, and the reason is worth keeping
+
+Reported as a defect: `perp-gate` snaps its inputs onto the 1e-9 grid at `services.js:313` and
+`portfolio-gate` never does. It was left unfixed on the grounds that snapping would move contentHashes.
+
+That reasoning was never tested. **Exactly one service builds a Plonk proof, `perp-gate`, and it
+snaps.** `portfolio-gate` returns a `proofEnvelope`, which is the ordinary signed-response wrapper
+nearly every service uses and is not a zk proof at all. `zk/circuits/portfoliogate.circom` is a proven
+identity gated under `zk/` and reaches no served path. So no buyer can receive a portfolio-gate proof,
+and there is no unsnapped-input proof failure to have. Nothing to fix, and the contentHash worry was
+about a change that was never needed.
+
+**The first attempt at this named the wrong service.** It concluded `risk-attest` on the strength of a
+probe matching `/zk|plonk|proof/` against each live service entry. That probe was reading prose:
+`risk-attest`'s description says "batch proof content-hashes into one Merkle root", so it matched on a
+word, while `perp-gate`'s says "proves it correct" and did not. The check caught it on its first run.
+
+Left as three checks in `gates/preflight.mjs` rather than a note in a document, because the gap between
+"true today" and "required the moment anyone wires a second proof in" is exactly where a fact rots into
+a wrong assumption. They read the handler functions themselves rather than sweeping the source file, so
+moving code between files cannot make them quietly stop matching.
+
+**Preflight and not `test/`, for two reasons.** This invariant belongs to deploy time, and preflight is
+the one thing that always runs before `railway up`; a gate in `gates/` with its own npm script is a gate
+that stops being run, which already happened here once. And the served whitepaper quotes the suite size
+in twelve places, so four new test cases would have made the live paper disagree with the repo, with the
+deploy window closed and no way to reconcile them.
+
+Both proven able to fail. Strip the snapping and "every service that builds a zk proof snaps its inputs
+onto that grid first" goes red; blank the handler bodies and the vacuity guard reports `NOTHING MATCHED
+across 22 handlers — this check proved nothing` rather than passing over an empty set. Preflight now 14
+checks, 13 passing, the one red being its refusal to pass without a changelog entry for a NEXT deploy,
+which is the gate working. Suite unchanged at 386 tests, 381 pass, 0 fail.

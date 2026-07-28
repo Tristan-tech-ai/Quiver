@@ -1,0 +1,35 @@
+{
+  "at": "2026-07-28T03:50:59.477Z",
+  "passed": true,
+  "samples": 4000,
+  "grid": {
+    "kept": 4000,
+    "violations": 0,
+    "tightestRatio": 0.9997149276908067,
+    "worst": {
+      "p": 0.076356106,
+      "b": 39.42140165,
+      "f": 0.052926094500142545,
+      "residual": "19705081850"
+    }
+  },
+  "raw": {
+    "kept": 4000,
+    "violations": 0,
+    "tightestRatio": 0.9997149276908067
+  },
+  "checks": [
+    {
+      "name": "the bound is never violated on grid-snapped inputs",
+      "pass": true
+    },
+    {
+      "name": "the sweep is discriminating, not vacuous",
+      "pass": true
+    },
+    {
+      "name": "the engine and the circuit agree about the same bet",
+      "pass": true
+    }
+  ]
+}

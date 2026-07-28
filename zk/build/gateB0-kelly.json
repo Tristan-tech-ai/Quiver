@@ -1,0 +1,40 @@
+{
+  "at": "2026-07-28T03:49:02.346Z",
+  "passed": true,
+  "proveMs": 547,
+  "plonkConstraints": 718,
+  "publicSignals": [
+    "0",
+    "1200000000",
+    "550000000",
+    "1200000000",
+    "175000000"
+  ],
+  "residual": "0",
+  "checks": [
+    {
+      "name": "the worked case has an exact residual",
+      "pass": true
+    },
+    {
+      "name": "the honest proof verifies against the published key",
+      "pass": true
+    },
+    {
+      "name": "the public signals are the scaled inputs, unchanged",
+      "pass": true
+    },
+    {
+      "name": "the residual and tolerance are published, not hidden",
+      "pass": true
+    },
+    {
+      "name": "every perturbed public signal is rejected",
+      "pass": true
+    },
+    {
+      "name": "a bent proof point is rejected",
+      "pass": true
+    }
+  ]
+}

@@ -34,6 +34,61 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 
 ---
 
+## Since the deadline
+
+The submission closed on 28 July 2026 and judging runs after it. OKX confirmed that during judging
+they cannot go back and forth resolving errors: if the service breaks while being scored it simply
+comes back empty. Our own redeploys take up to three minutes before the new container serves. So
+everything below was built **without deploying anything**, and the live endpoint has not been touched
+since the deadline. The machine-readable paper also stays at exactly seven parts, because the
+submitted entry hardcodes seven URLs.
+
+### A second circuit: the Kelly sizing identity
+
+The honest cap on this project is that the on-chain proof layer covers **one computation of
+twenty-two**. `size-gate` is the second, chosen because it is the smallest: the discrete Kelly
+criterion `f* = (p(b+1) − 1)/b` cross-multiplies to a single polynomial identity, where the
+liquidation identity needed a division cleared through three factors of SCALE.
+
+| | |
+|---|---|
+| Circuit | [`zk/circuits/kelly.circom`](zk/circuits/kelly.circom) — **357 R1CS / 718 Plonk constraints**, zero private inputs |
+| Statement | `f̂·b̂ = p̂·b̂ + S·p̂ − S²`, with the residual bounded by `2·|R| ≤ b̂`, derived from a public signal so a prover cannot widen it |
+| Proving | **547 ms**, zkey 2.2 MB (the liquidation circuit: 703 ms, 5.3 MB) |
+| Verifier | [`zk/build/KellyVerifier.sol`](zk/build/KellyVerifier.sol), 6,552 bytes deployed |
+| On chain cost | **273,118 gas** to accept · **573 gas** to reject a bent proof |
+
+Three gates, each able to fail, all runnable from a clone:
+
+```bash
+node zk/scripts/gateB0-kelly.mjs        # proves, verifies, and refuses all 5 perturbed signals
+node zk/scripts/gateB1-kelly-sweep.mjs  # 4,000 bets through the real engine; bound never violated
+node zk/scripts/gateB2-kelly-evm.mjs    # Solidity verifier in an EVM: accepts, then refuses 6 ways
+```
+
+**Gate B1 failed the first time it ran, and that is the point of it.** 3,997 of 4,000 sampled bets
+blew the residual bound by a factor of about a thousand. The cause was not the circuit: `sizeGate`
+publishes `fullKellyFraction: round(fullKelly, 6)`, so certifying the served number would have proved
+an identity about a bet up to 5×10⁻⁷ away from the one actually sized — five hundred grid steps, and
+exactly the factor of a thousand observed. This is the same defect class the liquidation circuit hit
+when the engine handed back `round(M, 2)` for margin. The witness now recomputes the fraction at full
+precision from the snapped inputs, with a guard that refuses to certify at all when the result drifts
+past the six decimals the answer is published at. After the fix: **0 violations in 4,000, tightest
+case using 0.9997 of the bound** — tight rather than generous, which is what makes it worth proving.
+
+**Not yet shipped, stated plainly:** the live `size-gate` service does not serve these proofs and no
+Kelly verifier is deployed on chain. Both need either a deploy or gas, and neither is worth the risk
+while reviewers are testing. This is exactly what the paper said about the liquidation circuit before
+it shipped: built, and verifiable from a clone.
+
+### Quiver bought from another agent
+
+See the [At a Glance](#at-a-glance) row and [on-chain verification](docs/onchain-verification.md).
+Settlement `0x51f44374…a1539` on X Layer, 0.01 USD₮0 to agent #4462, deliverable returned in 0.81 s.
+Zero deploys: a purchase is a transaction from our wallet, not a change to the service.
+
+---
+
 ## Documentation
 
 The full technical documentation is one continuous document, served as

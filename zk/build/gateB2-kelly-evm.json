@@ -1,0 +1,29 @@
+{
+  "at": "2026-07-28T03:52:13.797Z",
+  "passed": true,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "acceptGas": "273118",
+  "rejectGas": "573",
+  "publicSignals": [
+    "0",
+    "1200000000",
+    "550000000",
+    "1200000000",
+    "175000000"
+  ],
+  "verifierBytes": 6552,
+  "checks": [
+    {
+      "name": "calldata parses into proof words and public signals",
+      "pass": true
+    },
+    {
+      "name": "the honest proof verifies on chain",
+      "pass": true
+    },
+    {
+      "name": "every tampered submission is refused",
+      "pass": true
+    }
+  ]
+}

@@ -131,13 +131,15 @@ export const NOT_ATTESTABLE = {
   // the premium half, and it was validated exclusively on markets where the interest half is
   // dominated. A formula validated only where one of its terms vanishes has not been validated.
   fundingHourly:
-    'nextFundingRate is attestable for the 17 to 22 markets that carry premium samples in the current '
-    + 'epoch, where it reconstructs exactly from PremSamples as mean(samples, sint32 ppm) / 8 / 1e6. '
-    + 'It is NOT attestable for the rest: 182 of 296 markets sit on the interest-rate term (1.25e-5/h, '
-    + 'i.e. 0.01% per 8h) with no premium samples to prove it from, and the interest parameter has not '
-    + 'been located in any store. Refused for all markets rather than for some, because a per-market '
-    + 'answer would attest the liquid names and quietly decline the illiquid ones, which is the '
-    + 'opposite of where a caller needs the guarantee.',
+    'SUPERSEDED, and left here as a pointer rather than a refusal. The rate is not stored, which is '
+    + 'true and was never the obstacle: every INPUT to it is a store key carrying an ICS-23 existence '
+    + 'proof, and the aggregation is deterministic integer arithmetic. Recomputing it from those '
+    + 'inputs reproduces the venue exactly: 144 of 144 funding ticks integer-exact across 12 markets, '
+    + '30 of 30 again on a second independent archive, and nextFundingRate itself 18 of 18 at a worst '
+    + 'relative error of 2.7e-14, end to end from a signed CometBFT header through a verified proof. '
+    + 'The gap that made it look impossible was one wire type: `premiums` is repeated SINT32, so a '
+    + 'plain int32 read returns roughly -2x the true value. This entry stays until the recomputation '
+    + 'path is wired in, so that nobody reads a stale refusal as a finding. See PHASE_D_FUNDING.md.',
   orderbook:
     'dYdX documents the orderbook as in-memory per node and "not written to the blockchain or stored ' +
     'in the application state", so no depth is ever provable.',

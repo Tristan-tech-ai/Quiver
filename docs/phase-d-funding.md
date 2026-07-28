@@ -313,9 +313,15 @@ is used to convert position size to notional, not the mark price**. Both factors
 `0x800` returns position size, `0x807` returns the oracle price. So a payment plus those two would
 yield the rate by division.
 
-*Measured*: no precompile in `0x800`-`0x814` returns a funding payment or a cumulative funding figure
-under the calldata shapes I tried. `0x800` returns exactly five words
-(`szi`, `entryNtl`, `isolatedRawUsd`, `leverage`, `isIsolated`) with no funding term.
+*Measured*: none of the asset-indexed precompiles (`0x806`, `0x807`, `0x808`, `0x80a`, `0x80e`,
+`0x814`) returns the funding rate at any constant scale, across 40 assets with 19 distinct funding
+values. `0x800` returns exactly five words, matching the documented
+(`szi`, `entryNtl`, `isolatedRawUsd`, `leverage`, `isIsolated`).
+
+*Not tested*: I did **not** probe the account-shaped precompiles (`0x800`, `0x803`, `0x80f`, and the
+unidentified `0x802`, `0x811`, `0x813`) against the per-position `cumFunding` figure the HTTP API
+exposes. So "no cumulative funding on chain" is **not found rather than not there**, and that probe
+is the cheapest remaining test on this venue.
 
 *Argued, not measured*: the readable account aggregates (`0x803` withdrawable, `0x80f` account margin
 summary) move for trades, fees and unrealised PnL as well as funding, so an hourly delta should be

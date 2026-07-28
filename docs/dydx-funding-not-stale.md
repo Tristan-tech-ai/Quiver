@@ -1,5 +1,20 @@
 # dYdX funding is not stale, and the reconstruction that suggested it was is incomplete
 
+> **SUPERSEDED IN PART, 28 July 2026.** This document was right that the feed is correct and right
+> that the reconstruction was incomplete. It was wrong to leave the gap open. A later pass transcribed
+> dYdX's `MaybeProcessNewFundingTickEpoch` and recomputed the rate from its store inputs: **144 of 144
+> funding ticks integer-exact** across 12 markets, 30 of 30 again on a second independent archive, and
+> `nextFundingRate` itself 18 of 18 at a worst relative error of 2.7e-14, end to end from a signed
+> CometBFT header through a verified ICS-23 proof. The interest term this document could not locate is
+> a clamp, and it is deterministic.
+>
+> The gap that made it look impossible was one wire type: `premiums` is `repeated sint32`, zigzag
+> encoded, so a plain `int32` read returns roughly −2x the true value.
+>
+> **dYdX funding is verifiable today, for every market and not only the sampled ones.** See
+> `PHASE_D_FUNDING.md`. Everything below stands as the record of how far the evidence reached at the
+> time, including the part that was too cautious.
+
 **Measured 28 July 2026. No code changed: nothing was found to be wrong.**
 
 ## The claim under test

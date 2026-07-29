@@ -26,6 +26,7 @@ import { createRequire } from 'node:module';
 import path from 'node:path';
 import { BUILD, SCALE, S, toScaled, checklist, shutdown, snarkjs } from './lib/gatekit.mjs';
 import { load } from './service-root.mjs';
+import { readGas, GAS_VARIANCE_NOTE } from './lib/gas-facts.mjs';
 
 const require = createRequire(import.meta.url);
 const { perpGate } = await load(import.meta.url, 'engine/perpGate.js');
@@ -209,7 +210,13 @@ record('one invalid leg makes the whole answer fail', !!badRun.execResult.except
   badRun.execResult.exceptionError ? `reverted: ${badRun.execResult.exceptionError}` : 'ACCEPTED A BAD LEG');
 
 // ---- 4. the comparison ---------------------------------------------------------------------------
-const ROUTE_A_GAS = 273118n;      // measured: a Plonk verify is constant, whatever the circuit size
+// Route A IS THE ONE WIDE CIRCUIT, so its baseline is the wide portfolio verifier that gate B8-2
+// actually deployed and called, not a single-leg number. This was hardcoded as 273118 with the comment
+// "a Plonk verify is constant, whatever the circuit size", which is half true and misleading in the
+// half that matters here: verify gas is independent of circuit SIZE but costs about 822 gas per PUBLIC
+// INPUT, and the wide 3-leg circuit carries 28 public signals against the single-leg verifier's 8. The
+// literal also matched no artifact in the repo by the time anyone checked.
+const ROUTE_A_GAS = readGas('gateB8-2-portfolio-evm', 'acceptGas', 'the wide portfolio verifier, all legs in one proof');
 const nFull = prepared.length;
 const routeB = rows.find((r) => r.n === nFull);
 const perLegProve = Math.round(serialMs / Math.max(1, proofs.length));
@@ -218,7 +225,7 @@ const routeAProveEst = Math.round(770 * (nFull * 1301 / 2048));   // domain^1.01
 console.log(`\n${'-'.repeat(70)}`);
 console.log(`For an ${nFull}-leg book:\n`);
 console.log(`  ROUTE A  one wide circuit`);
-console.log(`    gas       ~${ROUTE_A_GAS}  (a Plonk verify costs the same at any circuit size)`);
+console.log(`    gas       ~${ROUTE_A_GAS}  (${GAS_VARIANCE_NOTE})`);
 console.log(`    proving   ~${(routeAProveEst / 1000).toFixed(1)} s, serial and unsplittable   EXTRAPOLATED`);
 console.log(`    ceiling   NOT BUILDABLE today: needs 2^14 powers of tau, and 5.7 s breaks the 3 s threshold`);
 console.log(`\n  ROUTE B  one proof per leg`);

@@ -1,39 +1,39 @@
 {
-  "at": "2026-07-28T09:59:59.056Z",
+  "at": "2026-07-29T00:09:46.131Z",
   "passed": true,
   "legs": 11,
   "routeA": {
-    "gas": "273118",
+    "gas": "293262",
     "proveMsEstimated": 5381,
     "buildableToday": false
   },
   "routeB": {
-    "gas": "2947769",
-    "proveMsPerLeg": 747,
-    "proveMsSerial": 8217,
-    "proveMsParallel": 909,
+    "gas": "2945077",
+    "proveMsPerLeg": 825,
+    "proveMsSerial": 9070,
+    "proveMsParallel": 1073,
     "buildableToday": true
   },
   "gasByLegCount": [
     {
       "legs": 1,
-      "gas": "276369"
+      "gas": "275745"
     },
     {
       "legs": 3,
-      "gas": "806915"
+      "gas": "803379"
     },
     {
       "legs": 5,
-      "gas": "1345154"
+      "gas": "1337262"
     },
     {
       "legs": 8,
-      "gas": "2145525"
+      "gas": "2141475"
     },
     {
       "legs": 11,
-      "gas": "2947769"
+      "gas": "2945077"
     }
   ]
 }

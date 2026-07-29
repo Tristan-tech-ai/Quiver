@@ -143,11 +143,44 @@ much a batched verifier could save, in section 6.
 
 ### A note on the three different numbers for "a Plonk verify"
 
-The repo records 273,901 (`gate0-plonk.json`, the liquidation verifier, 8 public signals) and 273,118
-(`gateB2-kelly-evm.json`, kelly, 5 public signals, and the constant gate B6 uses as `ROUTE_A_GAS`).
-Today's re-measurement of kelly gives 271,454. The spread is 0.9%, and it is not noise: these are
-different circuits, different public-input counts and slightly different call paths. The next section
-shows the public-input count alone explains most of it at 822 gas each. Nothing is wrong, but any
+**CORRECTED 29 July.** The paragraph below used to say 273,118 came from `gateB2-kelly-evm.json`, kelly
+at 5 public signals, and that gate B6 used it as `ROUTE_A_GAS`. **Every part of that was wrong.**
+`gateB2-kelly-evm.json` records 271,136. 273,118 was a hardcoded literal in two gate scripts that
+matched no artifact in this repo, described one way in gate B6 ("constant, whatever the circuit size")
+and a contradictory way in gate B8-2 ("one Plonk verify, 8 public signals"), and it had propagated into
+two published JSON files, one of them as three times the wrong number. Both gates now READ their figure
+from the artifact that measured it, and the literal is gone.
+
+What the repo actually records, each read at run time rather than written down:
+
+| figure | source | what it is |
+|---|---|---|
+| 273,901 | `gate0-plonk.json` `verifyGasHonest` | the single-leg liquidation verifier, 8 public signals |
+| 271,136 | `gateB2-kelly-evm.json` `acceptGas` | kelly, 5 public signals |
+| 293,262 | `gateB8-2-portfolio-evm.json` `acceptGas` | the wide 3-leg portfolio verifier, 28 public signals |
+
+The spread across circuits is not noise, and neither is the spread WITHIN one. These are different
+circuits with different public-input counts, and the next section shows the public-input count alone
+explains most of the difference: the 20 extra signals on the wide verifier cost about 19,400 gas over
+the single-leg one, near 970 each, against the 822 that section derives from a cleaner comparison.
+
+**But a re-run of the same verifier on the same statement also moves, and by more than expected.** Four
+samples of the wide verifier came out of this correction: 292,748 in the artifact as it stood, then
+289,726, 293,054 and 293,262 across three re-runs. That is a spread of **3,536 gas**, which is slightly
+WIDER than the 3,328 `probe-plonk-gas-variance.mjs` measures across twelve proofs of an identical
+statement. Four samples do not overturn twelve, and the honest reading is that the probe's figure is a
+floor rather than a bound. There is also a 7,500-gas EIP-2929 cold/warm step between the first call in
+an EVM instance and every later one, so two verifiers compared inside one process are not comparable
+unless each gets a fresh EVM.
+
+The per-signal figure above is quoted loosely for exactly that reason: 19,400 divided by 20 lands near
+970, but the numerator carries the same ±3,500 the samples do, so it is consistent with 822 and is not
+independent evidence for any particular value.
+
+So no single figure here is exact to the gas, and a comparison that turns on less than about 1.3% is
+not measuring what it thinks it is. The comparisons these gates make are all far wider than that: the
+wide verifier at 293,262 against 821,703 for three single-leg verifies is a factor of 2.8.
+Nothing is wrong, but any
 document that quotes "273k" as *the* number is quoting one row of a curve.
 
 ---

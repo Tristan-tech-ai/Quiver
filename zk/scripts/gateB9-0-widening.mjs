@@ -81,9 +81,29 @@ for (const N of SIZES) {
     unpack(words, N).every((m, i) => m.pHat === answers[i].pHat && m.bHat === answers[i].bHat && m.fHat === answers[i].fHat),
     `${words.length} word(s) for ${N} answers · word[0] = ${words[0]}`);
 
-  record(`the odd batch's spare lane is empty, so the encoding is canonical at N=${N}`,
-    N % 2 === 0 || (words[words.length - 1] >> 120n) === 0n,
-    N % 2 === 0 ? 'even batch, both lanes of every word carry an answer' : `top lane of the last word = ${words[words.length - 1] >> 120n}`);
+  record(N % 2 === 0
+    ? `every lane carries an answer at N=${N}, so there is no spare lane to make canonical`
+    : `the odd batch's spare lane is empty, so the encoding is canonical at N=${N}`,
+    N % 2 === 0 ? words.length * 2 === N : (words[words.length - 1] >> 120n) === 0n,
+    N % 2 === 0 ? `${N} answers in ${words.length} word(s), both lanes of each in use`
+                : `top lane of the last word = ${words[words.length - 1] >> 120n}`);
+
+  // THE NEGATIVE FOR THAT CLAIM. "The spare lane is zero" is a fact about the ENCODER; the claim that
+  // matters is that the CIRCUIT refuses any other value, because otherwise the same three answers could
+  // be published under 2^120 different words and a contract deduplicating on the word would be fooled.
+  // Checked by trying, not by reading the source.
+  if (N % 2 === 1) {
+    const stuffed = [...words];
+    stuffed[stuffed.length - 1] |= 1n << 120n;      // one bit in the lane nothing reads
+    let stuffedProved = false;
+    try {
+      await (await builderFor(circuit)).calculateWTNSBin({ packed: stuffed.map(String) }, 0);
+      stuffedProved = true;
+    } catch { /* refused, as required */ }
+    record(`a single bit set in the spare lane is REFUSED at N=${N}, so the encoding is unique`,
+      stuffedProved === false,
+      'without this the same answers would have 2^120 valid packings and a contract deduplicating on the word could be fooled');
+  }
 
   const builder = await builderFor(circuit);
   const wtns = await builder.calculateWTNSBin(witnessFor(answers), 0);
@@ -143,7 +163,6 @@ console.log(`\n${'='.repeat(72)}\nA tampered member: refused, and named\n`);
 
 const N = 4;
 const answers = pool.slice(0, N);
-const builder4 = await builderFor('kellybatch4');
 const zkey4 = path.join(BUILD, 'kellybatch4_plonk.zkey');
 
 // One grid step of f moves the residual by exactly b, so it moves the bound usage 2|R|/b by exactly 2.
@@ -151,6 +170,10 @@ const zkey4 = path.join(BUILD, 'kellybatch4_plonk.zkey');
 // a single step survives is the measure-zero case of a member at usage exactly 1.0 whose residual
 // changes sign. Two steps cannot survive at all. Both are tried; the two-step case is the pass
 // condition because it is the one that holds for every input rather than almost every input.
+// A FRESH witness calculator per attempt. circom's wasm error buffer is not reset between calls, so a
+// reused calculator returns a message that grows by one copy of the fault for every previous failure —
+// member 3's message came back with four copies of an identical fault. A prover that logged that text
+// would be reporting how many times it had failed before, not what went wrong.
 const stepReport = [];
 for (const step of [1n, 2n]) {
   for (let j = 0; j < N; j++) {
@@ -158,18 +181,18 @@ for (const step of [1n, 2n]) {
     const c = memberCheck(tampered[j]);
     let proved = false, err = null;
     try {
-      const w = await builder4.calculateWTNSBin(witnessFor(tampered), 0);
+      const w = await (await builderFor('kellybatch4')).calculateWTNSBin(witnessFor(tampered), 0);
       await snarkjs.plonk.prove(zkey4, w);
       proved = true;
-    } catch (e) { err = (e && e.message ? e.message : String(e)).split('\n')[0]; }
+    } catch (e) { err = (e && e.message ? e.message : String(e)).trim(); }
     const named = firstBadMember(pack(tampered), N);
     stepReport.push({ step: Number(step), member: j, boundUsage: c.usage, proved, err, namedIndex: named ? named.index : null });
   }
 }
 
-console.log(`  ${'shift of f'.padEnd(12)}${'member'.padEnd(8)}${'2|R|/b after'.padStart(14)}${'proved?'.padStart(10)}   named by the public-signal reader`);
+console.log(`  ${'shift of f'.padEnd(15)}${'member'.padEnd(8)}${'2|R|/b after'.padStart(14)}${'proved?'.padStart(10)}   named by the public-signal reader`);
 for (const r of stepReport) {
-  console.log(`  ${(`+${r.step} grid step`).padEnd(12)}${String(r.member).padEnd(8)}${r.boundUsage.toFixed(3).padStart(14)}${String(r.proved).padStart(10)}   ${r.namedIndex === null ? '(nothing wrong)' : `member ${r.namedIndex}`}`);
+  console.log(`  ${(`+${r.step} grid step`).padEnd(15)}${String(r.member).padEnd(8)}${r.boundUsage.toFixed(3).padStart(14)}${String(r.proved).padStart(10)}   ${r.namedIndex === null ? '(nothing wrong)' : `member ${r.namedIndex}`}`);
 }
 
 const twoStep = stepReport.filter((r) => r.step === 2);
@@ -185,12 +208,20 @@ record('the naming is discriminating: an honest batch names nobody',
   firstBadMember(pack(answers), N) === null,
   'firstBadMember returned null on the untampered batch, so it is not a function that always accuses');
 
-console.log('\n  What the circuit itself said when asked to prove a tampered batch:');
-console.log(`    ${twoStep[0].err}`);
-const circomNamesIt = twoStep.some((r) => r.err && /member|\[\s*\d+\s*\]/i.test(r.err) && !/^Error: Assert Failed\.$/.test(r.err));
-console.log(`\n  Does circom's own error identify the member? ${circomNamesIt ? 'yes' : 'NO'} — ` +
-  `${circomNamesIt ? 'it carries an index' : 'it names a template and a line, identical for every member'}.`);
-console.log('  That is why the naming is done by the public-signal reader instead: it works for anybody');
+console.log('\n  What the circuit itself said when asked to prove a tampered batch, in full:');
+for (const line of twoStep[0].err.split('\n')) console.log(`    ${line}`);
+
+// The question is not whether the message is informative, it is whether it DISTINGUISHES the members.
+// It does not: all four faults are the same template instance at the same line, because the four
+// members are four instances of one template.
+const distinct = new Set(twoStep.map((r) => r.err));
+const circomNamesIt = distinct.size === twoStep.length;
+console.log(`\n  Four different members tampered, ${distinct.size} distinct error message(s).`);
+console.log(`  Does circom's own error identify WHICH member? ${circomNamesIt ? 'yes' : 'NO'}.`);
+console.log('  It names a template instance and a line — KellyMember_8 line 87, the bound check — and');
+console.log('  names the same one whichever member is at fault, because the members are four instances');
+console.log('  of one template. It is a useful message and it is not an answer to "which one".');
+console.log('\n  That is why the naming is done by the public-signal reader instead: it works for anybody');
 console.log('  holding the calldata, not just for the prover watching its own witness generation fail.');
 
 // The one-step rows measure how much slack the tolerance really has. Reported rather than asserted,

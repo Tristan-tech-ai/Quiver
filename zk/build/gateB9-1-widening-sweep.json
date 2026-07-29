@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T23:41:28.281Z",
+  "at": "2026-07-29T00:11:18.575Z",
   "passed": true,
   "batchesPerSize": 1200,
   "totals": {
@@ -91,7 +91,7 @@
       "pass": true
     },
     {
-      "name": "no real answer comes close to overflowing its lane",
+      "name": "no real answer overflows its lane, and p stays a proper fraction",
       "pass": true
     },
     {

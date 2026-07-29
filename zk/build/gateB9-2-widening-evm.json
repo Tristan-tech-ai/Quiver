@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T23:54:19.921Z",
+  "at": "2026-07-29T00:11:46.794Z",
   "passed": true,
   "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
   "txBase": 21000,
@@ -12,18 +12,18 @@
     "publicSignals": 5,
     "plonk": 718,
     "domain": 1024,
-    "acceptGas": 271038,
+    "acceptGas": 269888,
     "acceptSamples": [
-      270720,
-      270720,
-      271038,
+      269680,
+      269790,
+      269888,
       271662,
-      272910
+      272176
     ],
-    "acceptSpread": 2190,
+    "acceptSpread": 2496,
     "rejectGas": 573,
-    "calldataGas": 13592,
-    "totalGas": 305630,
+    "calldataGas": 13556,
+    "totalGas": 304444,
     "deployedSize": 6552,
     "calldataBytes": 932
   },
@@ -32,25 +32,25 @@
     "publicSignals": 1,
     "plonk": 1190,
     "domain": 2048,
-    "acceptGas": 268416,
+    "acceptGas": 267792,
     "acceptSamples": [
-      265810,
-      267890,
+      266434,
+      267584,
+      267792,
       268416,
-      268722,
-      269554
+      268624
     ],
-    "acceptSpread": 3744,
+    "acceptSpread": 2190,
     "rejectGas": 573,
-    "calldataGas": 12624,
-    "totalGas": 302040,
+    "calldataGas": 12588,
+    "totalGas": 301380,
     "deployedSize": 5723,
     "calldataBytes": 804
   },
   "noiseProbe": {
     "circuit": "kelly",
-    "otherBetAcceptGas": 271246,
-    "spread": 2190
+    "otherBetAcceptGas": 271662,
+    "spread": 2496
   },
   "batches": {
     "2": {
@@ -58,18 +58,18 @@
       "publicSignals": 1,
       "plonk": 1664,
       "domain": 2048,
-      "acceptGas": 267890,
+      "acceptGas": 268514,
       "acceptSamples": [
-        266226,
-        267682,
-        267890,
-        268624,
-        269040
+        266544,
+        266544,
+        268514,
+        269040,
+        270288
       ],
-      "acceptSpread": 2814,
+      "acceptSpread": 3744,
       "rejectGas": 573,
-      "calldataGas": 12768,
-      "totalGas": 301658,
+      "calldataGas": 12732,
+      "totalGas": 302246,
       "deployedSize": 5721,
       "calldataBytes": 804
     },
@@ -78,18 +78,18 @@
       "publicSignals": 2,
       "plonk": 2854,
       "domain": 4096,
-      "acceptGas": 269579,
+      "acceptGas": 269065,
       "acceptSamples": [
+        267707,
+        268331,
         269065,
-        269163,
-        269579,
-        269579,
-        271561
+        269689,
+        269897
       ],
-      "acceptSpread": 2496,
+      "acceptSpread": 2190,
       "rejectGas": 573,
-      "calldataGas": 13028,
-      "totalGas": 303607,
+      "calldataGas": 13052,
+      "totalGas": 303117,
       "deployedSize": 5986,
       "calldataBytes": 836
     },
@@ -98,18 +98,18 @@
       "publicSignals": 2,
       "plonk": 3328,
       "domain": 4096,
-      "acceptGas": 268857,
+      "acceptGas": 268331,
       "acceptSamples": [
+        267915,
+        268331,
+        268331,
         268747,
-        268747,
-        268857,
-        268955,
         269689
       ],
-      "acceptSpread": 942,
+      "acceptSpread": 1774,
       "rejectGas": 573,
-      "calldataGas": 13184,
-      "totalGas": 303041,
+      "calldataGas": 13220,
+      "totalGas": 302551,
       "deployedSize": 5988,
       "calldataBytes": 836
     }
@@ -117,55 +117,55 @@
   "comparison": [
     {
       "N": 2,
-      "batchExec": 267890,
-      "batchTotal": 301658,
-      "separatePackedTotal": 604080,
-      "savedVsPacked": 302422,
-      "savedPctVsPacked": 50.063236657396374,
-      "separateLiveTotal": 611260,
-      "savedVsLive": 309602,
-      "savedPctVsLive": 50.64980532015836
+      "batchExec": 268514,
+      "batchTotal": 302246,
+      "separatePackedTotal": 602760,
+      "savedVsPacked": 300514,
+      "savedPctVsPacked": 49.85632755989117,
+      "separateLiveTotal": 608888,
+      "savedVsLive": 306642,
+      "savedPctVsLive": 50.36098592844661
     },
     {
       "N": 3,
-      "batchExec": 269579,
-      "batchTotal": 303607,
-      "separatePackedTotal": 906120,
-      "savedVsPacked": 602513,
-      "savedPctVsPacked": 66.49373151458968,
-      "separateLiveTotal": 916890,
-      "savedVsLive": 613283,
-      "savedPctVsLive": 66.88730382052373
+      "batchExec": 269065,
+      "batchTotal": 303117,
+      "separatePackedTotal": 904140,
+      "savedVsPacked": 601023,
+      "savedPctVsPacked": 66.4745504014865,
+      "separateLiveTotal": 913332,
+      "savedVsLive": 610215,
+      "savedPctVsLive": 66.81195884957496
     },
     {
       "N": 4,
-      "batchExec": 268857,
-      "batchTotal": 303041,
-      "separatePackedTotal": 1208160,
-      "savedVsPacked": 905119,
-      "savedPctVsPacked": 74.91714673553172,
-      "separateLiveTotal": 1222520,
-      "savedVsLive": 919479,
-      "savedPctVsLive": 75.21177567647155
+      "batchExec": 268331,
+      "batchTotal": 302551,
+      "separatePackedTotal": 1205520,
+      "savedVsPacked": 902969,
+      "savedPctVsPacked": 74.90286349459154,
+      "separateLiveTotal": 1217776,
+      "savedVsLive": 915225,
+      "savedPctVsLive": 75.15544730722235
     }
   ],
   "perAnswer": [
     {
       "N": 2,
-      "perAnswer": 150829,
-      "ratio": 0.4993676334260363,
+      "perAnswer": 151123,
+      "ratio": 0.5014367244010883,
       "domain": 2048
     },
     {
       "N": 3,
-      "perAnswer": 101202.33333333333,
-      "ratio": 0.3350626848541032,
+      "perAnswer": 101039,
+      "ratio": 0.33525449598513507,
       "domain": 4096
     },
     {
       "N": 4,
-      "perAnswer": 75760.25,
-      "ratio": 0.2508285326446828,
+      "perAnswer": 75637.75,
+      "ratio": 0.25097136505408457,
       "domain": 4096
     }
   ],

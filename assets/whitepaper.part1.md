@@ -236,7 +236,7 @@ Every service is defined by a name, a price, an input schema, a validator, and a
 
 The host is stateless between calls except for the three stores named above that exist for good reasons: a rendered-chart store that lets an image be fetched by URL after the call that produced it, and a cursor store for the loop-digest service that lets an agent diff a wallet against its own previous call. Both are ephemeral and per-session. The separation of data plane from compute keeps each service auditable: given the same venue state, the same request produces the same result, and the result names the block or the tape window it was computed on so a caller can reproduce it.
 
-Latency is bounded by the venue round trip rather than by the computation. Measured end to end, the transaction decode and simulation returns in roughly 125 to 160 milliseconds, the fast-tier chart in 220 to 300, and the full options desk, which fetches and normalises an entire Deribit chain and fits a surface across expiries, in 550 to 700. These are within the budget an agent can absorb inside a decision loop, which is the point of pricing calls low enough to poll. Every response carries an `elapsedMs` field so a caller can hold the service to its own timing.
+Latency is bounded by the venue round trip rather than by the computation. Measured end to end, the transaction decode and simulation returns in roughly 125 to 160 milliseconds, the fast-tier chart in 220 to 300, and the full options desk, which fetches and normalises an entire Deribit chain and fits a surface across expiries, in 550 to 700. These are within the budget an agent can absorb inside a decision loop, which is the point of pricing calls low enough to poll. Every response carries an `elapsedMs` field so a caller can hold the service to its own timing. It sits inside that response's proof or observation block rather than beside it, and the placement is not cosmetic: a timing is provenance of the call and not part of the computation, so a new key at the top level would sit inside what the verification recipe tells a caller to hash and outside what the service hashed, leaving every published proof — the worked exhibit of Appendix C included — failing its own instruction.
 
 **Table 1 — the twenty-two registered services, their data source, and per-call price.**
 
@@ -295,7 +295,7 @@ The volatility surface is fitted with the no-arbitrage inequalities enforced ins
 
 ### 3.5 Descriptive, not prescriptive
 
-Services report what the market prices and what the data shows. They do not tell a caller what to do. A composite "grade" that implies a validated predictive model is avoided where no labelled dataset exists to validate it; the protocol-risk service was rebuilt from a fitted 0–100 score into a set of individually defensible risk flags for exactly this reason. Every output that touches a trading decision carries a not-advice disclosure.
+Services report what the market prices and what the data shows. They do not tell a caller what to do. A composite "grade" that implies a validated predictive model is avoided where no labelled dataset exists to validate it; the protocol-risk service was rebuilt from a fitted 0–100 score into a set of individually defensible risk flags for exactly this reason. Ten of the thirteen observation services carry a not-advice disclosure in their own output; the nine deterministic risk engines carry none, and an earlier version of this sentence claimed that every output touching a trading decision carried one.
 
 
 ### 3.6 Proven by test

@@ -99,9 +99,12 @@ distinction that matters to anything trading around a release.
 
 ### 9. [structural] None of this is financial advice
 
-The services report what markets price and what data shows. Every output touching a decision carries
-a not-advice disclosure, and the short-window up/down service refuses to output a directional edge at
-all, because short-horizon direction is empirically indistinguishable from a coin flip.
+The services report what markets price and what data shows. A not-advice disclosure ships on ten of
+the thirteen observation services and on none of the nine deterministic risk engines — this section
+used to claim every output touching a decision carried one, which was measured false on both
+surfaces, and the nine engines it is most obviously wrong about are the risk gates. The short-window
+up/down service refuses to output a directional edge at all, because short-horizon direction is
+empirically indistinguishable from a coin flip.
 
 ### 10. [scheduled] Hosting is single-region with no redundancy
 

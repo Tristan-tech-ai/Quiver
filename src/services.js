@@ -33,6 +33,9 @@ import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapter
 // The other half of the enum contract: repair.js resolves a value to a declared alternative where it
 // can, and reports the ones it cannot so this file can refuse them. See the wrapper below `SERVICES`.
 import { enumViolations, enumRefusal } from './util/repair.js';
+// Every response carries its own timing — see the wrapper at the foot of this file, and
+// src/util/timing.js for why the field lives in the envelope and not at the top level.
+import { timedRun } from './util/timing.js';
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -896,6 +899,39 @@ for (const s of SERVICES) {
     const violations = enumViolations(s, b);
     return violations.length ? { error: enumRefusal(violations) } : v;
   };
+}
+
+// ── EVERY RESPONSE CARRIES ITS OWN TIMING ────────────────────────────────────────────────────────
+//
+// §2.3 of the paper promises `elapsedMs` on every response so a caller can hold the service to its
+// own timing, and before this loop the nine services a caller most wants to time carried no such
+// field on either surface. A wrapper for the same reason the enum guard above is one: all three call
+// sites that reach an engine over HTTP — the paid `/api/*` route and both gated diag testers — go
+// through `s.run`, so one line covers them and cannot fall behind a service added tomorrow. The
+// fourth site, `handleRpc` in src/mcp.js, shares nothing with this file and carries the stamp
+// explicitly.
+//
+// The value lands in the response's `proof`/`observation` block, never as a new top-level key.
+// src/util/timing.js records why in full: the content hash is taken over the engine's result and the
+// published recipe tells a caller to recompute over "this response WITHOUT its `proof` key", so a new
+// top-level sibling would leave every published proof failing its own verification instruction. The
+// stamp is taken around `s.run`, so a cached answer keeps the timing of the computation that produced
+// it rather than reporting the cache lookup as if it were the work.
+//
+// AND IT STAYS VISIBLE TO THE GUARDS THAT READ IT. `gates/preflight.mjs` decides which handlers build
+// a zk proof by stringifying `s.run` and matching on the source. Replacing the function with a closure
+// made all twenty-two HTTP handlers stringify to this wrapper, so the grid guard silently stopped
+// seeing any of them — measured: preflight's proof-emitting set collapsed from two entries to
+// `[mcp:perp_gate]` alone, and its own "the proof-emitting set is the one that has been checked" line
+// went red. That is a wrapper blinding a guard, which is this repository's most repeated defect, and it
+// was caught only because that check exists. The original handler is therefore published on the
+// wrapper so a source-reading check can see through it, and preflight reads BOTH bodies rather than
+// swapping one for the other — a future wrapper that forgets to expose its inner function still
+// collapses the set and still goes red.
+for (const s of SERVICES) {
+  const inner = s.run;
+  s.run = (i, ctx) => timedRun(() => inner(i, ctx));
+  s.run.unwrapped = inner;
 }
 
 export const byName = Object.fromEntries(SERVICES.map((s) => [s.name, s]));

@@ -39,6 +39,7 @@ import { gridSnapFields } from './util/grid.js';
 import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
 import { repairBody, correctedExample, enumViolations, enumRefusal } from './util/repair.js';
+import { timedRun } from './util/timing.js';
 
 // ── Capability metadata (MCP 2025-06-18: title / annotations / outputSchema) ────────────────────────────
 // outputSchema property sets mirror the REAL top-level keys each engine returns (captured by running the
@@ -553,7 +554,18 @@ export async function handleRpc(msg) {
           return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(refusal, null, 2) }], isError: true } };
         }
 
-        const out = await tool.run(args);
+        // THE FOURTH SITE AGAIN, for the second cross-cutting field. §2.3 promises `elapsedMs` on
+        // every response, and this surface — the free one, the one a builder and a judge try first —
+        // returned it on none of its nine tools. The HTTP path is covered by one wrapper over
+        // `SERVICES[].run`; `handleRpc` reaches `TOOLS[].run` and would have been left out by it, the
+        // same way it was left out of the validators until the enum guard above was written here too.
+        //
+        // Stamped by the shared helper rather than by a `Date.now()` pair inlined here, so the two
+        // surfaces cannot disagree about where the field goes — and it goes INSIDE the proof or
+        // observation block, because the content hash is taken over the engine's result and the recipe
+        // this response publishes tells the caller to recompute over the response with that block
+        // removed. See src/util/timing.js.
+        const out = await timedRun(() => tool.run(args));
 
         // Attached after the fact and only ever as siblings, so the proof envelope this tool built is
         // untouched and its contentHash still covers exactly {engine, codeHash, inputs, result}.

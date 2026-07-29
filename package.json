@@ -34,6 +34,8 @@
     "calibrate:div": "node gates/calibrate-divergence.mjs",
     "gate:e": "node --test gates/gateE-ethproof-anchor.mjs",
     "gate:e-revert": "node gates/gateE-revert.mjs",
+    "gate:l": "node --test gates/gateL-elapsed-timing.mjs",
+    "gate:l-revert": "node gates/gateL-revert.mjs",
     "preflight": "node gates/preflight.mjs",
     "watchdog": "node gates/watchdog.mjs",
     "gate:f": "node --test gates/gateF-tvl-reconstruct.mjs",

@@ -196,9 +196,17 @@ check('nothing about the routing table reaches the advertised inputSchema',
 // exactly that. It now enumerates BOTH handler arrays and asserts each is non-empty first.
 const EMITS_ZK = /env\.proof|obs\.snark|buildInBackground/;
 const SNAPS = /gridSnapFields\s*\(/;
+// BOTH bodies, never one instead of the other. `SERVICES[].run` is wrapped at the foot of
+// src/services.js so every response carries its own `elapsedMs`, and a closure stringifies to the
+// wrapper rather than to the handler — which made this check see zero HTTP handlers and report
+// `[mcp:perp_gate]` as the whole proof-emitting set. Reading the wrapper AND the function it
+// published as `.unwrapped` restores exactly the source this check read before, and adds the
+// wrapper's own source to it. A future wrapper that does NOT publish its inner function still
+// collapses the set, and the assertion below still goes red, which is how this one was found.
+const bodyOf = (fn) => `${String(fn || '')}\n${String(fn?.unwrapped || '')}`;
 const handlers = [
-  ...SERVICES.map((s) => ({ surface: 'http', name: s.name, body: String(s.run || '') })),
-  ...TOOLS.map((t) => ({ surface: 'mcp', name: t.name, body: String(t.run || '') })),
+  ...SERVICES.map((s) => ({ surface: 'http', name: s.name, body: bodyOf(s.run) })),
+  ...TOOLS.map((t) => ({ surface: 'mcp', name: t.name, body: bodyOf(t.run) })),
 ];
 const id = (h) => `${h.surface}:${h.name}`;
 const emitting = handlers.filter((h) => EMITS_ZK.test(h.body)).map(id).sort();

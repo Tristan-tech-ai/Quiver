@@ -12,6 +12,62 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the paper named a field a caller could hold us to, and nine services did not carry it
+
+Section 2.3 of the paper says, of the services it has just finished quoting latencies for: *"Every
+response carries an `elapsedMs` field so a caller can hold the service to its own timing."* Measured
+against the live endpoint, a `perp_gate` response carried no such key. Swept across every service and
+every input form the catalogue accepts, the field was present on 8 of 31 HTTP response forms and on
+**0 of 15** on the free MCP surface. All nine deterministic risk engines — the ones a caller most
+wants to time — carried none, and no wrapper on either surface added one.
+
+That is worse than a stale number. The sentence names a field and tells a reader to hold the service
+to account with it, so a judge who follows the invitation finds nothing. **The field was added rather
+than the sentence deleted**, because the promise is worth keeping and the machinery already times
+these calls.
+
+**Where it went, and why that was the hard part.** `elapsedMs` is a new field in *every* response, and
+the content hash is taken over `{engine, codeHash, inputs, result}` where `result` is the engine's
+return value. Each response then publishes a recipe telling the caller to recompute over *"this
+response WITHOUT its `proof` key"*. A new key at the **top level** would therefore sit inside what the
+caller hashes and outside what the service hashed: the stored hash would not move, and every published
+proof would silently stop verifying — including the worked exhibit of Appendix C, against an envelope
+whose own text says a mismatch means the response was altered. So the field goes **inside** the proof
+or observation block, where the caller's own recipe strips it, and where `codeHash`, `observedAtUtc`
+and `attestation` already live for the same reason: a timing is provenance of the call, not part of
+the computation.
+
+Measured, not reasoned: all **24** deterministic content hashes across both surfaces are byte-identical
+to the values recorded before the field existed, and the Appendix C exhibit still returns
+`8575ce5ae5bfae9c…` on the paid path and the free one, with the published recipe reproducing it
+verbatim. `src/engine/` is untouched, the build hash is still `q1-e1fa99d08887d6cc`, and the MCP
+`tools/list` is byte-identical to the live service at 30,041 bytes, so nothing on the OKX registry
+surface moves.
+
+**The second claim in the same sweep was corrected instead of implemented.** Section 8's limitations
+list said *"Every output that touches a decision carries a not-advice disclosure."* Measured: a
+disclosure ships on **10 of the 13** observation services and on **none of the 9** deterministic risk
+engines, and a live `perp_gate` response contains no occurrence of the word. Unlike a timing, a
+disclosure is an editorial assertion that would have to be written per service, and the three engines
+that carry one today carry it *inside* `result` — so adding it there for the rest would move every
+content hash those services publish. Section 8 is the section that argues we count carefully against
+ourselves; the honest repair there is an accurate count, not a field added to make a sentence pass.
+Sections 3.5 and 8 now state the measured numbers, as does `docs/limitations.md`.
+
+`gates/gateL-elapsed-timing.mjs` (`npm run gate:l`) sweeps all 22 services and every input form on
+both surfaces rather than sampling one, asserts the field on every response, and pins the 24
+deterministic content hashes to their pre-change values. `npm run gate:l-revert` puts the defect back
+twice — remove the field, and move it to the top level — and requires the gate to go red both times
+and name the services; under the first revert `gate:m` stays green, which is how fifteen of the
+twenty-two services could carry no such field at all with every check in the repository green.
+
+Two things a reader of this entry should know. `assets/whitepaper.part4.md` now has **85 bytes** of
+headroom against the 55 kB packing budget, down from 173: the next prose added to sections 6 to 8
+re-cuts the document and moves section 8 into part 5. And the recipe defect above is not fully closed —
+a response carrying `inputRepairs` or `howToFix` already fails its own published verification
+instruction for the same reason a top-level `elapsedMs` would have. That is a pre-existing defect in a
+different field, measured and reported in `docs/elapsedms.md`, not fixed here.
+
 ## 29 July 2026 — four published claims had stopped being true, and the gate that guards buyers had never been shown able to fail
 
 Four things were wrong in documents a reviewer reads, and one of them was wrong in the worst possible

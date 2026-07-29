@@ -1,9 +1,9 @@
 {
-  "at": "2026-07-28T07:02:21.160Z",
+  "at": "2026-07-29T22:51:00.392Z",
   "passed": true,
   "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
-  "proveMs": 967,
-  "acceptGas": "276476",
+  "proveMs": 1050,
+  "acceptGas": "276892",
   "rejectGas": "573",
   "verifierBytes": 7694,
   "pool": {

@@ -1,0 +1,45 @@
+{
+  "at": "2026-07-29T23:21:43.661Z",
+  "passed": true,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "proveMs": 1054,
+  "acceptGas": "279280",
+  "rejectGas": "573",
+  "verifierBytes": 8754,
+  "pool": {
+    "x": 1500000,
+    "y": 3750000,
+    "fee": 0.003,
+    "dx": 15000,
+    "realized": 36900
+  },
+  "servedAdverseBps": 31.99,
+  "certifiedBps": 31.991173521,
+  "servedAdverseValueOut": 118.42628989,
+  "certifiedShortfall": 118.42628989,
+  "marginalOverBenchmark": {
+    "benchmarkAcceptGas": 276892,
+    "headlineAcceptGas": 279280,
+    "gas": 2388,
+    "benchmarkBytes": 7694,
+    "headlineBytes": 8754,
+    "bytes": 1060
+  },
+  "publicSignals": [
+    "21888242871839275222246405745257275088548364400416034343698203881625808495617",
+    "0",
+    "14219238002690",
+    "5227936573710110",
+    "1000000000",
+    "37018426289890",
+    "118426289890",
+    "1500000000000000",
+    "3750000000000000",
+    "15000000000000",
+    "3000000",
+    "14955000000000",
+    "37018426289890",
+    "36900000000000",
+    "31991173521"
+  ]
+}

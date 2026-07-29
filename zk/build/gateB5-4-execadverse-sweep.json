@@ -1,0 +1,118 @@
+{
+  "at": "2026-07-29T23:26:58.468Z",
+  "passed": true,
+  "samples": 4000,
+  "kept": 3596,
+  "diverged": 0,
+  "outOfDomain": 404,
+  "outOfBpsDomain": 0,
+  "violations": 0,
+  "feeViolations": 0,
+  "bpsViolations": 0,
+  "tightestRatio": 0.7934342926576123,
+  "tightestFeeRatio": 1,
+  "tightestBpsRatio": 0.9997165210493837,
+  "worstHeadlineGapBps": 0.0049987990000062155,
+  "worstAllowanceBps": 0.005000000651464755,
+  "worstAllowanceUsed": 0.9997596697396055,
+  "boundTerms": {
+    "display": 0.005,
+    "bpsGrid": 5e-10,
+    "fillGrid": 1.7383758902200798e-12,
+    "benchmark": 1.4872637857358552e-10,
+    "ieee": 1e-12
+  },
+  "shortfall": {
+    "diverged": 0,
+    "worstGapTokens": 6.999999691004177e-9,
+    "worstAllowanceTokens": 1.5348795126729455e-8,
+    "worstUsed": 0.4560618363335825
+  },
+  "gOutReuse": {
+    "worstMeasured": 4.999947122996673e-9,
+    "derivedBound": 6.46077370657983e-9,
+    "used": 0.7738929345110152
+  },
+  "soundnessWindow": {
+    "effectiveInputGridSteps": 1,
+    "benchmarkGridSteps": 1.3445581913893865,
+    "headlineBpsWidest": 0.021697681415263476,
+    "headlineBpsWidestAtFill": 0.00059783,
+    "tradesOverPublishedStep": 5,
+    "keptTrades": 3596,
+    "largestFillOverPublishedStep": 0.00264237,
+    "publishedPrecisionBps": 0.01,
+    "verdictThresholdBps": 5
+  },
+  "boundIsBreakable": [
+    {
+      "label": "a MID-price benchmark",
+      "mode": "mid",
+      "why": "the confusion this whole service exists to prevent — unavoidable cost relabelled as adverse execution",
+      "mustBreak": true,
+      "over": 3596,
+      "under": 0,
+      "refusalRate": 1,
+      "worstMult": 214613.58363868337,
+      "worstRelativeBenchmarkError": 0.1091155402940434,
+      "worstAbsGridSteps": 37014269304662220
+    },
+    {
+      "label": "a 1e-6 relative slip in the benchmark",
+      "mode": "slip:1e-6",
+      "why": "just above the derived sensitivity of ~5e-7",
+      "mustBreak": true,
+      "over": 3447,
+      "under": 149,
+      "refusalRate": 0.9585650723025584,
+      "worstMult": 3.14051146384134,
+      "worstRelativeBenchmarkError": 0.0000010057240930657228,
+      "worstAbsGridSteps": 365542688906.19275
+    },
+    {
+      "label": "a 1e-7 relative slip in the benchmark",
+      "mode": "slip:1e-7",
+      "why": "just below it — this one MUST get through, or the line is not where the derivation puts it",
+      "mustBreak": false,
+      "over": 328,
+      "under": 3268,
+      "refusalRate": 0.09121245828698554,
+      "worstMult": 1.2020680725344572,
+      "worstRelativeBenchmarkError": 1.0543881613104374e-7,
+      "worstAbsGridSteps": 36554268836.9751
+    },
+    {
+      "label": "reading the DISPLAY-ROUNDED benchmark",
+      "mode": "display",
+      "why": "the liquidation and Kelly defect twice over",
+      "mustBreak": false,
+      "over": 0,
+      "under": 3596,
+      "refusalRate": 0,
+      "worstMult": 0,
+      "worstRelativeBenchmarkError": 2.0552841656611542e-16,
+      "worstAbsGridSteps": 29.802322387695312
+    },
+    {
+      "label": "the Math.round(v*1e9) encoder",
+      "mode": "honest",
+      "why": "the encoder gate B5-1 caught, wrong by up to 64 grid steps above 1e8 reserves",
+      "mustBreak": false,
+      "over": 0,
+      "under": 3596,
+      "refusalRate": 0,
+      "worstMult": 0,
+      "worstRelativeBenchmarkError": 5.407118627155982e-9,
+      "worstAbsGridSteps": 59.604644775390625
+    }
+  ],
+  "worst": {
+    "x": 230558308.01917213,
+    "y": 967480170.7267499,
+    "dx": 687820.7421446951,
+    "fee": 0.0005,
+    "realized": 2851082.1665687035,
+    "servedBps": 87.5,
+    "certBps": 87.495001201
+  }
+}

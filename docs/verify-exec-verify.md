@@ -69,12 +69,14 @@ magnitudes exec-verify actually sees. Measured over 4,000 sampled pools (3,595 p
 405 outside the circuit's 2^62 width). All figures are **grid steps of 1e-9 output token, maximum over
 the bucket**, against an exact-rational reference computed in BigInt at 1e-24:
 
-| reserve bucket | n | encoder alone | + input snapping | the ENGINE's own error | cert vs served | the OLD `Math.round` encoder | rearranged algebra |
-|---|---|---|---|---|---|---|---|
-| `max(x,y) < 9e6` | 2061 | 3 | 5 | 5 | 8 | 1 | 3 |
-| `9e6 … 1e8` | 625 | 3 | 5 | 5 | 8 | 8 | 3 |
-| `1e8 … 1e9` | 533 | 3 | 5 | 12 | 11 | **64** | 3 |
-| `≥ 1e9` | 376 | 3 | 5 | 30 | 30 | 255 | 3 |
+| reserve bucket | n | encoder alone | + input snapping | the ENGINE's own error | cert vs served | OLD encoder, input | OLD encoder, fill | rearranged algebra |
+|---|---|---|---|---|---|---|---|---|
+| `max(x,y) < 9e6` | 2061 | 3 | 5 | 5 | 8 | 1 | 5 | 3 |
+| `9e6 … 1e8` | 625 | 3 | 5 | 5 | 8 | 8 | 5 | 3 |
+| `1e8 … 1e9` | 533 | 3 | 5 | 12 | 11 | **64** | 8 | 3 |
+| `≥ 1e9` | 376 | 3 | 5 | 30 | 30 | 255 | 30 | 3 |
+
+Reproduce it with `node zk/scripts/probe-execverify-encoding.mjs`, which prints exactly this table.
 
 Four things fall out of that table.
 
@@ -319,6 +321,7 @@ New, all mine, none of them touching a sibling's circuit or gate:
 - `zk/scripts/gateB5-3-execadverse.mjs` — prove / verify / refuse, 13 dishonest witnesses
 - `zk/scripts/gateB5-4-execadverse-sweep.mjs` — against the live engine, with the derived bound and five breakers
 - `zk/scripts/gateB5-5-execadverse-evm.mjs` — the exported verifier in an EVM, and the marginal cost over B5-2
+- `zk/scripts/probe-execverify-encoding.mjs` — the blocker-2 attribution table, reproducible rather than quoted
 
 Run, unmodified: `zk/scripts/gateB5-0-constantproduct.mjs`, `gateB5-1-constantproduct-sweep.mjs`,
 `gateB5-2-constantproduct-evm.mjs`.

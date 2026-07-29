@@ -38,7 +38,7 @@ import { buildInBackground } from './util/snark.js';
 import { gridSnapFields } from './util/grid.js';
 import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
-import { repairBody, correctedExample } from './util/repair.js';
+import { repairBody, correctedExample, enumViolations, enumRefusal } from './util/repair.js';
 
 // ── Capability metadata (MCP 2025-06-18: title / annotations / outputSchema) ────────────────────────────
 // outputSchema property sets mirror the REAL top-level keys each engine returns (captured by running the
@@ -81,8 +81,18 @@ const TOOLS = [
       type: 'object',
       properties: {
         symbol: { type: 'string', description: 'perp symbol (e.g. BTC) — auto-fills live markPrice, fundingRateHourly, and the margin source (Hyperliquid notional tiers or dYdX maintenance rate); also defaults entryPrice to the live mark' },
-        venue: { type: 'string', enum: ['hyperliquid', 'dydx'], description: 'live-data venue (default hyperliquid)' },
-        side: { type: 'string', enum: ['long', 'short'], description: 'default long' },
+        // Same escape hatch as services.js, for the same reason: an unsupported venue is now refused
+        // at the schema rather than by the adapter, so the "pass the numbers yourself" route has to
+        // live somewhere a refused caller can still read it.
+        venue: { type: 'string', enum: ['hyperliquid', 'dydx'], description: 'live-data venue (default hyperliquid). The maths is venue-agnostic — for any other venue omit this and pass maxLeverage/markPrice/fundingRateHourly yourself.' },
+        // Was `['long','short']` here while services.js — the schema repairBody is actually handed —
+        // declared `['long','short','buy','sell']`. Narrower is not safer: a client validating its own
+        // arguments against this list would have rejected `sell`, which the engine has always accepted.
+        // gates/gateC-case-sensitivity.mjs test 6 caught the drift the moment it appeared.
+        // `-1` joined the list when an unrecognised value stopped being served as long and started
+        // being refused: perpGate.js:29 honours the string "-1" as short, so leaving it undeclared
+        // would have refused a call that answers correctly. Reasoned out in services.js.
+        side: { type: 'string', enum: ['long', 'short', 'buy', 'sell', '-1'], description: 'long | short (buy | sell are accepted synonyms, as is -1 for short); default long' },
         entryPrice: { type: 'number', description: 'defaults to live mark if a symbol is given' },
         size: { type: 'number', description: 'position size in base units (or pass notional)' },
         notional: { type: 'number', description: 'position notional in quote/USD' },
@@ -186,9 +196,22 @@ const TOOLS = [
     inputSchema: {
       type: 'object',
       properties: {
-        positions: { type: 'array', description: 'legs: {venue, asset|symbol, side long|short, size, entryPrice, markPrice?, margin|leverage, maxLeverage|maintMarginRate|marginTiers}. A Hyperliquid symbol auto-fills live mark/leverage/tiers.' },
+        // Mirrors services.js. An enum declared HERE and not there is decoration: handleRpc repairs
+        // against the SERVICES entry, so the constraint a client reads off tools/list would never be
+        // applied to the arguments it sends. gates/gateC-case-sensitivity.mjs asserts the two agree.
+        positions: {
+          type: 'array',
+          description: 'legs: {venue, asset|symbol, side long|short, size, entryPrice, markPrice?, margin|leverage, maxLeverage|maintMarginRate|marginTiers}. A Hyperliquid symbol auto-fills live mark/leverage/tiers.',
+          items: {
+            type: 'object',
+            description: 'one leg; see the array description for the full field list',
+            properties: {
+              side: { type: 'string', enum: ['long', 'short', 'buy', 'sell'], description: 'long | short (buy | sell are accepted synonyms); a negative size also reads as short' },
+            },
+          },
+        },
         account: { type: 'string', description: 'OR: a Hyperliquid account address (0x…) — the full live book (positions, margins, equity, venue liquidation prices) is pulled keylessly; explicit positions take precedence.' },
-        betaTier: { type: 'string', description: 'beta regime for the factor stress: mild | moderate | severe — cross-event validated tiers (pre-registered). Default = worst-case single-event table; explicit betas override.' },
+        betaTier: { type: 'string', enum: ['mild', 'moderate', 'severe'], description: 'beta regime for the factor stress: mild | moderate | severe — cross-event validated tiers (pre-registered). Default = worst-case single-event table; explicit betas override.' },
         shockScenariosPct: { type: 'array', description: 'correlated market moves (%) to stress; default [5,10,20,30]' },
       },
     },
@@ -327,7 +350,7 @@ const TOOLS = [
           items: {
             type: 'object', required: ['type', 'strike', 'iv', 'quantity'],
             properties: {
-              type: { type: 'string', description: 'call | put' }, strike: { type: 'number', description: 'strike price' },
+              type: { type: 'string', enum: ['call', 'put'], description: 'call | put' }, strike: { type: 'number', description: 'strike price' },
               expiryDays: { type: 'number', description: 'days to expiry (or pass T in years)' }, T: { type: 'number', description: 'years (or expiryDays)' },
               iv: { type: 'number', description: 'implied vol decimal, e.g. 0.6' },
               quantity: { type: 'number', description: 'signed: + long, − short' },
@@ -507,13 +530,40 @@ export async function handleRpc(msg) {
           ? repairBody(svc, params.arguments || {})
           : { body: params.arguments || {}, repairs: [], missing: [] };
 
+        // THE FOURTH SITE, and the one that needs its own line. On the paid surface every request
+        // passes `s.validate()`, so wrapping the validators in services.js closed `/api/*` and both
+        // diag testers at once. `handleRpc` calls `svc.validate()` NOWHERE: after repairBody the
+        // repaired body IS the engine input, which is why an enum declared only in this file was
+        // decoration and why a guard written only in services.js would have left this surface —
+        // the free one, the one a judge tries first — still answering `side:"banana"` as a long.
+        //
+        // Refused in the shape this surface already uses for a rejected input: `ok:false` with
+        // `errors` and a sendable `howToFix`, wrapped in `isError`, exactly as an engine refusal
+        // arrives twenty lines below. Same sentence as the paid path, from the same function, so the
+        // two surfaces cannot describe one refusal two ways. Nothing is charged on MCP at all.
+        const violations = svc ? enumViolations(svc, args) : [];
+        if (violations.length) {
+          const refusal = {
+            ok: false,
+            errors: [enumRefusal(violations)],
+            unknownEnumValues: violations,
+            howToFix: correctedExample(svc, args, missing),
+            ...(repairs.length ? { inputRepairs: { applied: repairs } } : {}),
+          };
+          return { jsonrpc: '2.0', id, result: { content: [{ type: 'text', text: JSON.stringify(refusal, null, 2) }], isError: true } };
+        }
+
         const out = await tool.run(args);
 
         // Attached after the fact and only ever as siblings, so the proof envelope this tool built is
         // untouched and its contentHash still covers exactly {engine, codeHash, inputs, result}.
         if (svc && out && typeof out === 'object') {
           if (repairs.length) {
-            out.inputRepairs = { applied: repairs, note: 'Your arguments were normalised before running. Shapes only: no value was supplied, defaulted or guessed.' };
+            // Same correction as the paid path (app.js): "shapes only" stopped being true when step 6 of
+            // repair.js gained a declared enum to rewrite a VALUE against. Kept word-for-word identical
+            // to the HTTP note, because a caller comparing the free surface to the paid one reading two
+            // different disclosures of the same behaviour is its own small defect.
+            out.inputRepairs = { applied: repairs, note: 'Your arguments were normalised before running. No value was supplied, defaulted or guessed: every change above is a re-reading of what you sent — params lifted out of a wrapper, a key matched to the one this service declares, a written number or boolean read as one, or a value matched case-insensitively to one of the alternatives this service declares for that key. A value matching none of them is passed through exactly as you wrote it.' };
           }
           const misroute = suggestService(svc, args, SERVICES);
           if (misroute) {

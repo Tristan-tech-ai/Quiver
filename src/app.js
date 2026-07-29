@@ -575,7 +575,12 @@ for (const s of SERVICES) {
     if (repairs.length && answer && typeof answer === 'object') {
       // Reported, never silent. A caller has to be able to see that the body they sent is not quite
       // the body that was priced.
-      answer.inputRepairs = { applied: repairs, note: 'Your request was normalised before pricing. Shapes only: no value was supplied, defaulted or guessed.' };
+      // The note used to read "Shapes only: no value was supplied, defaulted or guessed." Step 6 of
+      // repair.js rewrites a VALUE — `side: "SHORT"` is served as `"short"` — so "shapes only" had
+      // stopped being true the moment the enums were declared. The three promises that matter are kept
+      // and the claim narrowed to what is actually enforced: every change is a re-reading of the
+      // caller's own bytes, and a value matching no declared alternative is passed through untouched.
+      answer.inputRepairs = { applied: repairs, note: 'Your request was normalised before pricing. No value was supplied, defaulted or guessed: every change above is a re-reading of what you sent — params lifted out of a wrapper, a key matched to the one this service declares, a written number or boolean read as one, or a value matched case-insensitively to one of the alternatives this service declares for that key. A value matching none of them is passed through exactly as you wrote it.' };
     }
     const misroute = answer && typeof answer === 'object' ? suggestService(s, raw, SERVICES) : null;
     if (misroute) {

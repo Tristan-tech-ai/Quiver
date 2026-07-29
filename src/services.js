@@ -30,6 +30,9 @@ import { eventVol } from './engine/eventVol.js';
 import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 import { portfolioGate } from './engine/portfolioGate.js';
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
+// The other half of the enum contract: repair.js resolves a value to a declared alternative where it
+// can, and reports the ones it cannot so this file can refuse them. See the wrapper below `SERVICES`.
+import { enumViolations, enumRefusal } from './util/repair.js';
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
@@ -213,7 +216,14 @@ export const SERVICES = [
         symbol: { type: 'string', description: 'CEX pair, e.g. BTC-USDT or just BTC (defaults quote USDT) — routes to OKX public candles instead of the DEX feed' },
         interval: { type: 'string', description: '1m|5m|15m|1H|4H|1D' },
         lookback: { type: 'number', description: 'number of candles (10-300)' },
-        quality: { type: 'string', description: 'fast (default, browserless) | full (high-detail, browser)' },
+        // `quality` and `theme` are compared raw (chartPress.js:115 and :41) and fall through to the
+        // cheaper/darker default, so `"FULL"` silently bought the fast tier and `"LIGHT"` returned a dark
+        // chart. `chartType`, `format` and `interval` are NOT listed on purpose: each is already read
+        // through a lowercasing consumer (chartPress.js:43, :48, okx-market.js:13 mapBar), so a declared
+        // enum would recase the echoed input without changing a single served pixel — a moved
+        // contentHash bought with no correction. The rule is "declare where miscasing changes the
+        // ANSWER", and it is applied here in both directions.
+        quality: { type: 'string', enum: ['fast', 'full'], description: 'fast (default, browserless) | full (high-detail, browser)' },
         chartType: { type: 'string', description: 'candles (default) | heikin | line | area | renko' },
         logScale: { type: 'boolean', description: 'logarithmic price axis' },
         format: { type: 'string', description: 'png (default) | svg (vector, fast tier only)' },
@@ -224,7 +234,7 @@ export const SERVICES = [
         indicators: { type: 'array', description: 'e.g. [{type:"EMA",period:20},{type:"BOLL"},{type:"RSI"},{type:"VOL"},{type:"ICHIMOKU"}]', items: { type: 'object' } },
         drawings: { type: 'array', description: 'e.g. [{type:"hline",price,label},{type:"rect",p1:{index,price},p2},{type:"fib",p1,p2,extension?},{type:"trendline",p1,p2},{type:"ray",p1,p2},{type:"channel",p1,p2,width},{type:"measure",p1,p2},{type:"vline",index},{type:"text",index,price,text},{type:"longshort",side,entry,stop,target,entryIndex?,exitIndex?},{type:"orderline",side,price,label?}]', items: { type: 'object' } },
         annotations: { type: 'array', description: '[{index,price,text}]', items: { type: 'object' } },
-        theme: { type: 'string', description: 'dark | light' },
+        theme: { type: 'string', enum: ['dark', 'light'], description: 'dark | light' },
       },
     },
     validate: (b) => {
@@ -241,7 +251,13 @@ export const SERVICES = [
   {
     name: 'poly-fill', path: '/api/poly-fill', price: config.prices.polyFill,
     blurb: 'Pre-trade fill simulation on a Polymarket market: executable avg price + slippage for $X',
-    inputSchema: { type: 'object', required: ['market', 'usd'], properties: { market: { type: 'string', description: 'slug / conditionId / question text' }, side: { type: 'string', description: 'YES|NO' }, action: { type: 'string', description: 'buy|sell' }, usd: { type: 'number' }, maxSlippagePct: { type: 'number' } } },
+    // `action` carries an enum and `side` deliberately does not, and the difference is measured rather
+    // than stylistic: polyFill.js:33 reads side through `String(side).toUpperCase()`, so `"no"` already
+    // resolves to the NO book and declaring an enum there would only recase the echoed input — moving a
+    // contentHash for a request that was already answered correctly. `action` is compared raw
+    // (polyFill.js:44/47), so `"SELL"` walked the ASK book: measured on a 40/60 book, a seller was
+    // quoted 60c and 166.7 shares instead of 40c and 250 — the buy side of the market, priced as theirs.
+    inputSchema: { type: 'object', required: ['market', 'usd'], properties: { market: { type: 'string', description: 'slug / conditionId / question text' }, side: { type: 'string', description: 'YES|NO' }, action: { type: 'string', enum: ['buy', 'sell'], description: 'buy|sell' }, usd: { type: 'number' }, maxSlippagePct: { type: 'number' } } },
     validate: (b) => (b?.market && Number(b?.usd) > 0 ? { market: String(b.market), side: b.side, action: b.action, usd: Number(b.usd), maxSlippagePct: b.maxSlippagePct != null ? Number(b.maxSlippagePct) : null } : { error: 'require { market, usd>0 }' }),
     // A slug that is well-formed but names no live market is a caller's typo, not a server fault.
     // It used to surface as `HTTP 500 engine_error, detail: no active Polymarket market matched "…"` —
@@ -272,7 +288,13 @@ export const SERVICES = [
   {
     name: 'options-desk', path: '/api/options-desk', price: config.prices.optionsDesk,
     blurb: 'Live crypto options intelligence from Deribit: IV term structure, skew, max pain, put/call OI, DVOL regime',
-    inputSchema: { type: 'object', required: ['currency'], properties: { currency: { type: 'string', description: 'BTC | ETH | SOL' }, focus: { type: 'string', description: 'all | expiries' } } },
+    // `currency` needs no enum — validate() below uppercases it and refuses anything outside BTC/ETH/SOL,
+    // so case never reaches the engine. `focus` does: optionsDesk.js compares it raw (`focus === 'all'`,
+    // `focus === 'expiries'`, `focus === 'greeks'`, `focus === 'headline'`), so `"ALL"` matched no branch
+    // and returned STRICTLY LESS than sending nothing at all — greeksSurface dropped and expiries
+    // truncated to three, under the word "all". The enum lists the four values the engine actually
+    // distinguishes, which is two more than the old description admitted to.
+    inputSchema: { type: 'object', required: ['currency'], properties: { currency: { type: 'string', description: 'BTC | ETH | SOL' }, focus: { type: 'string', enum: ['all', 'expiries', 'greeks', 'headline'], description: 'all (default) | expiries | greeks | headline' } } },
     cacheKey: (b) => `od:${String(b.currency).toUpperCase()}`, cacheTtl: 30000,
     // A REQUIRED subject parameter is never silently defaulted. A call whose params were dropped in
     // transit (the marketplace funnel does this) would otherwise receive a confident BTC options
@@ -408,8 +430,32 @@ export const SERVICES = [
       type: 'object',
       properties: {
         symbol: { type: 'string', description: 'perp symbol (e.g. BTC) — auto-fills live markPrice, fundingRateHourly, and the margin source (Hyperliquid notional tiers, or dYdX maintenance rate)' },
-        venue: { type: 'string', description: 'live-data venue: hyperliquid (default) | dydx' },
-        side: { type: 'string', description: 'long | short' }, entryPrice: { type: 'number', description: 'defaults to live mark if a symbol is given' },
+        // THE ENUMS ARE LOAD-BEARING, NOT DECORATION. `src/util/repair.js` step 6 case-corrects a value
+        // against its declared `enum`, and only against a declared one. Without the array below, a caller
+        // who wrote `side: "SHORT"` fell through perpGate's `s === 'short' || s === 'sell' ? -1 : 1` to
+        // LONG and was served the liquidation price of the opposite position, self-checked and signed.
+        // `buy`/`sell` are listed because the engine has always honoured them (perpGate.js:29) — leaving
+        // them out would have left `"SELL"` reading as long, which is the same wrong answer wearing a
+        // different word. Declared HERE rather than only in src/mcp.js because repairBody is handed the
+        // SERVICES entry on both surfaces, so an enum declared only on the MCP tool is advertised and
+        // never applied. See hackathon/CASE_SENSITIVITY_FIX.md.
+        //
+        // `-1` IS IN THE LIST FOR THE SAME REASON `sell` IS. Now that a value matching no declared
+        // alternative is REFUSED rather than served as long (see the wrapper at the foot of this file),
+        // the enum stopped being only a repair target and became the definition of what this key
+        // accepts. `perpGate.js:29` honours the string "-1" as short — measured, 108,641.98, the
+        // correct answer — so omitting it would have turned a request that answers CORRECTLY today
+        // into a refusal, which is a worse defect than the one being fixed. The NUMBER -1 is honoured
+        // too and needs no declaration: the guard, like repair.js, only ever looks at strings.
+        // The escape hatch moved INTO the schema when the enum started being enforced. It used to be
+        // reachable only from the adapter's own refusal (`hyperliquid.js:99`), which a caller now
+        // never sees because `venue: "okx"` is refused at validation, before any venue is resolved.
+        // The sentence is worth more than the code path: the liquidation MATH is venue-agnostic, so a
+        // caller on an unsupported venue is one field away from the number they wanted, and a refusal
+        // that only says "no" would be strictly less useful than the one it replaced.
+        venue: { type: 'string', enum: ['hyperliquid', 'dydx'], description: 'live-data venue: hyperliquid (default) | dydx. The maths is venue-agnostic — for any other venue omit this and pass maxLeverage/markPrice/fundingRateHourly yourself.' },
+        side: { type: 'string', enum: ['long', 'short', 'buy', 'sell', '-1'], description: 'long | short (buy | sell are accepted synonyms, as is -1 for short); default long' },
+        entryPrice: { type: 'number', description: 'defaults to live mark if a symbol is given' },
         size: { type: 'number', description: 'position size in base units' }, notional: { type: 'number' },
         margin: { type: 'number', description: 'isolated margin (or pass leverage)' }, leverage: { type: 'number' },
         maintMarginRate: { type: 'number', description: 'e.g. 0.0125 (or pass maxLeverage/symbol; mmr=0.5/maxLev)' }, maxLeverage: { type: 'number' },
@@ -582,9 +628,29 @@ export const SERVICES = [
     inputSchema: {
       type: 'object',
       properties: {
-        positions: { type: 'array', description: 'legs across venues: {venue, asset|symbol, side, size, entryPrice, markPrice?, margin|leverage, maxLeverage|maintMarginRate|marginTiers}. A Hyperliquid symbol auto-fills live mark/leverage/margin-tiers.' },
+        positions: {
+          type: 'array',
+          description: 'legs across venues: {venue, asset|symbol, side, size, entryPrice, markPrice?, margin|leverage, maxLeverage|maintMarginRate|marginTiers}. A Hyperliquid symbol auto-fills live mark/leverage/margin-tiers.',
+          // A PARTIAL item schema, deliberately. The full leg shape is documented on the array above and
+          // stays there; what is declared here is the one leg field whose VALUE is constrained, because
+          // `enum` is the only thing repair.js can act on. `side: "SHORT"` on a leg used to read as LONG
+          // (portfolioGate.js:30, the same fall-through as perpGate.js:29), which turned a perfectly
+          // hedged book — one long, one short — into a doubled-up 200,000 directional bet, with every
+          // self-check passing. No `additionalProperties: false`: a leg carrying the other documented
+          // fields is still valid against this schema, exactly as before.
+          items: {
+            type: 'object',
+            description: 'one leg; see the array description for the full field list',
+            properties: {
+              side: { type: 'string', enum: ['long', 'short', 'buy', 'sell'], description: 'long | short (buy | sell are accepted synonyms); a negative size also reads as short' },
+            },
+          },
+        },
         account: { type: 'string', description: 'OR: a Hyperliquid account address (0x…) — the FULL live book (positions, margins, account equity, venue liquidation prices) is pulled keylessly and gated; no manual typing. Explicit positions take precedence.' },
-        betaTier: { type: 'string', description: 'beta regime for the factor stress: mild | moderate | severe — cross-event VALIDATED tiers (pre-registered; H1 Spearman 0.657, H2 out-of-sample relative risk 14.3×). Default = the worst-case single-event Oct-10 table. Explicit betas override.' },
+        // Unlisted, `betaTier: "SEVERE"` failed the `['mild','moderate','severe'].includes(...)` test at
+        // portfolioGate.js:127 and silently fell back to the default Oct-10 table — a DIFFERENT stress
+        // number returned under the tier the caller asked for, with nothing in the response saying so.
+        betaTier: { type: 'string', enum: ['mild', 'moderate', 'severe'], description: 'beta regime for the factor stress: mild | moderate | severe — cross-event VALIDATED tiers (pre-registered; H1 Spearman 0.657, H2 out-of-sample relative risk 14.3×). Default = the worst-case single-event Oct-10 table. Explicit betas override.' },
         shockScenariosPct: { type: 'array', description: 'correlated market moves (%) to stress; default [5,10,20,30]' },
       },
       // Exactly one book source is required: an explicit `positions` array OR an `account` address to pull
@@ -706,7 +772,11 @@ export const SERVICES = [
           items: {
             type: 'object', required: ['type', 'strike', 'iv', 'quantity'],
             properties: {
-              type: { type: 'string', description: 'call | put' }, strike: { type: 'number' },
+              // Every `type` that was not the literal "put" was priced as a CALL (optionsRisk.js:32), so
+              // `"PUT"` flipped portfolio delta from −0.680134 to +0.319866 and the mark-to-model by
+              // 10,000 on a single leg — while all six finite-difference greek checks passed, because
+              // they verify the book the engine chose, not the book the caller described.
+              type: { type: 'string', enum: ['call', 'put'], description: 'call | put' }, strike: { type: 'number' },
               expiryDays: { type: 'number' }, T: { type: 'number', description: 'years to expiry (or use expiryDays)' },
               iv: { type: 'number', description: 'implied vol, decimal e.g. 0.6' }, quantity: { type: 'number', description: 'signed: + long, − short' },
               forward: { type: 'number', description: 'per-position forward (else shared)' },
@@ -792,5 +862,40 @@ export const SERVICES = [
     run: (i) => proofEnvelope('event-vol', i, eventVol(i), config.version),
   },
 ];
+
+// ── AN UNRECOGNISED ENUM VALUE IS REFUSED, NOT SERVED ────────────────────────────────────────────
+//
+// The half the case-sensitivity work explicitly did NOT close. `side: "SHORT"` is repaired to `short`;
+// `side: "banana"` matched no declared alternative, was passed through exactly as written, and
+// `perpGate.js:29` read it as LONG. Same shape at `portfolioGate.js:30` (→ long) and
+// `optionsRisk.js:32` (anything not `"put"` → call). The caller got a confident, self-checked, signed,
+// billable answer about the OPPOSITE position, and every self-check passed, because a self-check
+// verifies the book the engine chose rather than the book the caller described.
+//
+// WHY THIS IS A WRAPPER AND NOT NINE EDITS. Each service's own `validate` is about the fields that
+// service reasons about; the enum rule is about every field ANY service declares, including ones added
+// tomorrow. Written into each validator it would be nine places to forget; written here it is derived
+// from `inputSchema` and cannot fall behind a schema it reads. Three of the four call sites that reach
+// an engine on this host go through `s.validate` — the paid `/api/*` route (app.js:548) and both
+// gated diag testers (app.js:410, app.js:425) — so all three close from this one line. The FOURTH is
+// `handleRpc` in mcp.js, which never calls `validate()` at all; it carries the same guard explicitly,
+// because a fix that covered three of four sites is the miss this repository has now made repeatedly.
+//
+// ORDER IS DELIBERATE: the service's own verdict FIRST. Only a body that validates today can be
+// refused by this, so not one refusal message that a caller reads today changes wording — the blast
+// radius is exactly the set of requests that were being answered wrongly.
+//
+// AND IT IS FREE. `err.status = 400` on the paid path is thrown from inside the x402 handler, which
+// returns before `/settle` is ever called (x402.js:255-264) — the same path every other `bad_input`
+// refusal takes. Verified rather than assumed, in gateU test 6.
+for (const s of SERVICES) {
+  const inner = s.validate;
+  s.validate = (b) => {
+    const v = inner(b);
+    if (v && v.error) return v;
+    const violations = enumViolations(s, b);
+    return violations.length ? { error: enumRefusal(violations) } : v;
+  };
+}
 
 export const byName = Object.fromEntries(SERVICES.map((s) => [s.name, s]));

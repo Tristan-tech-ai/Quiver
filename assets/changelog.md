@@ -12,6 +12,38 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — an unrecognised value is refused instead of being answered as something else
+
+`src/engine/` is untouched, the build hash is unchanged at `q1-e1fa99d08887d6cc`, and no content
+hash has moved for any request that already worked. `npm test` is unchanged at 386 tests, 381
+passing, 5 skipped, 0 failing.
+
+**What was wrong.** The case fix earlier the same day made `side: "SHORT"` answer as the short it
+means. It did nothing for `side: "banana"` — or `"lng"`, or `""`, or any of the other spellings that
+match no declared alternative — because `repair.js` matches a declared value or leaves the value
+exactly as written, and `perpGate.js:29` reads anything unrecognised as **long**. Measured across
+nine declared enum fields and seven illegal spellings each: **all 63 rows were served, on both
+surfaces.** Seven distinct signed content hashes each attested a long position to a caller who never
+wrote the word "long"; a perfectly hedged book read as net +200,000; any option `type` but `put`
+priced as a call.
+
+**What changed.** A value matching no declared alternative is now refused before an engine is
+reached, with a message naming the field, quoting back what was sent, listing every legal value and
+attaching a corrected body. Refusals are free on both surfaces. The guard is the exact complement of
+the repair layer — same case-insensitive comparison, same declared set — so no value the repairer
+accepts can be one the guard refuses.
+
+`perp-gate.side` gained `'-1'` as a declared alternative, because the engine honours the string and
+answers it correctly; leaving it out would have turned a correct answer into a refusal.
+`perp-gate`'s advertised `inputSchema` grew 145 bytes and every other service's is byte-identical.
+The OKX registry surface is untouched: 22 services, same endpoint, agent 5152, same `codeHash`.
+
+Held by `gates/gateU-unknown-enum.mjs` (`npm run gate:u`) and `gates/gateU-revert.mjs`, which puts
+the guard back — on each surface separately, and once in the over-firing direction — and requires
+the gate to go red on the exact rows measured above. Write-up: `docs/unknown-enum-refusal.md`.
+
+---
+
 ## 29 July 2026 — a fifth site said the same thing in a verb the new gate does not read
 
 Documentation only. `src/engine/` is untouched, the build hash is unchanged at `q1-e1fa99d08887d6cc`,

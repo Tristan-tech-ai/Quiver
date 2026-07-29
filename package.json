@@ -48,7 +48,13 @@
     "gate:p2": "node --test gates/gateP-sealed-provenance.mjs",
     "gate:p-revert": "node gates/gateP-revert.mjs",
     "gate:w": "node --test gates/gateW-divergence-guard.mjs",
-    "gate:w-revert": "node gates/gateW-revert.mjs"
+    "gate:w-revert": "node gates/gateW-revert.mjs",
+    "gate:c": "node --test gates/gateC-case-sensitivity.mjs",
+    "gate:c-revert": "node gates/gateC-revert.mjs",
+    "gate:x": "node --test gates/gateX-paper-contradiction.mjs",
+    "gate:x-revert": "node gates/gateX-revert.mjs",
+    "gate:u": "node --test gates/gateU-unknown-enum.mjs",
+    "gate:u-revert": "node gates/gateU-revert.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",

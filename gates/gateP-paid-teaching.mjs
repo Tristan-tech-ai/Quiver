@@ -203,12 +203,34 @@ test('an answer that is delivered is still billed, and its contentHash has not m
 test('an engine refusal (ok:false) is still served free, with its not_charged receipt', async () => {
   // isChargeable's contract, on the wire. This path is NOT the throw path above — it returns 200 with
   // ok:false — and the two must not have been conflated by the change.
-  const r = await paidCall('/api/perp-gate', { symbol: 'BTC', venue: 'okx', size: 1, leverage: 10 });
+  //
+  // THE FIXTURE CHANGED, AND THE REASON MATTERS. This used to drive `perp-gate {venue:"okx"}`, whose
+  // refusal came from the venue registry inside `run`. Since the unknown-enum guard (see
+  // hackathon/UNKNOWN_ENUM_REFUSAL.md) `venue:"okx"` is refused at VALIDATION — earlier, and before
+  // any venue is resolved — so it exercises the throw path above, not this one. Replaced with a
+  // caller mistake that is still only knowable after the engine has looked at it: a Solana chain
+  // carrying an EVM address. No network is reached; `chainAddressMismatch` fires first.
+  const r = await paidCall('/api/tape-pulse', { chain: 'solana', address: '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2' });
   assert.equal(r.status, 200);
   assert.equal(r.json.ok, false);
   assert.equal(r.billed, false, 'an input the engine rejected is not a delivery');
   const receipt = JSON.parse(Buffer.from(r.payResponse, 'base64').toString('utf8'));
   assert.equal(receipt.status, 'not_charged');
+});
+
+test('and the refusal that moved EARLIER is free too — a 400 is never settled', async () => {
+  // The other half of the swap above, so nothing is lost by it: the body that used to prove the
+  // ok:false path still has to prove it costs nothing, now on the path it actually takes. A guard
+  // that refused before payment could settle would be a silent revenue leak in the caller's favour;
+  // one that refused AFTER settling would be theft. It is the second that this asserts against.
+  const r = await paidCall('/api/perp-gate', { symbol: 'BTC', venue: 'okx', size: 1, leverage: 10 });
+  assert.equal(r.status, 400, 'an unknown enum value is refused before the engine, not after it');
+  assert.equal(r.billed, false, 'a refused request must never settle');
+  assert.match(JSON.stringify(r.json), /hyperliquid/, 'and the refusal must name what IS accepted');
+  // The teaching the adapter's own refusal used to carry has to survive the move, or this is a
+  // downgrade wearing a better status code.
+  assert.match(JSON.stringify(r.json), /venue-agnostic/,
+    'the "pass the numbers yourself" escape hatch must still reach a caller who named an unsupported venue');
 });
 
 // ── 3. the helper itself ──────────────────────────────────────────────────────────────────────────

@@ -241,18 +241,43 @@ for (const t of toolList.result.tools) {
 check('every MCP tool survives a wrapped, empty argument set', toolsThrew.length === 0,
   toolsThrew.length ? toolsThrew.join('; ') : `${toolsRun} tools called, none threw`);
 
-// ── 5. the static assets a judge reads have not moved ────────────────────────────────────────────
-let same = 0, parts = 0;
+// ── 5. the static assets a judge reads have not moved, or the difference is accounted for ────────
+//
+// THIS CHECK USED TO BE UNSATISFIABLE. It demanded every part be byte-identical to live, while
+// check 6 below demands the changelog be AHEAD of live. One asked for repo == live and the other for
+// repo > live, and the only state satisfying both was one in which the paper had not been touched.
+// The moment the paper is legitimately corrected this went red BY CONSTRUCTION and stayed red until
+// the correction was deployed — while this script is the gate that authorises the deploy. It blocked
+// precisely the deploy that would have made it green.
+//
+// It was not deleted or loosened. It exists to catch drift in what a judge reads, and a gate
+// weakened to erase a red is worse than no gate. What it now distinguishes is whether the difference
+// is ACCOUNTED FOR: a part whose text differs must be declared by content hash in
+// gates/paper-pending-deploy.json and covered by a changelog entry that has not yet shipped. The
+// hash is what makes that more than a formality — a second, unnoticed edit to a part that was
+// already named moves the hash and the declaration stops matching.
+//
+// It also stops reporting `0 of 7` when two parts changed. Every part's navigation header prints the
+// whole-document size, so a 116-byte edit tipped `Math.round(bytes/1024)` from 247 to 248 kB and
+// rewrote one line in all seven. That echo is now separated from a real change in the paper text —
+// but ONLY that one line: the header also carries the part map, so anything else differing in it is
+// treated as substantive, because it can be a section moving between parts.
+const { assessPaperParity } = await import('./paper-integrity.mjs');
+const paperParts = [];
 for (let i = 1; i <= 40; i++) {
   const f = join(ROOT, 'assets', `whitepaper.part${i}.md`);
   if (!existsSync(f)) break;
-  parts++;
-  try {
-    const live = await (await fetch(`${LIVE}/paper/${i}`)).text();
-    if (live === readFileSync(f, 'utf8')) same++;
-  } catch { /* counted as a mismatch */ }
+  let livePart = null;
+  try { livePart = await (await fetch(`${LIVE}/paper/${i}`)).text(); } catch { /* null blocks below */ }
+  paperParts.push({ n: i, repo: readFileSync(f, 'utf8'), live: livePart });
 }
-check('every paper part is still byte-identical to live', parts > 0 && same === parts, `${same} of ${parts}`);
+const parity = assessPaperParity({
+  parts: paperParts,
+  manifest: (() => { try { return JSON.parse(readFileSync(join(ROOT, 'gates', 'paper-pending-deploy.json'), 'utf8')); } catch { return null; } })(),
+  changelogRepo: readFileSync(join(ROOT, 'assets', 'changelog.md'), 'utf8'),
+  changelogLive: await (async () => { try { return await (await fetch(`${LIVE}/changelog`)).text(); } catch { return null; } })(),
+});
+check('every difference between the repo paper and live is declared and documented', parity.pass, parity.detail);
 
 // ── 6. the changelog is not stale ────────────────────────────────────────────────────────────────
 // The promise at /changelog is that behaviour changes are dated and published. A deploy that changes

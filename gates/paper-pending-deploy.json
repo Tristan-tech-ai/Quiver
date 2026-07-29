@@ -1,0 +1,49 @@
+{
+  "//": [
+    "WHAT THIS IS. The list of paper parts whose text this repository has deliberately changed and",
+    "not yet deployed, each pinned to the exact bytes that were approved and to the changelog entry",
+    "that explains them. gates/preflight.mjs check 5 reads it.",
+    "",
+    "WHY IT EXISTS. Check 5 used to require every part to be byte-identical to the live service, and",
+    "check 6 requires the changelog to be AHEAD of live. Together those demanded repo == live and",
+    "repo > live at the same time, so the first legitimate correction to the paper turned check 5",
+    "permanently red — and preflight is the gate that authorises the deploy that would clear it. The",
+    "check had to keep blocking undocumented drift while allowing a documented change through, and",
+    "the only signal that separates those two is one that binds to the BYTES.",
+    "",
+    "WHY A HASH AND NOT A SENTENCE. 'the changelog mentions the paper' is satisfied by an unrelated",
+    "entry. 'the changelog names the parts that changed' is satisfied twice over by a second,",
+    "unnoticed edit to a part that was already named — and since the parts are regenerated wholesale",
+    "by tools/paper-to-text.mjs, that is the likeliest accident there is. A hash is not satisfied by",
+    "anything except the bytes somebody actually looked at.",
+    "",
+    "WHY PER-PART CHANGELOG ENTRIES. On the day this was written the paper had been changed by two",
+    "separate corrections landing in different parts. One anchor for the whole file would have let the",
+    "second ride on the first one's paperwork.",
+    "",
+    "AFTER A DEPLOY these declarations become harmlessly stale: the parts match live again, so nothing",
+    "is demanded of them, and the pinned hashes still describe the tree. They stop matching the moment",
+    "a part changes again, which is the point — the next change has to be looked at and named too.",
+    "",
+    "NOTHING GENERATES THIS FILE. preflight prints the hash of any undeclared part when it blocks, so",
+    "the value can be pasted in after reading the diff; writing it is the act of saying 'I read this",
+    "and I meant it'."
+  ],
+  "parts": {
+    "1": {
+      "sha256": "0dad03f7e006b5e686d0d122c39f8a1fbb41fbff8a6283c5c15d99d8095a4f89",
+      "why": "§1 contributions and §3.6 — two of the four stale suite figures corrected in assets/whitepaper.html and regenerated",
+      "changelog": "## 29 July 2026 — the paper said the suite was bigger than it is, in four places, and a gate now says so"
+    },
+    "4": {
+      "sha256": "ab2c7dbffc8db907b27805ccf8eb07a97731f06b8af9729537bc98f4cc486a78",
+      "why": "§6.1 and the Table 2 caption — the other two of the four",
+      "changelog": "## 29 July 2026 — the paper said the suite was bigger than it is, in four places, and a gate now says so"
+    },
+    "7": {
+      "sha256": "615e6d05bf60120b8b95ae5dc366095afd8fb3ba0b089f8638803e8daf3d59d6",
+      "why": "Appendix B — a fifth site stating the same suite figure in a phrasing the gate's matcher did not read",
+      "changelog": "## 29 July 2026 — a fifth site said the same thing in a verb the new gate does not read"
+    }
+  }
+}

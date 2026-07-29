@@ -1,0 +1,106 @@
+{
+  "//": [
+    "THE SECTION-TO-PART CONTRACT. Hand-written, and NOTHING regenerates it — that is the entire",
+    "point of the file. assets/whitepaper.parts.json records the same mapping but is rewritten by the",
+    "same run of tools/paper-to-text.mjs that moves a boundary, so it agrees with every move and can",
+    "never witness its own drift. This file can, because changing it is a separate human act.",
+    "",
+    "WHY A MAPPING AND NOT A COUNT. tools/paper-to-text.mjs packs sections greedily against a 55,000",
+    "byte budget at section boundaries. Measured 29 July 2026: part 4 sat 173 bytes under budget, and",
+    "adding 465 bytes to section 6 moved section 8 (Limitations and Honest Disclosures) out of part 4",
+    "and into part 5 while the count stayed at seven. Every check in this repository watched the",
+    "count, so all of them stayed green through that move, while every citation telling a reader that",
+    "part 4 carries the limitations silently became wrong. The count is not the contract; this is.",
+    "",
+    "'sections' is what the splitter must produce, joined with two spaces, a pipe and two spaces.",
+    "'publications' is every place the mapping is stated in prose. Each 'mustContain' string is",
+    "matched BYTE FOR BYTE, deliberately: keyword-matching prose against generated headings was tried",
+    "on paper and rejected, because part 2 is published as 'the twenty-two services' and generated as",
+    "'4. Service Catalogue', and no keyword rule relates those without either false-positiving or",
+    "being loosened until it matches anything. Storing both sides verbatim asserts the weaker but",
+    "checkable property: the pairing a human approved is still the pairing being served AND the",
+    "pairing being published, and neither side may move without the other.",
+    "",
+    "TO CHANGE THE PAPER'S SHAPE ON PURPOSE: regenerate, run `npm run gate:y`, read what it says",
+    "moved, decide whether the published descriptions are still true of the new mapping, then update",
+    "BOTH this file and every publication it names. If that feels like friction, it is the friction",
+    "that was missing when assets/landing.html went on telling readers the paper had six parts."
+  ],
+  "minimumSitesChecked": 3,
+  "parts": [
+    { "n": 1, "sections": ["Abstract", "At a Glance", "Contents", "1. Introduction", "2. System Architecture", "3. Design Principles"] },
+    { "n": 2, "sections": ["4. Service Catalogue"] },
+    { "n": 3, "sections": ["5. Methodology"] },
+    { "n": 4, "sections": ["6. Verification and Testing", "7. Worked Walkthrough", "8. Limitations and Honest Disclosures"] },
+    { "n": 5, "sections": ["9. Related Work and Positioning", "10. The Build: Story, Process, and a User Scenario"] },
+    { "n": 6, "sections": ["11. Roadmap: Operating Quiver After the Hackathon", "12. Conclusion"] },
+    { "n": 7, "sections": ["Appendix A · API Reference", "Appendix B · Reproducibility", "Appendix C · Checkable Artifacts", "References"] }
+  ],
+  "publications": [
+    {
+      "file": "hackathon/QUIVER_SUBMISSION.md",
+      "what": "the submission a judge reads, which points them at specific parts",
+      "mustContain": [
+        "https://quiver-production-c3a8.up.railway.app/paper/1 — abstract, architecture, design principles",
+        "https://quiver-production-c3a8.up.railway.app/paper/2 — the twenty-two services",
+        "https://quiver-production-c3a8.up.railway.app/paper/3 — methodology",
+        "https://quiver-production-c3a8.up.railway.app/paper/4 — verification, walkthrough, limitations",
+        "https://quiver-production-c3a8.up.railway.app/paper/5 — related work, the build",
+        "https://quiver-production-c3a8.up.railway.app/paper/6 — roadmap, what the on-chain proof changes and what it does not, conclusion",
+        "https://quiver-production-c3a8.up.railway.app/paper/7 — appendices, checkable artifacts, references"
+      ]
+    },
+    {
+      "file": "assets/landing.html",
+      "what": "the service's own front page. It published a SIX-part index for days after the seventh part existed, and pointed a judge at part 6 for the checkable artifacts, which are in part 7. Nothing caught it: tools/docs-consistency.mjs has exactly the right rule and walks only .md files.",
+      "mustContain": [
+        "<li><span><a href=\"/paper/1\">/paper/1</a></span>abstract · architecture · design principles</li>",
+        "<li><span><a href=\"/paper/2\">/paper/2</a></span>the twenty-two services</li>",
+        "<li><span><a href=\"/paper/3\">/paper/3</a></span>methodology</li>",
+        "<li><span><a href=\"/paper/4\">/paper/4</a></span>verification · walkthrough · <b>limitations</b></li>",
+        "<li><span><a href=\"/paper/5\">/paper/5</a></span>related work · the build</li>",
+        "<li><span><a href=\"/paper/6\">/paper/6</a></span>roadmap · conclusion</li>",
+        "<li><span><a href=\"/paper/7\">/paper/7</a></span>appendices · <b>checkable artifacts</b> · references</li>"
+      ]
+    },
+    {
+      "file": "assets/whitepaper.html",
+      "what": "the paper's own index of its machine-readable edition. Read only — this file is the paper.",
+      "mustContain": [
+        "<span class=\"mono\">/paper/1</span> abstract, introduction, architecture, design principles",
+        "<span class=\"mono\">/paper/2</span> service catalogue",
+        "<span class=\"mono\">/paper/3</span> methodology",
+        "<span class=\"mono\">/paper/4</span> verification, walkthrough, limitations",
+        "<span class=\"mono\">/paper/5</span> related work, the build",
+        "<span class=\"mono\">/paper/6</span> roadmap and conclusion",
+        "<span class=\"mono\">/paper/7</span> appendices and references"
+      ]
+    },
+    {
+      "file": "hackathon/paper/quiver-whitepaper.html",
+      "what": "the copy the PDF is rendered from. A judge who downloads the PDF reads this index, not the served one.",
+      "mustContain": [
+        "<span class=\"mono\">/paper/1</span> abstract, introduction, architecture, design principles",
+        "<span class=\"mono\">/paper/2</span> service catalogue",
+        "<span class=\"mono\">/paper/3</span> methodology",
+        "<span class=\"mono\">/paper/4</span> verification, walkthrough, limitations",
+        "<span class=\"mono\">/paper/5</span> related work, the build",
+        "<span class=\"mono\">/paper/6</span> roadmap and conclusion",
+        "<span class=\"mono\">/paper/7</span> appendices and references"
+      ]
+    },
+    {
+      "file": "Quiver/README.md",
+      "what": "the repository README, the only site that publishes the mapping by section NUMBER",
+      "mustContain": [
+        "| [`/paper/1`](https://quiver-production-c3a8.up.railway.app/paper/1) | Abstract · At a Glance · Contents · 1 Introduction · 2 System Architecture · 3 Design Principles |",
+        "| [`/paper/2`](https://quiver-production-c3a8.up.railway.app/paper/2) | 4 Service Catalogue |",
+        "| [`/paper/3`](https://quiver-production-c3a8.up.railway.app/paper/3) | 5 Methodology |",
+        "| [`/paper/4`](https://quiver-production-c3a8.up.railway.app/paper/4) | 6 Verification and Testing · 7 Worked Walkthrough · 8 Limitations |",
+        "| [`/paper/5`](https://quiver-production-c3a8.up.railway.app/paper/5) | 9 Related Work · 10 The Build |",
+        "| [`/paper/6`](https://quiver-production-c3a8.up.railway.app/paper/6) | 11 Roadmap · 12 Conclusion |",
+        "| [`/paper/7`](https://quiver-production-c3a8.up.railway.app/paper/7) | Appendix A API · Appendix B Reproducibility · Appendix C Checkable Artifacts · References |"
+      ]
+    }
+  ]
+}

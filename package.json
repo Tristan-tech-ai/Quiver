@@ -53,6 +53,8 @@
     "gate:c-revert": "node gates/gateC-revert.mjs",
     "gate:x": "node --test gates/gateX-paper-contradiction.mjs",
     "gate:x-revert": "node gates/gateX-revert.mjs",
+    "gate:y": "node --test gates/gateY-paper-mapping.mjs",
+    "gate:y-revert": "node gates/gateY-revert.mjs",
     "gate:u": "node --test gates/gateU-unknown-enum.mjs",
     "gate:u-revert": "node gates/gateU-revert.mjs"
   },

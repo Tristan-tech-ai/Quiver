@@ -46,7 +46,9 @@
     "gate:m-revert": "node gates/gateM-revert.mjs",
     "gate:p": "node --test gates/gateP-paid-teaching.mjs",
     "gate:p2": "node --test gates/gateP-sealed-provenance.mjs",
-    "gate:p-revert": "node gates/gateP-revert.mjs"
+    "gate:p-revert": "node gates/gateP-revert.mjs",
+    "gate:w": "node --test gates/gateW-divergence-guard.mjs",
+    "gate:w-revert": "node gates/gateW-revert.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",

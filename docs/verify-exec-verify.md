@@ -199,12 +199,19 @@ this sweep found:
 | fill grid | `realized` snaps by half a step, `d(bps)/d(realized) = −1e4/out` | 1.74e-12 |
 | benchmark | `d(bps)/d(out) = 1e4·realized/out²`, times an a-priori `gOut` | 1.49e-10 |
 | IEEE | the engine's own cancellation, `out·1e-16`, carried through | 1.00e-12 |
-| **total** | | **5.000e-3** |
+| **total** | | **5.0000e-3** |
 
-Worst measured gap **4.999e-3 bps — the worst honest case uses 100.0% of the bound.** The shortfall
+The display step is 99.99% of the whole allowance, which is itself the finding behind the two blind
+spots recorded below: this bound's resolution is set almost entirely by how coarsely the service prints
+the number, not by anything in the circuit.
+
+Worst measured gap **4.9988e-3 bps against an allowance of 5.0000e-3 — the worst honest case uses
+99.98% of the bound** (the gate prints 100.0% at one decimal; the artifact records 0.99976). The shortfall
 statement carries its own derived allowance in tokens and the worst honest case uses **45.6%** of it
-(7.000e-9 tokens of 1.535e-8). The three circuit bounds are used at **79.3%** (invariant), **100.0%**
-(fee) and **99.97%** (headline) by the worst honest case in the sweep. None of them is slack.
+(7.000e-9 tokens of 1.535e-8). The three circuit bounds are used at **79.34%** (invariant), **100.00%**
+(fee — `2|Rf|/S` is exactly 1, an exact half-step tie, which is also why the effective-input window
+below is one grid step rather than zero) and **99.97%** (headline) by the worst honest case in the
+sweep. None of them is slack.
 
 **The first version of this bound could not fail, and the gate caught it.** `gOut` was measured as
 `|certified − served|` for the trade under test, so the allowance expanded to cover whatever the encoder

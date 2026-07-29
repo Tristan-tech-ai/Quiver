@@ -18,7 +18,7 @@ import { SERVICES } from '../src/services.js';
 import { repairBody } from '../src/util/repair.js';
 import { suggestService, REQUIRED_ALTERNATIVES } from '../src/util/routing.js';
 import { GENUINE, UNREACHABLE_BY_SHAPE, invalidFixtures, coverageSummary, noisyOnCorrectCalls } from './routing-fixtures.mjs';
-import { handleRpc } from '../src/mcp.js';
+import { handleRpc, TOOLS } from '../src/mcp.js';
 import { _internal, engineSourceFiles } from '../src/engine/proof.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -184,21 +184,44 @@ check('nothing about the routing table reaches the advertised inputSchema',
 // `portfolio-gate` was reported as a defect for never snapping. It emits no zk proof at all, so there
 // was nothing for a buyer to receive; `zk/circuits/portfoliogate.circom` is gated under `zk/` and
 // reaches no served path. The moment that changes, this check is what says so.
-const EMITS_ZK = /env\.proof|buildInBackground/;
+// THIS CHECK USED TO BE ABLE TO PASS OVER THE DEFECT IT EXISTS TO FIND.
+//
+// It read `SERVICES.map(s => s.run)` and nothing else. `src/mcp.js` keeps its own handler array —
+// nine tools, the free surface a builder tries first — and perp_gate there calls
+// `buildInBackground` with un-snapped inputs. The guard could not see that array at all, so it swept
+// twenty-two handlers, found the one that already complied, and reported "every service that builds
+// a zk proof snaps". Every word of that was true and the sentence was false, because "every service"
+// silently meant "every service on the HTTP surface". A check that cannot reach the code where the
+// invariant breaks is not a weak check, it is a decoration, and this codebase is organised against
+// exactly that. It now enumerates BOTH handler arrays and asserts each is non-empty first.
+const EMITS_ZK = /env\.proof|obs\.snark|buildInBackground/;
 const SNAPS = /gridSnapFields\s*\(/;
-const handlers = SERVICES.map((s) => ({ name: s.name, body: String(s.run || '') }));
-const emitting = handlers.filter((h) => EMITS_ZK.test(h.body)).map((h) => h.name).sort();
+const handlers = [
+  ...SERVICES.map((s) => ({ surface: 'http', name: s.name, body: String(s.run || '') })),
+  ...TOOLS.map((t) => ({ surface: 'mcp', name: t.name, body: String(t.run || '') })),
+];
+const id = (h) => `${h.surface}:${h.name}`;
+const emitting = handlers.filter((h) => EMITS_ZK.test(h.body)).map(id).sort();
+// Asserted per SURFACE, not over the union: the whole failure above was one surface contributing
+// zero handlers while the other carried the check. A union count of 22 looked healthy and was blind.
+for (const surface of ['http', 'mcp']) {
+  const n = handlers.filter((h) => h.surface === surface).length;
+  const withBodies = handlers.filter((h) => h.surface === surface && h.body.length > 20).length;
+  check(`the ${surface} handler array is visible to this check`, n > 0 && withBodies === n,
+    `${withBodies} of ${n} handlers stringified to a readable body`
+    + (withBodies === n ? '' : ' — an unreadable body makes this check pass over code it never examined'));
+}
 // Asserted first: a stringify that returned "[native code]" or empty bodies would find nothing and
 // report success over nothing, which is how a check stops being able to fail.
-check('the proof-emitting services are actually visible to this check',
+check('the proof-emitting handlers are actually visible to this check',
   emitting.length > 0,
   emitting.length ? `found ${emitting.join(', ')}` : `NOTHING MATCHED across ${handlers.length} handlers — this check proved nothing`);
-check('every service that builds a zk proof snaps its inputs onto that grid first',
+check('every handler that builds a zk proof snaps its inputs onto that grid first — on BOTH surfaces',
   handlers.every((h) => !EMITS_ZK.test(h.body) || SNAPS.test(h.body)),
-  handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map((h) => h.name).join(', ')
+  handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map(id).join(', ')
     || `${emitting.join(', ')} snap; the other ${handlers.length - emitting.length} build no proof`);
 check('the proof-emitting set is the one that has been checked',
-  emitting.length === 1 && emitting[0] === 'perp-gate',
+  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'mcp:perp_gate']. sort()),
   `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
 
 // ── 4. the new code paths actually run ───────────────────────────────────────────────────────────

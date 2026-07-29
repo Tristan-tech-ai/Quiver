@@ -48,6 +48,23 @@ function vToken(b) {
 }
 function vWallet(b) { return vToken(b); }
 
+const EVM_CHAINS = ['ethereum', 'base', 'bsc', 'xlayer', 'polygon', 'arbitrum'];
+
+// Does the address belong to a DIFFERENT chain family than the one named? `vToken` validates the two
+// fields independently, so `{chain:"solana", address:"0x…"}` passes it: each half is well-formed, and
+// only the PAIR is wrong. Returns the diagnosis plus the chain the address itself implies, so a
+// refusal can hand back a body that would work instead of a complaint.
+export function chainAddressMismatch(chain, address) {
+  const isEvmChain = EVM_CHAINS.includes(chain);
+  if (isEvmChain && SOL.test(address)) {
+    return { diagnosis: `chain "${chain}" is an EVM chain but "${address}" is a base58 (Solana) address — the pair cannot exist`, chain: 'solana', suggested: ['solana'] };
+  }
+  if (chain === 'solana' && EVM.test(address)) {
+    return { diagnosis: `chain "solana" was given a 0x… EVM address ("${address}") — the pair cannot exist`, chain: 'ethereum', suggested: EVM_CHAINS };
+  }
+  return null;
+}
+
 // A refusal must TEACH. A caller that reached the wrong service, or whose params were dropped in
 // transit (the marketplace funnel does this), can only self-correct if the rejection says what this
 // service IS and what it expects. Derived from the service's own published inputSchema + blurb, so
@@ -77,12 +94,75 @@ export function refusalDetail(s, err) {
   return String(err).includes(s.name) ? String(err) : `${err} | ${inputHint(s)}`;
 }
 
+// A CALLER MISTAKE THAT ONLY THE UPSTREAM COULD DETECT.
+//
+// The schema-refusal path above catches everything knowable from the body alone. Two mistakes are not:
+// a Polymarket slug that is well-formed but names no live market, and a token address that is
+// well-formed for the WRONG chain. Both used to escape as `HTTP 500 engine_error` — one reporting a
+// caller's typo as a server fault, the other pasting OKX's own `{"code":"51000","msg":"...param is
+// error"}` verbatim into the answer, which reads to a caller as "the service is down". Neither is a
+// fault and neither is billable.
+//
+// So they come back in the shape every other refusal here uses: `ok:false` with `errors` and a
+// `howToFix` carrying a body that would work. `ok:false` is load-bearing beyond politeness — it is
+// the exact condition `x402.isChargeable()` reads to SKIP settlement, so this refusal is free on the
+// paid path, served as 200 with `PAYMENT-RESPONSE: not_charged`, in a way a 500 never was (a 500
+// after verify but before settle also left the caller unbilled, but told them nothing and looked like
+// an outage). `refusalDetail`/`redirectLine` are the sibling shape used when the body alone is enough
+// to refuse; this one exists because these two need an upstream answer first.
+//
+// It deliberately does NOT swallow genuine upstream failure. Each call site matches one narrow,
+// enumerated symptom of caller error; anything else rethrows and stays a 500, because an outage
+// reported as a caller mistake is the same defect in the other direction.
+export function callerMistake(serviceName, diagnosis, correctedBody, extra = {}) {
+  const s = byName[serviceName];
+  return {
+    ok: false,
+    errors: [diagnosis],
+    refusalDetail: refusalDetail(s, diagnosis),
+    howToFix: {
+      missing: [],
+      send: { method: 'POST', url: s.path, body: correctedBody },
+      note: `This is a problem with the request, not with the service — nothing was computed and you were not charged. Send the body above to ${s.path}.`,
+    },
+    ...extra,
+  };
+}
+
 export const SERVICES = [
   {
     name: 'tape-pulse', path: '/api/tape-pulse', price: config.prices.tapePulse,
     blurb: 'Live DEX tape microstructure read (buy/sell imbalance, net flow, whale prints) for a token',
     inputSchema: tokenIn, cacheKey: (b) => `tp:${b.chain}:${b.address}`, cacheTtl: 20000,
-    validate: vToken, run: async (i) => observationEnvelope('tape-pulse', i, await tapePulse(i.chain, i.address), config.version),
+    validate: vToken,
+    // `vToken` checks the chain and the address SEPARATELY — both were individually well-formed for
+    // `{chain:"solana", address:"0xc02a…"}`, so the pair went upstream and came back as
+    // `HTTP 500 engine_error, detail: okx GET /api/v6/dex/market/trades -> 400 {"code":"51000",…}`.
+    // The mismatch is knowable here without asking anyone, so it is answered here.
+    //
+    // WHY ONLY THIS SERVICE. `vToken` is shared with token-scan, wallet-audit and chart-press, and the
+    // same mismatch is measured returning an honest `INSUFFICIENT_DATA` observation (HTTP 200) on
+    // token-scan and wallet-audit rather than a 500. Moving the check into the shared validator would
+    // have turned two answers that already work into refusals, and moved their contentHashes.
+    run: async (i) => {
+      const mism = chainAddressMismatch(i.chain, i.address);
+      if (mism) return callerMistake('tape-pulse', mism.diagnosis, { chain: mism.chain, address: i.address }, { suggestedChains: mism.suggested });
+      try {
+        return observationEnvelope('tape-pulse', i, await tapePulse(i.chain, i.address), config.version);
+      } catch (e) {
+        // Backstop for any OTHER shape of "this token does not exist on this chain" the pre-check
+        // cannot see (a well-formed EVM address that is not a token, a chain the index maps oddly).
+        // Narrow on purpose: only OKX's own parameter rejection, and the raw upstream string is
+        // reported as `upstreamDetail` rather than as the answer. Anything else rethrows and is a 500.
+        if (/tokenContractAddress param is error|"code":"51000"/.test(String(e.message || ''))) {
+          return callerMistake('tape-pulse',
+            `the DEX market index has no token at address "${i.address}" on chain "${i.chain}" — the upstream rejected the pair as a bad parameter`,
+            { chain: i.chain, address: '<a token contract address that exists on ' + i.chain + '>' },
+            { upstreamDetail: String(e.message).slice(0, 200) });
+        }
+        throw e;
+      }
+    },
   },
   {
     name: 'chart-press', path: '/api/chart-press', price: config.prices.chartPress,
@@ -124,7 +204,24 @@ export const SERVICES = [
     blurb: 'Pre-trade fill simulation on a Polymarket market: executable avg price + slippage for $X',
     inputSchema: { type: 'object', required: ['market', 'usd'], properties: { market: { type: 'string', description: 'slug / conditionId / question text' }, side: { type: 'string', description: 'YES|NO' }, action: { type: 'string', description: 'buy|sell' }, usd: { type: 'number' }, maxSlippagePct: { type: 'number' } } },
     validate: (b) => (b?.market && Number(b?.usd) > 0 ? { market: String(b.market), side: b.side, action: b.action, usd: Number(b.usd), maxSlippagePct: b.maxSlippagePct != null ? Number(b.maxSlippagePct) : null } : { error: 'require { market, usd>0 }' }),
-    run: async (i) => observationEnvelope('poly-fill', i, await polyFill(i), config.version),
+    // A slug that is well-formed but names no live market is a caller's typo, not a server fault.
+    // It used to surface as `HTTP 500 engine_error, detail: no active Polymarket market matched "…"` —
+    // a sentence that correctly diagnoses the caller and then files it under the wrong party. The
+    // diagnosis is kept; only its status, its shape and its billability change. The match is narrow so
+    // that a Polymarket outage (a fetch failure, a 5xx from Gamma) still rethrows as a genuine 500.
+    run: async (i) => {
+      try {
+        return observationEnvelope('poly-fill', i, await polyFill(i), config.version);
+      } catch (e) {
+        if (/no active Polymarket market matched/.test(String(e.message || ''))) {
+          return callerMistake('poly-fill',
+            `no active Polymarket market matched "${i.market}" — it is resolved, it never existed, or the slug is misspelt`,
+            { market: '<an ACTIVE market slug, conditionId, or the question text>', usd: i.usd },
+            { searched: i.market, findASlug: 'Slugs are the last path segment of a Polymarket event URL, e.g. https://polymarket.com/event/<slug>. A conditionId (0x…) or the full question text also resolves.' });
+        }
+        throw e;
+      }
+    },
   },
   {
     name: 'poly-desk', path: '/api/poly-desk', price: config.prices.polyDesk,

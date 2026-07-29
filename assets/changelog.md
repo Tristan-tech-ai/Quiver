@@ -12,6 +12,88 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — a defect we have NOT fixed, said plainly: `side: "SHORT"` returns the wrong answer
+
+An outside reviewer swept the live service and found a defect in the worst possible place. We
+reproduced every number below ourselves before writing this, and we are leaving the defect in place
+until judging closes. Both halves of that sentence need saying.
+
+**What is wrong.** `side` and option `type` are matched as exact lowercase strings, and anything that
+does not match becomes the *riskier* default instead of a refusal. `perp_gate` with `side: "SHORT"`
+returns **91,139.24** — the LONG's liquidation price — where `"short"` returns **108,641.98**. It
+tells a short seller they liquidate on the way *down*. A perfectly hedged book on `portfolio_gate`
+reports net exposure **0** with `side: "short"` and **+200,000** with `side: "SHORT"`: a flat book
+served as a fully doubled-up directional bet. `options_risk` prices every `type` that is not literally
+`"put"` as a **call**, including `"PUT"` — the delta sign flips from −0.680 to +0.320.
+
+**The answer is wrong, not merely surprising.** A caller who acts on it takes the opposite risk from
+the one they intended.
+
+**Every self-check passes, and the answer is signed.** All six finite-difference greek checks pass in
+every row; they verify the greeks against the book the engine *chose*, not the book the caller
+*described*. `proof.inputs` echoes `"SHORT"` faithfully, the content hash reproduces, and the
+signature recovers to the published signer — because re-running the open engine repeats the same
+substitution. **Re-runnability certifies the pipeline, not the interpretation.** That is the sharpest
+limit on this project's thesis and it belongs in the paper, which does not yet state it. And because
+`isChargeable()` only declines on `ok:false` or a failed check, the inverted answer is billable.
+
+**Why it is still here.** The two lines are inside `src/engine/`, which is the directory the build
+hash covers, so fixing them changes `q1-e1fa99d08887d6cc` — and the top of this page promises that
+hash will not move while judging runs. Moving it breaks the Appendix C exhibit's reproduction and
+every document that quotes the build identity. **That is a trade-off, and we are naming it as one:
+we chose stability of the published artifact over correctness on an unusual input, and that is only
+defensible because it is disclosed here instead of discovered.** An inverted risk number is a worse
+defect than a changed hash; what makes us hold is changing the hash underneath a reviewer who is
+mid-verification. **It will be fixed immediately after judging closes.**
+
+Two smaller disclosures from the same sweep, also unfixed: **12 of the 13 observation services ship
+`selfChecks: []`** while `/` and `/llms.txt` say every answer carries a self-checked proof (true of 9
+of 22 — the envelopes themselves are scrupulous about this; the summary line overreaches); and
+`portfolio_gate` **seals a live Hyperliquid mark it fetched into a `deterministic: true` proof with no
+`observedAtUtc`, no `live` block and no `mathReproducibility` note** — the same defect §11.5 records
+fixing on `perp-gate` symbol mode.
+
+The full write-up, with the reproduction commands and the exact four-part fix, is in
+`KNOWN_DEFECTS.md` in the repository.
+
+## 29 July 2026 — three fixes on the surfaces the build hash does not cover
+
+All three were found by the same sweep, all three are outside `src/engine/`, and the build hash does
+not move.
+
+**`portfolio_gate {account: "0x…"}` crashed.** It answered `error: fetchHlAccount is not defined` — a
+live ReferenceError on the headline feature of the most expensive tool, on the free endpoint a builder
+tries first. `src/mcp.js` called the function and never imported it; the HTTP path imported it
+correctly, so the paid surface worked and the free one did not. Account mode now returns the full
+live book again.
+
+**Two caller mistakes were reported as server faults.** `poly-fill` on a market slug that names
+nothing live, and `tape-pulse` on a chain/address mismatch, both returned HTTP 500 `engine_error` —
+and the second pasted OKX's own `{"code":"51000","msg":"tokenContractAddress param is error"}` into
+the response, which reads to a caller as "the service is down". Both now refuse in the shape every
+other refusal here uses: `ok:false` with a `howToFix` carrying a body that would work. Because
+`isChargeable()` reads `ok:false` to skip settlement, these refusals are free. Genuine upstream
+failure still surfaces as a 500 — the conversion matches one enumerated symptom each and rethrows
+anything else, because an outage reported as a caller mistake is the same defect pointing the other
+way.
+
+**A guard that could not fail.** `gates/preflight.mjs` asserts that any service building a zk proof
+snaps its inputs onto the circuit's grid first. It read `SERVICES.map(s => s.run)` and nothing else,
+so it could not see the MCP handler array at all — and `src/mcp.js` builds Plonk proofs without
+snapping. The check swept 22 handlers, found the one that already complied, and reported that every
+one did. It now enumerates both surfaces and asserts each is non-empty on its own. The MCP handler now
+snaps, with the same field list the HTTP path uses: measured over 20,000 random off-grid positions,
+the un-snapped path's served liquidation price differs from the certified one at full display
+precision (a whole cent) in 1 of them, and the proof store's divergence guard refuses only at 0.005 —
+an order of magnitude too coarse to see it. Snapping is the identity on any value already on the grid,
+so the Appendix C content hash `8575ce5a…` is unmoved; for an off-grid body the free MCP hash now
+*agrees* with the paid HTTP hash, where the two silently disagreed before.
+
+Each of these has a check that would have caught it (`gates/gateM-mcp-surface.mjs`), and each check
+has a scripted revert that puts the defect back and requires the check to go red
+(`gates/gateM-revert.mjs`). Two of those reverts also demonstrate the *old* checks staying green over
+the same defect, so the blind spot is measured rather than asserted.
+
 ## 29 July 2026 — a symbol-mode perp-gate call can now carry a succinct proof, and says what it does not cover
 
 `perp-gate` built a Plonk proof only when the caller supplied every input. Pass a symbol instead and

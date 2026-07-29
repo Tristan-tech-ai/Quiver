@@ -24,9 +24,18 @@ import { riskAttest } from './engine/riskAttest.js';
 import { eventVol } from './engine/eventVol.js';
 import { portfolioGate } from './engine/portfolioGate.js';
 import { proofEnvelope, observationEnvelope } from './engine/proof.js';
-import { enrichPerpInputs, enrichPortfolioLegs } from './adapters/hyperliquid.js';
+// `fetchHlAccount` is the account-mode reader behind portfolio_gate's headline feature ("OR just
+// account: a Hyperliquid 0x address, whose FULL live book … is pulled keylessly"). It was called on
+// the handler below and never imported, so every account-mode call over free MCP answered
+// `error: fetchHlAccount is not defined` — a live ReferenceError on the advertised feature of the
+// most expensive tool, while the HTTP path (services.js, which imports it correctly) worked. Nothing
+// caught it because the only gate that called the MCP tools sent `{ params: {} }` to all nine, and an
+// empty argument set never reaches the `0x…` branch. See gates/gateM-mcp-surface.mjs, which now calls
+// every tool with a body a caller would actually send.
+import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
 import { buildInBackground } from './util/snark.js';
+import { gridSnapFields } from './util/grid.js';
 import { SERVICES } from './services.js';
 import { suggestService } from './util/routing.js';
 import { repairBody, correctedExample } from './util/repair.js';
@@ -104,7 +113,38 @@ const TOOLS = [
       // opt-in proof flag without stripping it here would have done the identical thing — a caller
       // asking for a proof would have received a DIFFERENT content hash for the same position, and
       // the published appendix would have stopped matching the free endpoint a builder tries first.
-      const { live, snark: wantSnark, ...compute } = e;
+      const { live, snark: wantSnark, ...raw } = e;
+      // Snap onto the 1e-9 grid the succinct-proof circuit works over — the same call, with the same
+      // field list, that services.js has made on the paid HTTP path since the grid was introduced.
+      //
+      // WHY IT IS HERE NOW. This handler builds a Plonk proof (`buildInBackground`, below) and did not
+      // snap, so the identity the circuit certified was computed from `toScaled`-encoded values while
+      // the ANSWER was computed from the caller's raw doubles. Those are two different positions:
+      // measured over 20,000 random off-grid positions, the served liquidationPrice differs at full
+      // DISPLAY precision (a whole cent: 44339.55 vs 44339.54) in 1 of them, and the proof store's
+      // divergence guard cannot see it — that guard refuses at 0.005, which is the 2dp display
+      // rounding, an order of magnitude coarser than what this leaks. So it built, and it certified a
+      // neighbouring position, silently.
+      //
+      // THE OBJECTION, AND WHY IT POINTS THE OTHER WAY. Snapping was previously declined here because
+      // it would ship "a proof of a nearby position". That is the sentence at the top of util/grid.js
+      // and it describes NOT snapping: the circuit encodes via toScaled either way, so the encoded
+      // integers are identical whether this line runs or not. What the line changes is which position
+      // the ENGINE was asked about. Without it the proof is about a neighbour of the answer; with it
+      // the answer moves by at most 1e-9 of an input and the proof is about the answer.
+      //
+      // WHAT IT MOVES. Nothing that is published. Snapping is the identity on any value already on the
+      // grid, which is every input in the Appendix C exhibit (`{side:"long", entryPrice:64000, size:1,
+      // leverage:10, maintMarginRate:0.0125}`) — contentHash 8575ce5a… re-measured unchanged after
+      // this line, over MCP, which is the surface the appendix was captured from. For an OFF-grid body
+      // the contentHash does move, and it moves TO the one the paid HTTP endpoint already returns for
+      // the same request: measured before this change, `/api/perp-gate` and `/mcp` returned
+      // 2a74cc10… and 4be119f5… for one identical body. The paper claims the free answer IS the paid
+      // answer for these nine engines; that was false off-grid, and this is the line that makes it
+      // true. Snapping only when a snark is requested would have been the smaller diff and is the
+      // wrong shape — it is exactly the "same position hashes differently depending on whether a proof
+      // was asked for" trap that `wantSnark` is destructured out above to avoid.
+      const compute = gridSnapFields(raw, ['entryPrice', 'size', 'notional', 'margin', 'leverage', 'maintMarginRate', 'maxLeverage', 'markPrice']);
       // A venue this service cannot resolve is a caller error, not an answer. Serving the maths with
       // the complaint embedded produced a signed result carrying an error string, which is neither a
       // refusal nor a usable answer. Refuse, name what is supported, and say how to get the number

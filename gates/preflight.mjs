@@ -228,9 +228,46 @@ check('every handler that builds a zk proof snaps its inputs onto that grid firs
   handlers.every((h) => !EMITS_ZK.test(h.body) || SNAPS.test(h.body)),
   handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map(id).join(', ')
     || `${emitting.join(', ')} snap; the other ${handlers.length - emitting.length} build no proof`);
+// FOUR ENTRIES NOW, AND EACH ADDITION IS A DECISION RECORDED HERE RATHER THAN A DRIFT NOTICED LATER.
+//
+//   http:perp-gate / mcp:perp_gate   the liquidation identity, over `liquidation_plonk.zkey`.
+//     Grid: entryPrice, size, notional, margin, leverage, maintMarginRate, maxLeverage, markPrice.
+//     Leverage is snapped even though the circuit has no term for it, because the engine DERIVES
+//     margin from it and the quotient lands off-grid otherwise.
+//
+//   http:treasury-risk / mcp:treasury_risk   the Herfindahl identity, over `concentration_plonk.zkey`.
+//     Grid: `amountUsd` on each position, and nothing else. The circuit's own inputs are the SHARES,
+//     which the engine forms by grouping and dividing — no snap can put a quotient on the grid, and
+//     the guard's encoding term carries a full half step per share because of it. What snapping the
+//     amounts buys is that the quotient the engine divides is the double a reader recomputing from
+//     `proof.inputs` would form. `apyPct`, `pegTarget` and `depegProbAnnual` reach no circuit.
+//
+//   http:size-gate / mcp:size_gate   the discrete-Kelly identity, over `kelly_plonk.zkey`.
+//     Grid: winProb and winLossRatio, and deliberately nothing else. `kelly.circom` has terms for p
+//     and b alone, so `bankroll`, `kellyFraction` and `drawdownLevels` are left where the caller put
+//     them — snapping a field no circuit can see would move a content hash and buy nothing. The
+//     continuous-mode pair is untouched for the same reason: f* = mu/sigma^2 is a different identity
+//     with no circuit on this host, and that handler refuses a proof for it by name rather than
+//     certifying the discrete statement about numbers that never entered it.
+//
+// The list is written out rather than counted so that adding a service cannot pass by arithmetic.
 check('the proof-emitting set is the one that has been checked',
-  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'mcp:perp_gate']. sort()),
+  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk'].sort()),
   `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
+
+// AND EACH CIRCUIT'S ARTIFACTS ARE ACTUALLY IN THIS BUILD. A handler that emits a proof against a key
+// the deploy does not carry fails at prove time, in a worker, on a background path nobody is waiting
+// on — the record lands as `failed` and the caller sees a `building` that never finishes. Deploy time
+// is where that is cheap to catch, which is the same argument the grid check above is here for.
+for (const [circuit, files] of Object.entries({
+  liquidation: ['liquidation_plonk.zkey', 'vk_plonk.json', 'liquidation_js/liquidation.wasm', 'liquidation_js/witness_calculator.cjs'],
+  kelly: ['kelly_plonk.zkey', 'kelly_vk.json', 'kelly_js/kelly.wasm', 'kelly_js/witness_calculator.cjs'],
+  concentration: ['concentration_plonk.zkey', 'concentration_vk.json', 'concentration_js/concentration.wasm', 'concentration_js/witness_calculator.cjs'],
+})) {
+  const missing = files.filter((f) => !existsSync(join(ROOT, 'assets', 'zk', f)));
+  check(`every artifact the ${circuit} circuit proves against is in this build`, missing.length === 0,
+    missing.length ? `missing under assets/zk: ${missing.join(', ')}` : `${files.length} files present`);
+}
 
 // ── 4. the new code paths actually run ───────────────────────────────────────────────────────────
 // A 500 discovered in production is the failure this deploy is supposed to avoid, so every MCP tool is

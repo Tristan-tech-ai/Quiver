@@ -12,7 +12,7 @@ import { repairBody, correctedExample } from './util/repair.js';
 import { sealContentHashRecipe } from './util/recipe.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
-import { getProof, verificationKey, warmProver } from './util/snark.js';
+import { getProof, verificationKey, warmProver, CIRCUITS } from './util/snark.js';
 // Every one of these is async — see util/proofStore.js for why there is no synchronous read left on
 // either backend. `kind()` is the exception and does no I/O at all.
 import { durable as proofsAreDurable, count as storedProofCount, kind as proofStoreKind, durabilityNote } from './util/proofStore.js';
@@ -271,13 +271,43 @@ app.get('/proof/vk', (_req, res) => {
   });
 });
 
+// A SECOND CIRCUIT NEEDS A SECOND KEY, and this route exists rather than a query parameter on the
+// one above because `/proof/vk` is a published URL: the paper quotes it, every liquidation proof
+// carries it as a string, and re-pointing it at a key selector would change what an existing caller
+// gets back. So `/proof/vk` keeps meaning exactly the liquidation key it has always meant, and each
+// further circuit gets its own path. `/proof/:contentHash` matches two path segments and this matches
+// three, so the two cannot collide however they are ordered.
+//
+// An unknown circuit is a 404 that NAMES the ones that exist. Answering "no key" without saying which
+// keys there are is the shape of refusal this codebase keeps replacing: a caller holding a proof they
+// cannot check has no way to discover the right URL from the wrong one.
+app.get('/proof/vk/:circuit', (req, res) => {
+  const name = String(req.params.circuit || '').toLowerCase();
+  const vk = verificationKey(name);
+  if (!vk) {
+    return res.status(404).json({
+      error: 'verification_key_unavailable',
+      circuit: name,
+      available: CIRCUITS,
+      note: `This host proves ${CIRCUITS.join(' and ')}. Each proof record names its own circuit and carries the URL of the key that checks it; /proof/vk without a circuit is the liquidation key, for the perp-gate proofs that have always been served there.`,
+    });
+  }
+  res.set('cache-control', 'public, max-age=86400');
+  res.json({
+    protocol: 'plonk',
+    circuit: name,
+    note: 'Verify with: snarkjs plonk verify <this> <publicSignals> <proof>. Plonk rather than Groth16 deliberately — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so a proof under it is forgeable by us. This key derives from the public Hermez powers-of-tau.',
+    verificationKey: vk,
+  });
+});
+
 // `async` because the store is. A missing `await` on getProof would serialise a Promise as `{}` and
 // answer 200 with an empty body — which is why gate A asserts on this route's JSON rather than on the
 // store's return value.
 app.get('/proof/:contentHash', async (req, res) => {
   const h = String(req.params.contentHash || '').toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(h)) {
-    return res.status(400).json({ error: 'bad_content_hash', note: 'Pass the 64-character proof.contentHash from a perp-gate response.' });
+    return res.status(400).json({ error: 'bad_content_hash', note: 'Pass the 64-character proof.contentHash from a perp-gate or size-gate response.' });
   }
   const rec = await getProof(h);
   if (!rec) {
@@ -291,18 +321,44 @@ app.get('/proof/:contentHash', async (req, res) => {
     return res.status(404).json({
       error: 'no_proof_for_that_hash',
       note: durable
-        ? 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Finished proofs are stored by content hash and survive a redeploy, so this hash was never proved here; ask again and it will be built.'
+        ? 'A proof is built only when a perp-gate or size-gate call asks for one with {"snark": true}. Finished proofs are stored by content hash and survive a redeploy, so this hash was never proved here; ask again and it will be built.'
         : proofStoreKind() === 'in-memory only'
-          ? 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.'
-          : `A proof is built only when a perp-gate call asks for one with {"snark": true}. Durable storage is CONFIGURED BUT NOT WORKING here, so this miss may be the store rather than the hash: ${why}`,
+          ? 'A proof is built only when a perp-gate or size-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.'
+          : `A proof is built only when a perp-gate or size-gate call asks for one with {"snark": true}. Durable storage is CONFIGURED BUT NOT WORKING here, so this miss may be the store rather than the hash: ${why}`,
     });
   }
   if (rec.status === 'building') return res.status(202).json({ status: 'building', retryAfterMs: 900, contentHash: h });
   if (rec.status !== 'ready') return res.status(409).json({ status: rec.status, error: rec.error || null, contentHash: h });
+  // WHICH IDENTITY THIS PROOF IS ABOUT. Absent on every record built before this host knew a second
+  // circuit, and absent on every liquidation record built since — the field is written only when the
+  // circuit is NOT liquidation, so the default here is what makes the thousands of already-published
+  // perp-gate proofs serialise to the byte they always did. gates/gateS-live-input-snark.mjs pins that
+  // key list exactly; it is the check that would catch this going wrong.
+  const circuit = rec.circuit || 'liquidation';
+  const kelly = circuit === 'kelly';
+  const hhi = circuit === 'concentration';
   res.json({
     status: 'ready', contentHash: h, protocol: rec.protocol,
+    // Spread, so a liquidation response has no `circuit` key at all and its shape is unmoved. A Kelly
+    // proof announces itself, because a reader who fetched this hash may never have seen the answer
+    // it came from and has no other way to know which key checks it or what the signals mean.
+    ...(rec.circuit ? { circuit: rec.circuit } : {}),
     proof: rec.proof, publicSignals: rec.publicSignals,
     encodedInputs: rec.encoded, gapToServedPrice: rec.gapToServedPrice,
+    // A bankroll fraction is not a price, and giving it the price's field name would be the schema
+    // itself telling a reader something false. Present only on a Kelly record.
+    ...(rec.gapToServedFraction !== undefined ? { gapToServedFraction: rec.gapToServedFraction } : {}),
+    ...(rec.gapToServedIndex !== undefined ? { gapToServedIndex: rec.gapToServedIndex } : {}),
+    ...(hhi ? {
+      signalLayout: ['residual', 'tolerance', 'weightSlack', 'wHat[0..7]', 'hHat'],
+      proves: 'Ĥ·S = Σ ŵᵢ² over the scaled integers, with the residual R and a one-grid-step tolerance published as signals 0 and 1, and the drift of the shares from summing to the whole book published as signal 2. The proven bound is 2|R| <= S, which says Ĥ is the CORRECTLY ROUNDED Herfindahl index of these shares rather than merely a number near it.',
+      doesNotProve: 'That the shares are a real treasury. They are inputs, and the circuit has no term for where a balance came from. It also covers the byAsset dimension alone; the treasury-risk answer this hash came from publishes byVenue and byChain beside it, and neither is here.',
+    } : {}),
+    ...(kelly ? {
+      signalLayout: ['residual', 'tolerance', 'pHat', 'bHat', 'fHat'],
+      proves: 'f*·b = p·b + p - 1 over the scaled integers, with the residual R and the tolerance b̂ published as signals 0 and 1 so a verifier sees the slack actually used rather than being asked to trust that it was small. The proven bound is 2|R| <= b̂.',
+      doesNotProve: 'That the edge is real, or that the recommendation was this number. The circuit takes p and b as given and has no term for kellyFraction, so signal 4 is the FULL-Kelly ceiling; the size-gate answer this hash came from recommends a fraction of it.',
+    } : {}),
     // Two separate claims, and the caller gets both or neither is implied. The proof says the
     // arithmetic is right; the attestation says Quiver stands behind these exact eight field
     // elements. Absent when no signing key is configured — an unattested proof is still a proof,
@@ -310,7 +366,11 @@ app.get('/proof/:contentHash', async (req, res) => {
     // key list rather than spreading `rec`, which is how the attestation went missing in production
     // for one deploy: the route was written before the field existed and silently dropped it.
     signalsAttestation: rec.signalsAttestation || null,
-    verificationKey: '/proof/vk', verify: rec.verify,
+    // The key that checks THIS proof, not the key that checks the other one. A single published URL
+    // was correct while there was a single circuit and becomes a wrong answer the moment there are
+    // two — a verifier handed the liquidation key for a Kelly proof gets a failed verification and no
+    // reason for it, which reads exactly like a forged proof.
+    verificationKey: rec.circuit ? `/proof/vk/${rec.circuit}` : '/proof/vk', verify: rec.verify,
     // Present only when at least one number in the proven statement was READ FROM A VENUE rather than
     // supplied by the caller — which is a distinction the circuit cannot carry, because it has no term
     // for where a number came from. Spread rather than assigned, and placed immediately above the
@@ -318,10 +378,24 @@ app.get('/proof/:contentHash', async (req, res) => {
     // verifiable end to end, and for a live-read input it is the arithmetic that gets verified there,
     // not the input. Every proof built before this field existed serialises exactly as it did.
     ...(rec.provenance ? { provenance: rec.provenance } : {}),
-    onChain: {
-      contract: 'QuiverProofRegistry.submit(uint256[24] proof, uint256[8] publicSignals, bytes attestation)',
-      note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The contract verifies the arithmetic itself and records the outcome; a bad proof is refused in public rather than reverted silently.',
-    },
+    // THE SIGNAL COUNT IS PART OF THE ABI AND IT IS NOT THE SAME. The liquidation circuit publishes
+    // eight public signals and the Kelly circuit five, so handing a caller `uint256[8]` for a Kelly
+    // proof is an instruction that cannot compile — a wrong number dressed as a call signature. The
+    // liquidation branch is the string this route has always returned, unchanged.
+    onChain: kelly
+      ? {
+        contract: 'KellyVerifier.verifyProof(uint256[24] proof, uint256[5] publicSignals)',
+        note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The verifier is generated by snarkjs from kelly_plonk.zkey and is NOT deployed — it exists in this repository at zk/build/KellyVerifier.sol, gated by zk/scripts/gateB2-kelly-evm.mjs against a local EVM, and has no address on any chain. This field describes what checks the proof, not something that has happened on chain.',
+      }
+      : hhi
+        ? {
+          contract: 'ConcentrationVerifier.verifyProof(uint256[24] proof, uint256[12] publicSignals)',
+          note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The verifier is generated by snarkjs from concentration_plonk.zkey and is NOT deployed — it exists in this repository at zk/build/ConcentrationVerifier.sol, gated by zk/scripts/gateB3-2-concentration-evm.mjs against a local EVM, and has no address on any chain. Twelve signals: three outputs, then eight shares and the index.',
+        }
+        : {
+        contract: 'QuiverProofRegistry.submit(uint256[24] proof, uint256[8] publicSignals, bytes attestation)',
+        note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The contract verifies the arithmetic itself and records the outcome; a bad proof is refused in public rather than reverted silently.',
+      },
   });
 });
 

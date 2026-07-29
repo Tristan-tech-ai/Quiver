@@ -2,7 +2,7 @@
 // Each drives: the paid POST route, the gated /diag/scan tester, and the / index.
 import { config } from './config.js';
 import { gridSnapFields } from './util/grid.js';
-import { buildInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground } from './util/snark.js';
 import { tokenScan } from './engine/tokenScan.js';
 import { walletAudit } from './engine/walletAudit.js';
 import { tapePulse } from './engine/tapePulse.js';
@@ -738,7 +738,67 @@ export const SERVICES = [
       if (!disc && !cont) return { error: 'require {winProb, winLossRatio} or {expectedReturn, volatility}' };
       return b;
     },
-    run: (i) => proofEnvelope('size-gate', i, sizeGate(i), config.version),
+    run: (i) => {
+      // `snark` is a delivery preference, not a term in the identity — the same destructure
+      // perp-gate makes, for the same reason and with one difference worth naming. On perp-gate the
+      // flag was stripped from the day the proof shipped; here it has been an UNDECLARED key that
+      // fell straight into `proof.inputs` and therefore into the content hash, doing nothing. So a
+      // caller who was already sending `{"snark": true}` to this endpoint — receiving no proof for it
+      // — sees their content hash move once, to the hash the identical body without the flag has
+      // always returned. Every request that does not carry the flag is byte-identical.
+      const { snark: wantSnark, ...raw } = i;
+      // Snap onto the 1e-9 grid the Kelly circuit works over. EXACTLY TWO FIELDS, and the narrowness
+      // is the decision rather than an omission: `kelly.circom` has terms for p and b and for nothing
+      // else, so `bankroll`, `kellyFraction` and `drawdownLevels` are snapped nowhere — moving a
+      // content hash for a field no circuit can see would be paying the cost of this grid without
+      // buying any of it. The continuous-mode pair is left alone for the same reason: f* = mu/sigma^2
+      // is a different identity with no circuit here.
+      //
+      // WHAT IT MOVES. Nothing that is published. `winProb: 0.55, winLossRatio: 1.2` and every other
+      // value in this repo's fixtures is already on the grid, so snapping is the identity on them and
+      // both pinned size-gate hashes were re-measured unchanged. It moves only for a caller passing
+      // more than nine decimal places — a p computed from a backtest rather than typed — and it moves
+      // that caller onto the grid the proof they can now ask for is stated over.
+      const compute = gridSnapFields(raw, ['winProb', 'winLossRatio']);
+      const r = sizeGate(compute);
+      const env = proofEnvelope('size-gate', compute, r, config.version);
+      // A succinct proof, when asked for. Attached as a SIBLING of `proof`, never inside `result`, so
+      // the content hash covers exactly what it covered before — and `src/util/recipe.js` names it in
+      // `proof.excludedFromContentHash` automatically, because it is derived from insertion order
+      // rather than from a list anybody maintains.
+      if (wantSnark === true || wantSnark === 'true') {
+        // THREE WAYS THIS ANSWER CAN HAVE NO PROOF, and each is named rather than collapsed into a
+        // silent absence. The circuit states the DISCRETE identity over a positive edge; a continuous
+        // answer and a no-edge answer are both perfectly good answers that it has no statement about.
+        // `r.mode` is only a TOP-LEVEL key when the bet has an edge; on the no-edge return the engine
+        // reports it inside `inputs`. Reading only the top-level one told a caller whose discrete bet
+        // had no edge that their answer was continuous-mode — a wrong reason, which is worse than a
+        // blunt one, and gate K.6 caught it on the first run.
+        const mode = r.mode || r.inputs?.mode;
+        const why = !r.ok ? 'this request was refused, so there is no sized bet to certify'
+          : mode !== 'discrete' ? 'the answer is continuous-mode (f* = mu/sigma^2), and the circuit here states the DISCRETE Kelly identity f* = (p(b+1) - 1)/b — there is no term in it for a mean and a variance'
+            : r.hasEdge !== true || !(Number(r.fullKellyFraction) > 0) ? 'the edge is non-positive, so Kelly says do not bet and there is no size to prove — the circuit excludes a zero fraction at its boundary'
+              : null;
+        if (!why) {
+          buildKellyInBackground(env.proof.contentHash, env.proof.inputs, r.fullKellyFraction);
+        }
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'kelly',
+          status: why ? 'unavailable' : 'building',
+          ...(why
+            ? { reason: why }
+            : { retrieveAt: `/proof/${env.proof.contentHash}`, verificationKey: '/proof/vk/kelly' }),
+          // Published so a reader can check public signal 2 without re-deriving it, and so the
+          // distinction below is checkable rather than only asserted.
+          ...(why ? {} : { fullKellyProven: r.fullKellyFraction }),
+          proves: 'The discrete-Kelly identity over the three integers pinned in the proof\'s public signals — win probability, net odds and full-Kelly fraction satisfy f*·b = p·b + p - 1 on a 1e-9 grid, inside a tolerance the circuit publishes as a signal of its own (2|R| <= b̂). That statement is deterministic and checkable offline against /proof/vk/kelly, and it is the whole of what the SNARK says.',
+          doesNotProve: 'That the edge is real. The circuit takes p and b as given and says nothing about where they came from or whether they are estimated well — over-estimating an edge is the single most common way Kelly sizing ruins an account, and no proof of the arithmetic can detect it. It also does NOT cover the number this service leads with: `recommendedBetFraction` is kellyFraction × the proven full-Kelly fraction, and the circuit has no term for kellyFraction, so the proof covers the CEILING the recommendation is a fraction of, not the recommendation. Risk-of-ruin, expected log-growth and the leverage warning are outside it entirely.',
+          note: 'A succinct proof of the discrete-Kelly identity for exactly these inputs, over the public Hermez reference string. Proving takes about 0.4s, so it is built off this request rather than inside it — fetch it at the URL above, free. It certifies the identity on a 1e-9 grid; winProb and winLossRatio as echoed here are already snapped to that grid, so the proof and this answer describe the same bet.',
+        };
+      }
+      return env;
+    },
   },
   {
     name: 'exec-verify', path: '/api/exec-verify', price: config.prices.execVerify, register: true,
@@ -832,7 +892,51 @@ export const SERVICES = [
       },
     },
     validate: (b) => (Array.isArray(b?.positions) && b.positions.length ? b : { error: 'require positions: [{asset, amountUsd, apyPct?, venue?, chain?}]' }),
-    run: (i) => proofEnvelope('treasury-risk', i, treasuryRisk(i), config.version),
+    run: (i) => {
+      const { snark: wantSnark, ...raw } = i;
+      // ONE FIELD, INSIDE AN ARRAY, and the narrowness is again the decision. `concentration.circom`
+      // takes the SHARES, which the engine forms by grouping and dividing — so snapping cannot put
+      // the circuit's inputs on the grid however hard it tries, and the encoding term in the guard
+      // carries a full half step per share because of it. What snapping `amountUsd` does buy is that
+      // the quotient the engine divides is the same double a reader recomputing from `proof.inputs`
+      // would form. `apyPct`, `pegTarget` and `depegProbAnnual` reach no circuit and are left alone.
+      const compute = Array.isArray(raw.positions)
+        ? { ...raw, positions: raw.positions.map((p) => gridSnapFields(p, ['amountUsd'])) }
+        : raw;
+      const r = treasuryRisk(compute);
+      const env = proofEnvelope('treasury-risk', compute, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        // The book is grouped BY ASSET, and only that dimension is proven. `byVenue` and `byChain`
+        // are computed by the same code and published beside it, and neither has a circuit — saying
+        // so is cheaper than letting a reader assume the proof covers the concentration figure they
+        // happen to be looking at.
+        const groups = r.ok === true ? (r.concentration?.byAsset?.groups ?? 0) : 0;
+        const why = r.ok !== true ? 'this request was refused, so there is no book to certify'
+          : !(Number(r.concentration?.byAsset?.hhi) > 0) ? 'this answer carries no positive concentration index to certify'
+            : groups > 8 ? `this book holds ${groups} distinct assets and the circuit is compiled for 8 — a wider book has no statement in it, and padding cannot help because the extra shares are real rather than absent`
+              : null;
+        if (!why) {
+          buildConcentrationInBackground(env.proof.contentHash, env.proof.inputs, r);
+        }
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'concentration',
+          status: why ? 'unavailable' : 'building',
+          ...(why
+            ? { reason: why }
+            : { retrieveAt: `/proof/${env.proof.contentHash}`, verificationKey: '/proof/vk/concentration' }),
+          ...(why ? {} : {
+            dimensionProven: 'byAsset',
+            indexProven: r.concentration.byAsset.hhi,
+            assetsProven: groups,
+          }),
+          proves: 'That the published byAsset concentration index is the correctly-rounded Herfindahl index OF THE PUBLISHED SHARES — Ĥ·S = Σ ŵᵢ² on a 1e-9 grid, inside a tolerance of one grid step that the circuit publishes as a signal of its own. The shares themselves are public signals, so a reader sees the book the index was taken over rather than being asked to accept a number about it.',
+          doesNotProve: 'That the shares were read correctly from a real treasury. They are inputs; nothing in a circuit can attest where a balance came from. It also covers ONE dimension: `byVenue` and `byChain` are published beside it, computed by the same code, and neither is in this proof. Everything else this service returns — the depeg stress, the correlated crash, the risk-adjusted yield and the effective-exposure count — is outside it entirely.',
+          note: 'A succinct proof of the Herfindahl identity for exactly these shares, over the public Hermez reference string. Built off this request rather than inside it; fetch it at the URL above, free. A book of fewer than eight assets pads with zero shares, which contribute nothing to either side of the identity and are visible in the public signals rather than hidden behind a count.',
+        };
+      }
+      return env;
+    },
   },
   {
     name: 'risk-attest', path: '/api/risk-attest', price: config.prices.riskAttest, register: true,

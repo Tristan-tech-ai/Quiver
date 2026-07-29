@@ -34,7 +34,7 @@ import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 // every tool with a body a caller would actually send.
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
-import { buildInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground } from './util/snark.js';
 import { gridSnapFields } from './util/grid.js';
 import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
@@ -301,7 +301,48 @@ const TOOLS = [
       note: { description: 'plain-language guidance' },
       model: { description: 'model assumptions used' },
     }),
-    run: (a) => proofEnvelope('size-gate', a, sizeGate(a), config.version),
+    // THE FOURTH SITE, WRITTEN AT THE SAME TIME AS THE OTHER THREE. This handler array is separate
+    // from `SERVICES` and has been the one left behind four times — the un-snapped perp_gate proof,
+    // the missing `fetchHlAccount` import, the narrower `side` enum, the unsealed recipe. So the
+    // Kelly proof lands on both surfaces in the same edit, and `gates/preflight.mjs` asserts the
+    // proof-emitting set is `[http:perp-gate, http:size-gate, mcp:perp_gate, mcp:size_gate]` — four
+    // entries, so a surface silently contributing nothing turns it red.
+    //
+    // Deliberately the same shape as services.js rather than a shared helper: the two surfaces
+    // differ in nothing here, but `gates/gateC-case-sensitivity.mjs` and gate M compare them as
+    // independent texts, and a helper both called would make them agree by construction rather than
+    // by check.
+    run: (a) => {
+      const { snark: wantSnark, ...raw } = a;
+      const compute = gridSnapFields(raw, ['winProb', 'winLossRatio']);
+      const r = sizeGate(compute);
+      const env = proofEnvelope('size-gate', compute, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        // See services.js: `mode` is top-level only when the bet has an edge, and inside `inputs`
+        // otherwise. Reading one of the two gives a no-edge discrete bet the continuous-mode reason.
+        const mode = r.mode || r.inputs?.mode;
+        const why = !r.ok ? 'this request was refused, so there is no sized bet to certify'
+          : mode !== 'discrete' ? 'the answer is continuous-mode (f* = mu/sigma^2), and the circuit here states the DISCRETE Kelly identity f* = (p(b+1) - 1)/b — there is no term in it for a mean and a variance'
+            : r.hasEdge !== true || !(Number(r.fullKellyFraction) > 0) ? 'the edge is non-positive, so Kelly says do not bet and there is no size to prove — the circuit excludes a zero fraction at its boundary'
+              : null;
+        if (!why) {
+          buildKellyInBackground(env.proof.contentHash, env.proof.inputs, r.fullKellyFraction);
+        }
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'kelly',
+          status: why ? 'unavailable' : 'building',
+          ...(why
+            ? { reason: why }
+            : { retrieveAt: `/proof/${env.proof.contentHash}`, verificationKey: '/proof/vk/kelly' }),
+          ...(why ? {} : { fullKellyProven: r.fullKellyFraction }),
+          proves: 'The discrete-Kelly identity over the three integers pinned in the proof\'s public signals — win probability, net odds and full-Kelly fraction satisfy f*·b = p·b + p - 1 on a 1e-9 grid, inside a tolerance the circuit publishes as a signal of its own (2|R| <= b̂). That statement is deterministic and checkable offline against /proof/vk/kelly, and it is the whole of what the SNARK says.',
+          doesNotProve: 'That the edge is real. The circuit takes p and b as given and says nothing about where they came from or whether they are estimated well — over-estimating an edge is the single most common way Kelly sizing ruins an account, and no proof of the arithmetic can detect it. It also does NOT cover the number this service leads with: `recommendedBetFraction` is kellyFraction × the proven full-Kelly fraction, and the circuit has no term for kellyFraction, so the proof covers the CEILING the recommendation is a fraction of, not the recommendation. Risk-of-ruin, expected log-growth and the leverage warning are outside it entirely.',
+          note: 'A PLONK proof of the discrete-Kelly identity is being built off this request path — the answer above did not wait for it. Poll retrieveAt; 202 means still building. The proof is over the SAME winProb and winLossRatio echoed in proof.inputs, already snapped to the 1e-9 grid the circuit states the identity over.',
+        };
+      }
+      return env;
+    },
   },
   {
     name: 'exec_verify',
@@ -433,7 +474,43 @@ const TOOLS = [
       verdict: { description: 'plain-language verdict' },
       model: { description: 'model assumptions used' },
     }),
-    run: (a) => proofEnvelope('treasury-risk', a, treasuryRisk(a), config.version),
+    // The fourth site again, written in the same edit as the HTTP one. See services.js for why the
+    // snapped field list is one field inside an array, and why only the byAsset dimension is proven.
+    run: (a) => {
+      const { snark: wantSnark, ...raw } = a;
+      const compute = Array.isArray(raw.positions)
+        ? { ...raw, positions: raw.positions.map((p) => gridSnapFields(p, ['amountUsd'])) }
+        : raw;
+      const r = treasuryRisk(compute);
+      const env = proofEnvelope('treasury-risk', compute, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        const groups = r.ok === true ? (r.concentration?.byAsset?.groups ?? 0) : 0;
+        const why = r.ok !== true ? 'this request was refused, so there is no book to certify'
+          : !(Number(r.concentration?.byAsset?.hhi) > 0) ? 'this answer carries no positive concentration index to certify'
+            : groups > 8 ? `this book holds ${groups} distinct assets and the circuit is compiled for 8 — a wider book has no statement in it, and padding cannot help because the extra shares are real rather than absent`
+              : null;
+        if (!why) {
+          buildConcentrationInBackground(env.proof.contentHash, env.proof.inputs, r);
+        }
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'concentration',
+          status: why ? 'unavailable' : 'building',
+          ...(why
+            ? { reason: why }
+            : { retrieveAt: `/proof/${env.proof.contentHash}`, verificationKey: '/proof/vk/concentration' }),
+          ...(why ? {} : {
+            dimensionProven: 'byAsset',
+            indexProven: r.concentration.byAsset.hhi,
+            assetsProven: groups,
+          }),
+          proves: 'That the published byAsset concentration index is the correctly-rounded Herfindahl index OF THE PUBLISHED SHARES — Ĥ·S = Σ ŵᵢ² on a 1e-9 grid, inside a tolerance of one grid step that the circuit publishes as a signal of its own. The shares themselves are public signals, so a reader sees the book the index was taken over rather than being asked to accept a number about it.',
+          doesNotProve: 'That the shares were read correctly from a real treasury. They are inputs; nothing in a circuit can attest where a balance came from. It also covers ONE dimension: `byVenue` and `byChain` are published beside it, computed by the same code, and neither is in this proof. Everything else this service returns — the depeg stress, the correlated crash, the risk-adjusted yield and the effective-exposure count — is outside it entirely.',
+          note: 'A PLONK proof of the Herfindahl identity is being built off this request path — the answer above did not wait for it. Poll retrieveAt; 202 means still building. A book of fewer than eight assets pads with zero shares, which contribute nothing to either side of the identity and are visible in the public signals rather than hidden behind a count.',
+        };
+      }
+      return env;
+    },
   },
   {
     name: 'risk_attest',

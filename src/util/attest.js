@@ -33,10 +33,27 @@ function signer() {
   return SIGNER;
 }
 
-/** keccak256(abi.encodePacked(uint256[8])) — exactly what the contract recomputes from calldata. */
+/**
+ * keccak256(abi.encodePacked(uint256[N])) — exactly what a verifier recomputes from calldata.
+ *
+ * THE LENGTH USED TO BE THE LITERAL 8, AND THAT SILENTLY DISARMED THE SECOND AND THIRD CIRCUITS.
+ * Eight is the liquidation circuit's signal count; the Kelly circuit publishes five and the
+ * concentration circuit twelve. So `length !== 8` returned null for both, `attestSignals` returned
+ * null with it, and every Kelly and Herfindahl proof shipped `signalsAttestation: null` — which is
+ * the shape this file uses to mean "no signing key is configured". Two different facts wearing one
+ * value, and the wrong one would have been read on a deploy that HAS a key.
+ *
+ * Generalising costs nothing and moves nothing: at N = 8 this is the same `solidityPacked` call over
+ * the same eight values, so every liquidation digest, signature and scheme string is byte-identical
+ * to what it was. A bound is kept because `publicSignals` reaches here from a prover rather than from
+ * a caller, and an unbounded pack is an unbounded allocation.
+ */
+const MAX_SIGNALS = 64;
+
 export function signalsDigest(publicSignals) {
-  if (!Array.isArray(publicSignals) || publicSignals.length !== 8) return null;
-  return keccak256(solidityPacked(Array(8).fill('uint256'), publicSignals.map((s) => BigInt(s))));
+  if (!Array.isArray(publicSignals) || publicSignals.length === 0 || publicSignals.length > MAX_SIGNALS) return null;
+  const n = publicSignals.length;
+  return keccak256(solidityPacked(Array(n).fill('uint256'), publicSignals.map((s) => BigInt(s))));
 }
 
 /**
@@ -50,7 +67,10 @@ export function attestSignals(publicSignals) {
   if (!s || !digest) return null;
   try {
     return {
-      scheme: 'secp256k1 (EIP-191 personal_sign over keccak256(abi.encodePacked(uint256[8] publicSignals)))',
+      // The count is the array's, not a literal. At eight signals this renders the exact string it
+      // has always rendered, so a liquidation attestation is unchanged to the byte; at five or twelve
+      // it describes the pack that was actually performed rather than one that was not.
+      scheme: `secp256k1 (EIP-191 personal_sign over keccak256(abi.encodePacked(uint256[${publicSignals.length}] publicSignals)))`,
       signer: s.address,
       digest,
       signature: s.sk.sign(hashMessage(getBytes(digest))).serialized,

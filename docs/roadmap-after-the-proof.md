@@ -55,11 +55,44 @@ from any instance; a test kills the process between build and fetch and the fetc
 
 ## Phase B — circuits for the rest of the deterministic catalogue (3 months)
 
-> **Status, 28 July 2026 — one of six done, not shipped.** `size-gate` has a circuit: 357 R1CS / 718
-> Plonk constraints, 547 ms to prove, 273,118 gas to verify and 573 to refuse. Three gates run from a
-> clone (`zk/scripts/gateB{0,1,2}-kelly*.mjs`). Gate B1 failed on its first run and found a real
-> defect, described in the README. No Kelly verifier is deployed and the live `size-gate` does not
-> serve proofs. The remaining five are unstarted.
+> **Status, 29 July 2026 — all six have a circuit; three of them are REACHABLE.** The line this replaced
+> said "one of six done, not shipped… the remaining five are unstarted", and by the time anyone
+> re-read it every one of the six had a circuit under `zk/circuits/`. It also quoted three numbers that
+> had stopped matching any artifact in the repository, of which the worst was a hardcoded gas literal;
+> see below.
+>
+> The distinction that actually matters is not how many circuits exist. It is how many a CALLER can
+> obtain a proof from, and until 29 July that was one. Every circuit here was demonstrated by a gate
+> under `zk/scripts/` that built its own witness — which establishes a property of the circuit and of
+> the script beside it, and nothing about the product. `size-gate` and `treasury-risk` are the first to
+> cross that line since `perp-gate`: each answers `{"snark": true}` with a PLONK proof on both the paid
+> and the free surface, each guarded by a bound derived from its own display rounding rather than
+> inherited from the guard next door. `hackathon/PHASE_B_WIRED.md` records what that took, what each
+> does not prove, and what stands between the remaining four and the same treatment.
+>
+> | | state |
+> |---|---|
+> | `perp-gate` → `liquidation.circom` | reachable; proof served, verifier written, nothing deployed |
+> | `size-gate` → `kelly.circom` | reachable as of 29 July; `npm run gate:k` |
+> | `treasury-risk` → `concentration.circom` | reachable as of 29 July; `npm run gate:h` |
+> | `exec-verify` → `constantproduct.circom` | circuit built, gated under `zk/`, not reachable; unfinished, not blocked |
+> | `lp-risk` → `divergence.circom` | circuit built, gated under `zk/`, not reachable; unfinished, not blocked |
+> | `options-risk` → `greeksfp` / `greekssigned` / `parity` | circuits built, gated under `zk/`, not reachable; the transcendentals are dodged, not solved |
+> | `portfolio-gate` → `portfoliogate.circom` | circuit built for THREE legs at the Plonk domain ceiling; the only genuine wall of the six |
+>
+> **The Kelly figures, re-measured.** 372 R1CS and 718 Plonk constraints over a domain of 1024,
+> 405 ms to prove — all read from `zk/build/gateB0-kelly.json` rather than written down. The old line
+> said 357 R1CS, which is circom's *non-linear* count and not what the `.r1cs` file holds.
+>
+> **And the gas figure was a literal, not a measurement.** `273,118` appeared here, in two gates, and
+> in a research note, described three different ways and matching no artifact in the repository. Gates
+> now read it through `zk/scripts/lib/gas-facts.mjs`, which refuses rather than defaulting when the
+> artifact is absent: `zk/build/gateB2-kelly-evm.json` records **272,286** gas to accept and 573 to
+> refuse. That is ONE SAMPLE and should be read as one — `probe-plonk-gas-variance.mjs` measures a
+> 1.26% spread across proofs of an identical statement, plus a 7,500-gas cold/warm gap, so any
+> comparison built on a single figure needs room well beyond that.
+>
+> No verifier for any of these circuits is deployed to any chain.
 
 Six of the twenty-two engines rest on a closed-form identity that a circuit can state. In rough order
 of how much a buyer would pay to have it proven rather than re-run:

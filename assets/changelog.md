@@ -12,6 +12,120 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the concentration circuit takes the engine's grouping, and `treasury-risk` now serves a proof
+
+The third engine across the fence, and the first whose circuit inputs are not the caller's.
+`kelly.circom` takes a probability and a ratio, both typed by whoever asked. `concentration.circom`
+takes the SHARES, and the shares are something the engine made: it groups the book by asset, sums each
+group, and divides by the total.
+
+**That difference is the whole defect this wiring had to avoid.** A book with two USDC positions has
+ONE USDC share. An encoder that forms one share per POSITION is the natural thing to write; it
+produces a well-formed witness, proves against it, verifies, and describes a book with a lower
+concentration than the one that was priced — agreeing with itself perfectly the entire time. No gate
+under `zk/` would have caught it, because the sweep that proves the circuit re-derives weights per
+position too, and is sound only because its own generator gives each asset exactly one position.
+`gates/gateH-concentration-snark.mjs` is built the other way round: 4,928 of its 8,000 books repeat an
+asset, so the mistake dies on the first one. It is revert 1 of `npm run gate:h-revert`.
+
+The proven statement is that the published `byAsset` index is the correctly-rounded Herfindahl index
+**of the published shares** — Ĥ·S = Σ ŵᵢ², bounded by one grid step, with the shares themselves as
+public signals so a reader sees the book the index was taken over. A five-position book across four
+assets proves as four shares of 0.51, 0.25, 0.18 and 0.06 with four padded zero lanes and a residual
+of exactly zero.
+
+**Its bound is derived from its own rounding, like the others and unlike them.** The index is
+displayed to four decimals, so the display half-unit is 5e-5 — but no snap can put a share on the
+grid, because a share is a quotient and lands where the division lands. So the encoding term carries a
+full half step per share, measured over all 2^N corners of the encoding box rather than
+differentiated. Median bound 1.50e-9, three times the single grid rounding, and the worst honest book
+uses **94.671%** of it across 8,000 books run against the real engine.
+
+**What it does not cover is stated on the response rather than left to inference.** The shares are
+inputs — nothing in a circuit can attest that a balance is real. Only the `byAsset` dimension is
+proven, while `byVenue` and `byChain` are published beside it by the same code. The depeg stress, the
+correlated crash and the risk-adjusted yield are outside it entirely. And a book of nine distinct
+assets is refused by name with the count, because the circuit is compiled for eight and the ninth
+share is real rather than absent, so padding cannot help; eight exactly still proves.
+
+`treasury-risk#0` is byte-identical on both surfaces with and without the flag, the build hash is
+still `q1-e1fa99d08887d6cc`, and `npm run gate:h-revert` puts five defects back — the per-position
+grouping, a re-associated fold, a truncating solve, a widened bound and a drifting display rounding —
+each turning the gate red at the right assertion, green again after.
+
+**One thing the second and third circuits found on their way in.** `signalsDigest` refused any signal
+array whose length was not exactly eight, which is the liquidation circuit's count. The Kelly circuit
+publishes five and the concentration circuit twelve, so both were refused a digest, `attestSignals`
+returned `null` with it, and every proof from either would have shipped `signalsAttestation: null` —
+which is the value this codebase uses to mean *no signing key is configured*. Two different facts
+wearing one value, and on a deploy that HAS a key the wrong one would have been read. The length is
+now the array's rather than a literal; at eight signals it packs the same eight values and renders the
+same scheme string, so every liquidation attestation is unchanged to the byte.
+
+---
+
+## 29 July 2026 — six circuits existed and one of them was reachable; `size-gate` now serves a proof
+
+`src/util/snark.js` opened with the words *"Succinct proofs for the liquidation identity"* and knew
+exactly one circuit. Its witness builder built a liquidation witness and nothing else. Meanwhile
+`zk/scripts/lib/` held working encoders for the Kelly, portfolio and batch circuits — each proven
+correct by a gate that built its own witness, sitting on the wrong side of the fence from the service.
+
+So every circuit in this repository had been demonstrated by a script standing in for the product, and
+`perp-gate` was the only endpoint from which a caller could obtain one. That gap is the difference
+between *we built a circuit* and *we build circuits*, and it is the whole of what this entry closes
+for the second engine.
+
+**`size-gate` now answers `{"snark": true}` with a PLONK proof of the discrete-Kelly identity.**
+`kelly.circom` states, over integers scaled by 1e9, that f*·b = p·b + p − 1 — the first-order
+condition the sizing rests on — and publishes the residual R and the tolerance b̂ as signals of its
+own, so a reader sees the slack that was actually used rather than being asked to accept that it was
+small. The proven bound is 2|R| <= b̂. On the worked case p = 0.55, b = 1.2 the residual is exactly
+zero and the certified fraction is 0.175, which is the number the engine serves.
+
+**Its guard is derived, not inherited, and that is most of the work.** The liquidation guard is built
+from `round(pLiq, 2)`; this one from `round(f*, 6)`, ten thousand times finer. Reusing the price
+guard's half-cent would have admitted a Kelly fraction five hundred grid steps from the one that was
+served. Four questions are now asked before anything is proved, each with its own refusal so the
+stored record says which one failed: is there a positive edge to certify; does the witness size the
+bet the engine sized, asked as an equality against the engine's own display rounding rather than as a
+tolerance; can the 1e-9 grid pin this bet to the width the answer is displayed at; and does the
+circuit's integer solve agree with the engine's own unrounded fraction. Measured over 18,540 bets run
+against the real engine, nothing exceeds the bound and the worst honest bet uses **99.998%** of it — a
+bound the worst case cannot approach is not measuring anything.
+
+The expression the guard compares against is the engine's, and that is checked by executing it:
+`gates/gateK-kelly-snark.mjs` lifts the line out of `src/engine/sizeGate.js`, compiles it, and requires
+`Object.is` agreement over 200,000 bets weighted onto the break-even boundary where two orderings of
+the same algebra are most likely to part. Re-deriving an engine expression outside the engine is a
+defect class this repository has shipped three times.
+
+**Nothing that already worked moved.** Both pinned `size-gate` content hashes are byte-identical on
+both surfaces, with and without the flag; Appendix C still publishes
+`8575ce5ae5bfae9cdfdfc604250f8032e4ba85fb33560386586b7538d0ab0960`; the liquidation proof-retrieval
+shape is unchanged to the key; and the build hash is still `q1-e1fa99d08887d6cc`, because
+`src/engine/` was not touched. The one caller who does see a change is one who was already sending
+`{"snark": true}` to `size-gate` and receiving nothing for it — that flag used to fall into the
+content hash, and it is now stripped before hashing, exactly as `perp-gate` strips it.
+
+A second circuit needed a second key, so `/proof/vk/kelly` joins `/proof/vk`, which keeps meaning the
+liquidation key it has always meant. Each proof record names its own circuit and carries the URL of
+the key that checks it; handing a verifier the wrong key produces a failed verification with no reason
+attached, which reads exactly like a forged proof.
+
+`npm run gate:k` is the check. It goes through `SERVICES['size-gate'].run` and through `handleRpc` —
+the same entry points the paid and free surfaces use — rather than building its own witness, which is
+the thing that made the earlier circuit gates prove less than they appeared to. Eight tests: the
+lifted expression, the display rounding, the sweep against the real engine, a proof built by the
+service that verifies against the published key, every public signal perturbed and rejected plus a
+bent proof rejected, the four named refusals, both surfaces agreeing, and the retrieval routes over
+real HTTP. `npm run gate:k-revert` puts six defects back one at a time — a drifting encoder,
+rearranged algebra, a truncating solve, a witness that reads the displayed fraction, a widened bound,
+and a drifting display rounding — and requires the gate to go red naming the right assertion each
+time, then green again once every revert is undone.
+
+---
+
 ## 29 July 2026 — the verification recipe every response publishes did not reproduce the hash beside it
 
 Every enveloped response carries `proof.verifyContentHash`: a sentence telling a caller how to

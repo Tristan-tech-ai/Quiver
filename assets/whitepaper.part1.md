@@ -12,7 +12,7 @@
 > - **Part 6** — `/paper/6` — 11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 7** — `/paper/7` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (247 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (248 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
@@ -192,7 +192,7 @@ The contributions are the following.
 5. A concentrated-liquidity reality-check that reconstructs a Uniswap-V3 position's realised fees against its divergence loss from the pool's live on-chain swap history, read over a keyless public archive node, so the fee-versus-loss verdict is measured on real flow rather than assumed.
 6. A transaction-safety service that combines on-chain simulation with EIP-712 permit-signature analysis [20], addressing the dominant modern drainer vector that pure simulators cannot observe.
 7. Real market-microstructure estimators on the DEX tape: Kyle's lambda, Amihud illiquidity, and VPIN, with quality gates that return null rather than a false number on thin data.
-8. A verification methodology: 386 automated tests of model-free invariants that run on every build, a further five live-archive integration tests behind an RPC flag, a ground-truthing protocol against live venues, and a pre-registered out-of-sample validation of the risk engine against real market crashes (Section 6) — with every reported figure reproducible by a documented request.
+8. A verification methodology: 386 automated tests of model-free invariants, of which 381 run on every build and five are live-archive integration tests skipped unless an archive RPC is configured, a ground-truthing protocol against live venues, and a pre-registered out-of-sample validation of the risk engine against real market crashes (Section 6) — with every reported figure reproducible by a documented request.
 
 The remainder of the document is organised as follows. Section 2 describes the payment, identity, and hosting architecture. Section 3 states the design principles that constrain every service. Section 4 catalogues the twenty-two services. Section 5 gives the mathematics. Section 6 describes verification. Section 7 walks through live calls end to end. Section 8 is a candid account of what the services do not do. Section 9 positions the work, Section 10 recounts how it was built and how an agent uses it, Section 11 sets out what happens after the hackathon and what would falsify that plan, and Section 12 concludes.
 
@@ -300,7 +300,7 @@ Services report what the market prices and what the data shows. They do not tell
 
 ### 3.6 Proven by test
 
-The financial mathematics is locked by an automated suite of model-free invariants: put-call parity, the delta relationship, non-negativity of the risk-neutral density, the martingale property of the distribution, and the absence of look-ahead in every time-series indicator. A change that breaks an identity breaks the build. Section 6 describes the suite; it currently holds 386 tests that run on every build, with a further five live-archive integration tests that are SKIPPED unless an archive RPC is configured. None of the 333 fails; the five are not run in the default environment, and calling that "all pass" — as this sentence did — counted a test that never executed as a passing one.
+The financial mathematics is locked by an automated suite of model-free invariants: put-call parity, the delta relationship, non-negativity of the risk-neutral density, the martingale property of the distribution, and the absence of look-ahead in every time-series indicator. A change that breaks an identity breaks the build. Section 6 describes the suite; it currently holds 386 tests, of which 381 run on every build and five are live-archive integration tests that are SKIPPED unless an archive RPC is configured. None of the 381 fails; the five are not run in the default environment, and calling that "all pass" — as this sentence did — counted a test that never executed as a passing one.
 
 ---
 

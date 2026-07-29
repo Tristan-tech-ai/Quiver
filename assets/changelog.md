@@ -12,6 +12,95 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — a fifth site said the same thing in a verb the new gate does not read
+
+Documentation only. `src/engine/` is untouched, the build hash is unchanged at `q1-e1fa99d08887d6cc`,
+and no content hash has moved. `npm test` is unchanged at 386 tests, 381 passing, 5 skipped, 0 failing.
+
+**What was wrong.** Appendix B (Reproducibility) closed with a sentence that made the same over-claim
+the entry below corrects, in different words — a universal predicate over the whole 386 when five of
+them do not run:
+
+| Where | Said | Now says |
+|---|---|---|
+| Appendix B, `assets/whitepaper.html:1631` | "so **the 386** model-free properties of Section 6 **can be verified offline**" — five of the 386 cannot | "so **381 of the 386** model-free properties of Section 6 can be verified offline, **and five are live-archive integration tests skipped unless an archive RPC is configured**" |
+
+The tail clause is reused verbatim from the corrections below rather than phrased a sixth way. A
+document that states one fact six ways is how the drift started.
+
+**The gate did not catch it, and that is the finding.** `npm run gate:x` was **green with this
+sentence still in the paper**. Its over-claim rule matches the literal phrase `all pass` / `all
+currently pass`; "can be verified offline" is the same claim in a different verb, so the rule could
+not see it. The other rules were satisfied for the reason three of the four sentences below were:
+the integer 386 is *correct*, and there was no second number for the arithmetic rule to add up.
+The corrected sentence now carries 386, 381 and five together, so it is arithmetic the gate *can*
+check — the site moved from invisible to verified. Widening the over-claim rule from a phrase list to
+a claim shape is left to the paper-integrity workstream rather than done here.
+
+**Byte accounting, measured before and after.** The sentence lives in **part 7**, not in part 4 where
+the margin is thin. The edit is **+96 bytes**: part 7 went 33,907 → 34,003 packed, headroom 21,093 →
+20,997. **Part 4's 173 bytes of headroom are untouched.** The served part count is unchanged at 7 and
+`whitepaper.parts.json` is byte-identical, so the section-to-part mapping published in the submission
+did not move. Unlike the entry below, the whole-document size stayed at 248 kB
+(253,507 → 253,603 B, still rounding to 248), so the navigation header did **not** change: parts 1–6
+are byte-identical and **part 7 is the only file that changed**, by exactly the one prose line.
+
+Edited in `assets/whitepaper.html` and regenerated with `tools/paper-to-text.mjs`. The deploy gap
+recorded below is unchanged in kind: the repository's paper is still ahead of live until the next
+deploy, and no deploy was performed.
+
+---
+
+## 29 July 2026 — the paper said the suite was bigger than it is, in four places, and a gate now says so
+
+Documentation only. `src/engine/` is untouched, the build hash is unchanged at `q1-e1fa99d08887d6cc`,
+and no content hash has moved. `npm test` is unchanged at 386 tests, 381 passing, 5 skipped, 0 failing.
+
+**What was wrong.** The suite reports `tests 386` = `pass 381` + `skipped 5`. The five are the
+live-archive integration tests, skipped unless an archive RPC is configured — and they are *inside*
+the 386, not additional to it. Four published sentences said otherwise:
+
+| Where | Said | Now says |
+|---|---|---|
+| §1 contributions | "386 automated tests … **a further five** live-archive integration tests" — asserts 391 | "386 automated tests of model-free invariants, of which 381 run on every build and five are live-archive integration tests skipped unless an archive RPC is configured" |
+| §3.6 Proven by test | "386 tests … **with a further five** … **None of the 333 fails**" — 333 was the passing count two review rounds ago | "386 tests, of which 381 run on every build and five are live-archive … **None of the 381 fails**" |
+| §6.1 | "386 automated tests … **alongside a further five**" | "386 automated tests … — 381 of them run on every build, and five are live-archive integration tests exercised behind an RPC flag" |
+| Table 2 caption | "from the 386-test suite. **All currently pass.**" — five never ran | "from the 386-test suite. The 381 that run in the default environment all pass; five need an archive node" |
+
+The wording now matches §11.7, which already said it correctly ("later rounds have taken it to 386
+and 381"). A fifth site, `README.md`'s `npm test` comment, still said **152** model-free tests — 234
+stale — and was found by the new gate rather than by the sweep.
+
+Edited in `assets/whitepaper.html` and regenerated with `tools/paper-to-text.mjs`; the `.part*.md`
+files are generated and editing them directly would have been overwritten. **The served part count is
+unchanged at 7** and the section-to-part mapping in `whitepaper.parts.json` is byte-identical.
+`whitepaper.html` grew 120 B, part 1 by 32 B and part 4 by 84 B; parts 2, 3, 5, 6 and 7 are unchanged.
+
+**The served bytes of all seven machine-readable parts now differ from this repository until the next
+deploy.** Every part carries the whole-document size in its navigation header, so the 116-byte growth
+tipped that line from 247 kB to 248 kB in all seven — parts 2, 3, 5, 6 and 7 are otherwise untouched.
+That gap
+is expected and is recorded here rather than left to be discovered.
+
+**The gate.** `gates/gateX-paper-contradiction.mjs` (`npm run gate:x`) reads the suite figures by
+*running* the suite and parsing the runner's own `tests`/`pass`/`fail`/`skipped` summary, then holds
+152 documents to them: no published suite figure may disagree with the runner, no two published
+documents may state the same quantity differently, no total may fail to equal the sum of its parts,
+and nothing may claim "all pass" while tests are skipped. `tools/docs-consistency.mjs` missed all four
+because its only suite fact was a static count of `test(` declarations — the total, which was *right*
+in three of the four sentences — so it had no pass count or skipped count to compare anything against,
+and no rule that compares one document to another.
+
+`npm run gate:x-revert` restores each defect and requires the gate to go red on it by name: 7 of 7
+caught, including 4 of 4 of the sweep's findings, with `docs-consistency` green on all four.
+
+One residual gap is measured and recorded rather than asserted away: part 4 sits **173 bytes** under
+the splitter's 55 kB budget, and adding 465 bytes to §6 moves §8 Limitations from part 4 into part 5
+*while the count stays at 7*. The count is not the contract; the mapping is, and nothing asserts the
+mapping today. Full write-up in `PAPER_CONSISTENCY.md`.
+
+---
+
 ## 29 July 2026 — the refusal a PAYING caller gets, and a fetched mark that claimed to be re-runnable
 
 Two changes, both caller-visible, both outside `src/engine/`. The build hash is unchanged at
@@ -59,7 +148,67 @@ older gates that ought to have caught them stay green, which is why they survive
 
 ---
 
+## 29 July 2026 — `side: "SHORT"` is fixed, and the build hash did not move
+
+**This supersedes the entry below it, which said the same defect could not be fixed without moving
+`q1-e1fa99d08887d6cc`. That was wrong, and the reason it was wrong is worth more than the fix.** Both
+offending lines really are inside `src/engine/` — but the *substitution* they perform can be prevented
+before the engine is ever called. `src/util/repair.js` already case-corrects a value against a
+declared `enum`; `src/services.js` declared `side` as the prose `description: 'long | short'` with no
+enum array, so the mechanism had nothing to match against and never fired. Declaring the alternatives
+is a schema change, and the schema is not hashed.
+
+The build hash is unchanged at `q1-e1fa99d08887d6cc` and `src/engine/` is byte-identical to the
+published mirror.
+
+**What changed for a caller.** `perp_gate` with `side: "SHORT"`, `"Short"` or `"SELL"` now returns
+**108,641.98** — the short's liquidation price — on both the paid HTTP path and the free MCP one, with
+**the same content hash as the correctly-cased body it meant**. Not a similar answer: the identical
+signed artifact. The hedged `portfolio_gate` book reports net exposure **0** again with a leg reading
+`"SHORT"`. `options_risk` prices `"PUT"` as a put, delta back to **−0.680134**.
+
+Sweeping all 22 services for fields of the same shape found three defects nobody had reported.
+`poly-fill` with `action: "SELL"` walked the **ask** book — a seller was quoted the buy side of the
+market, 60c for 166.7 shares on a book where selling fills at 40c for 250. `portfolio_gate` with
+`betaTier: "SEVERE"` silently returned the default stress table instead of the validated tier that was
+asked for. `options-desk` with `focus: "ALL"` returned *strictly less* than sending nothing at all.
+Nine fields were declared in total; eleven further candidates were deliberately left alone because
+their consumer already folds case, each recorded with the file:line that does so.
+
+**What moved, measured rather than promised.** Nothing that was already correct. Across all 22
+services — 31 fixture forms and 14 deterministic content hashes, captured from the unmodified
+repository and re-measured against the fixed one — the two runs are **byte-identical**. One honest
+exception: a miscased spelling that happened to land on the default branch anyway (`side: "LONG"`,
+`venue: "HYPERLIQUID"`) now hashes as the canonical value, with its served numbers unchanged. No
+canonically-cased request moved.
+
+**What is still open, and is not scheduled around judging.** A value that is not a case-variant of a
+declared alternative — `"banana"`, `"p"`, `"puts"` — is still passed through to the engine's fail-open
+default. `repair.js` matches a declared alternative or leaves the value exactly as the caller wrote
+it; it will never coerce to a nearest neighbour, because that would be inventing a value. Closing that
+needs the engines to refuse, which does move the build hash and remains an owner's decision.
+
+**Cost.** The advertised `inputSchema` gains `enum` arrays, so the 402 challenge bytes and the MCP
+`tools/list` bytes change. The OKX registry — service count, endpoints, identity — is untouched, so
+this triggers no re-review; `gates/preflight.mjs` checks exactly those three plus the build hash and
+passes all four unchanged. The `inputRepairs` disclosure was also reworded, because *"Shapes only: no
+value was supplied, defaulted or guessed"* stopped being true the moment a declared enum let step 6
+rewrite a value. It now says what is actually enforced, identically on both surfaces.
+
+Held by `gates/gateC-case-sensitivity.mjs` (`npm run gate:c`), which sweeps every service and every
+enum field on both surfaces and asserts the published numbers as hardcoded values.
+`gates/gateC-revert.mjs` puts each half of the fix back and shows the gate go red — and shows
+`preflight` and `gateBuyer` stay green over the same defect, which is why it survived: gateBuyer's
+entire subject is what buyers get wrong about inputs, and it checks miscased **keys** while never once
+checking a miscased **value**. Full write-up: `CASE_SENSITIVITY_FIX.md`.
+
+---
+
 ## 29 July 2026 — a defect we have NOT fixed, said plainly: `side: "SHORT"` returns the wrong answer
+
+**Superseded by the entry above, on the day it was written. Kept because what a defect looked like
+before it was closed — including a wrong assumption about where its fix had to live — is the part a
+reader cannot reconstruct afterwards.** The half about `"banana"` remains accurate and open.
 
 An outside reviewer swept the live service and found a defect in the worst possible place. We
 reproduced every number below ourselves before writing this, and we are leaving the defect in place

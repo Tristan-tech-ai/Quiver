@@ -186,7 +186,7 @@ The contributions are the following.
 5. A concentrated-liquidity reality-check that reconstructs a Uniswap-V3 position's realised fees against its divergence loss from the pool's live on-chain swap history, read over a keyless public archive node, so the fee-versus-loss verdict is measured on real flow rather than assumed.
 6. A transaction-safety service that combines on-chain simulation with EIP-712 permit-signature analysis [20], addressing the dominant modern drainer vector that pure simulators cannot observe.
 7. Real market-microstructure estimators on the DEX tape: Kyle's lambda, Amihud illiquidity, and VPIN, with quality gates that return null rather than a false number on thin data.
-8. A verification methodology: 386 automated tests of model-free invariants that run on every build, a further five live-archive integration tests behind an RPC flag, a ground-truthing protocol against live venues, and a pre-registered out-of-sample validation of the risk engine against real market crashes (Section 6) — with every reported figure reproducible by a documented request.
+8. A verification methodology: 386 automated tests of model-free invariants, of which 381 run on every build and five are live-archive integration tests skipped unless an archive RPC is configured, a ground-truthing protocol against live venues, and a pre-registered out-of-sample validation of the risk engine against real market crashes (Section 6) — with every reported figure reproducible by a documented request.
 
 The remainder of the document is organised as follows. Section 2 describes the payment, identity, and hosting architecture. Section 3 states the design principles that constrain every service. Section 4 catalogues the twenty-two services. Section 5 gives the mathematics. Section 6 describes verification. Section 7 walks through live calls end to end. Section 8 is a candid account of what the services do not do. Section 9 positions the work, Section 10 recounts how it was built and how an agent uses it, Section 11 sets out what happens after the hackathon and what would falsify that plan, and Section 12 concludes.
 
@@ -294,7 +294,7 @@ Services report what the market prices and what the data shows. They do not tell
 
 ### 3.6 Proven by test
 
-The financial mathematics is locked by an automated suite of model-free invariants: put-call parity, the delta relationship, non-negativity of the risk-neutral density, the martingale property of the distribution, and the absence of look-ahead in every time-series indicator. A change that breaks an identity breaks the build. Section 6 describes the suite; it currently holds 386 tests that run on every build, with a further five live-archive integration tests that are SKIPPED unless an archive RPC is configured. None of the 333 fails; the five are not run in the default environment, and calling that "all pass" — as this sentence did — counted a test that never executed as a passing one.
+The financial mathematics is locked by an automated suite of model-free invariants: put-call parity, the delta relationship, non-negativity of the risk-neutral density, the martingale property of the distribution, and the absence of look-ahead in every time-series indicator. A change that breaks an identity breaks the build. Section 6 describes the suite; it currently holds 386 tests, of which 381 run on every build and five are live-archive integration tests that are SKIPPED unless an archive RPC is configured. None of the 381 fails; the five are not run in the default environment, and calling that "all pass" — as this sentence did — counted a test that never executed as a passing one.
 
 
 ## 4. Service Catalogue
@@ -583,9 +583,9 @@ Two mechanisms keep the services honest: an automated test suite of model-free i
 
 ### 6.1 The invariant test suite
 
-The financial mathematics is locked by 386 automated tests that run under the built-in Node test runner [34] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
+The financial mathematics is locked by 386 automated tests that run under the built-in Node test runner [34] with no external dependency — 381 of them run on every build, and five are live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
 
-**Table 2 — representative invariants from the 386-test suite. All currently pass.**
+**Table 2 — representative invariants from the 386-test suite. The 381 that run in the default environment all pass; five need an archive node.**
 
 | Property asserted | Why it must hold |
 | --- | --- |
@@ -1165,7 +1165,7 @@ The figures in this document divide into three kinds, and only one of them invol
 - **Tape microstructure (Section 5.5).** Call `tape-pulse` on a liquid token; the `tape.medianGapSeconds` field indicates whether the read rests on a dense or a sampled feed, and Kyle's lambda carries its own R-squared and confidence.
 - **Market impact (Section 7).** Call `poly-fill` on a live market; `marketImpact.fitR2` is the measured quality of the square-root fit, and `bookDepth.imbalance` is computed from the same book that the walk consumes.
 
-Everything referenced in this appendix lives in the public repository: `https://github.com/Tristan-tech-ai/Quiver` — the full engine source, the test suite, and the research artifacts under `research/` (the crash study, the validation scripts, and the field-test harnesses with their raw results). The invariant test suite is self-contained and deterministic; it runs with the project's standard test command and requires no network access, so the 386 model-free properties of Section 6 can be verified offline. The market-validation numbers of Section 6 reproduce from public data with the scripts in `research/reservoir-data/` (episode detection, beta measurement, and the two pre-registered event tests; about $1 of requester-pays S3 access — the folder's README gives the exact fetch commands).
+Everything referenced in this appendix lives in the public repository: `https://github.com/Tristan-tech-ai/Quiver` — the full engine source, the test suite, and the research artifacts under `research/` (the crash study, the validation scripts, and the field-test harnesses with their raw results). The invariant test suite is self-contained and deterministic; it runs with the project's standard test command and requires no network access, so 381 of the 386 model-free properties of Section 6 can be verified offline, and five are live-archive integration tests skipped unless an archive RPC is configured. The market-validation numbers of Section 6 reproduce from public data with the scripts in `research/reservoir-data/` (episode detection, beta measurement, and the two pre-registered event tests; about $1 of requester-pays S3 access — the folder's README gives the exact fetch commands).
 
 
 ## Appendix C · Checkable Artifacts

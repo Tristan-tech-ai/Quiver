@@ -12,7 +12,7 @@
 > - **Part 6** — `/paper/6` — 11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 7** — `/paper/7` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (247 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (248 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
@@ -25,9 +25,9 @@ Two mechanisms keep the services honest: an automated test suite of model-free i
 
 ### 6.1 The invariant test suite
 
-The financial mathematics is locked by 386 automated tests that run under the built-in Node test runner [34] with no external dependency, alongside a further five live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
+The financial mathematics is locked by 386 automated tests that run under the built-in Node test runner [34] with no external dependency — 381 of them run on every build, and five are live-archive integration tests exercised behind an RPC flag. They assert identities that must hold for any inputs, so a regression in the math breaks the build rather than shipping a wrong number; defects caught against live data during development (a mis-scaled reconciliation tolerance, a skipped enrichment path, a microstructure-contaminated front slice) are each locked by a test that fails on the pre-fix code. The load-bearing tests are the following.
 
-**Table 2 — representative invariants from the 386-test suite. All currently pass.**
+**Table 2 — representative invariants from the 386-test suite. The 381 that run in the default environment all pass; five need an archive node.**
 
 | Property asserted | Why it must hold |
 | --- | --- |

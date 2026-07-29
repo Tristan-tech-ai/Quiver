@@ -12,7 +12,7 @@
 > - **Part 6** — `/paper/6` — 11. Roadmap: Operating Quiver After the Hackathon  |  12. Conclusion
 > - **Part 7** — `/paper/7` — Appendix A · API Reference  |  Appendix B · Reproducibility  |  Appendix C · Checkable Artifacts  |  References
 >
-> Whole document in one response (247 kB, may truncate in your client): `/paper/full`
+> Whole document in one response (248 kB, may truncate in your client): `/paper/full`
 > Typeset edition with figures: `/paper`
 > Live service: https://quiver-production-c3a8.up.railway.app · Source: https://github.com/Tristan-tech-ai/Quiver
 
@@ -117,7 +117,7 @@ The figures in this document divide into three kinds, and only one of them invol
 - **Tape microstructure (Section 5.5).** Call `tape-pulse` on a liquid token; the `tape.medianGapSeconds` field indicates whether the read rests on a dense or a sampled feed, and Kyle's lambda carries its own R-squared and confidence.
 - **Market impact (Section 7).** Call `poly-fill` on a live market; `marketImpact.fitR2` is the measured quality of the square-root fit, and `bookDepth.imbalance` is computed from the same book that the walk consumes.
 
-Everything referenced in this appendix lives in the public repository: `https://github.com/Tristan-tech-ai/Quiver` — the full engine source, the test suite, and the research artifacts under `research/` (the crash study, the validation scripts, and the field-test harnesses with their raw results). The invariant test suite is self-contained and deterministic; it runs with the project's standard test command and requires no network access, so the 386 model-free properties of Section 6 can be verified offline. The market-validation numbers of Section 6 reproduce from public data with the scripts in `research/reservoir-data/` (episode detection, beta measurement, and the two pre-registered event tests; about $1 of requester-pays S3 access — the folder's README gives the exact fetch commands).
+Everything referenced in this appendix lives in the public repository: `https://github.com/Tristan-tech-ai/Quiver` — the full engine source, the test suite, and the research artifacts under `research/` (the crash study, the validation scripts, and the field-test harnesses with their raw results). The invariant test suite is self-contained and deterministic; it runs with the project's standard test command and requires no network access, so 381 of the 386 model-free properties of Section 6 can be verified offline, and five are live-archive integration tests skipped unless an archive RPC is configured. The market-validation numbers of Section 6 reproduce from public data with the scripts in `research/reservoir-data/` (episode detection, beta measurement, and the two pre-registered event tests; about $1 of requester-pays S3 access — the folder's README gives the exact fetch commands).
 
 
 ## Appendix C · Checkable Artifacts

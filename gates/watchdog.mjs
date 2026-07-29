@@ -23,11 +23,62 @@ const ALARM_S = Number((process.argv.find((a) => a.startsWith('--alarm='))
 const EVERY_MS = 5000;
 
 // The marker that says the NEW code is serving. Not the codeHash, which is deliberately unchanged and
-// therefore proves nothing about which container answered. `/build.proofStorage` exists only in code
-// that has not shipped yet, so its appearance is unambiguous.
-const NEW_BUILD_MARKER = (build) => build && Object.prototype.hasOwnProperty.call(build, 'proofStorage');
+// therefore proves nothing about which container answered.
+//
+// IT HAS TO BE CONFIGURABLE, AND THIS SCRIPT WAS ABANDONED THREE TIMES BECAUSE IT WAS NOT. The default
+// below was `/build.proofStorage`, chosen when that key existed only in unshipped code. It shipped. On
+// every deploy after that the marker was ALREADY PRESENT at baseline, and the success condition further
+// down requires `!baseline.newBuild` — correct, and silent. The script did not declare a false success;
+// it hung, forever, saying nothing about why. So three deploys were watched by throwaway scripts
+// written from scratch instead, and the third of them recorded nothing at all, which is why nobody can
+// say how long it was dark.
+//
+// A marker must be something only THIS deploy can produce. Pass one:
+//   --marker build.someNewKey        a dotted path into /build that must appear
+//   --marker index.services.length>22
+// and if none is given, the default is used and checked at baseline like any other.
+const markerArg = (process.argv.find((a) => a.startsWith('--marker=')) || '').split('=')[1]
+  || (process.argv.includes('--marker') ? process.argv[process.argv.indexOf('--marker') + 1] : null);
+const MARKER_DESC = markerArg || 'build.proofStorage';
+const dig = (o, path) => path.split('.').reduce((v, k) => (v == null ? v : v[k]), o);
+const NEW_BUILD_MARKER = (build) => {
+  if (!build) return false;
+  if (!markerArg) return Object.prototype.hasOwnProperty.call(build, 'proofStorage');
+  const p = markerArg.startsWith('build.') ? markerArg.slice(6) : markerArg;
+  const v = dig(build, p);
+  return v !== undefined && v !== null && v !== false;
+};
 
 const stamp = () => new Date().toISOString().slice(11, 19);
+
+// THE LOG EXISTS BECAUSE THE THIRD DEPLOY HAS NO NUMBER. This script printed its darkness figure to
+// stdout and wrote nothing, so when three published documents later disagreed about how many deploys
+// there had been and which one went dark, the answer had to be reconstructed from commit timestamps —
+// and the third deploy's darkness could not be recovered at all, because nobody had captured the
+// terminal. A measurement that exists only in a scrollback is a measurement that will be lost.
+//
+// It starts empty and earns its rows. Nothing is backfilled from commit messages, because a log whose
+// first entries are reconstructions teaches a reader to trust reconstructions.
+import { appendFileSync, existsSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const LOG = join(dirname(fileURLToPath(import.meta.url)), 'deploy-log.tsv');
+function recordDeploy(row) {
+  try {
+    if (!existsSync(LOG)) {
+      writeFileSync(LOG, '# Written by gates/watchdog.mjs on every completed deploy. Never edited by hand,\n'
+        + '# never backfilled. A deploy with no row here was watched by something else, or not watched.\n'
+        + 'startedUtc\tliveUtc\tdarkSeconds\tservices\tmcpTools\tcodeHash\tmarker\n', 'utf8');
+    }
+    appendFileSync(LOG, [STARTED_UTC, new Date().toISOString(), row.darkS, row.services, row.mcpTools, row.codeHash, MARKER_DESC].join('\t') + '\n', 'utf8');
+    console.log(`     recorded in gates/deploy-log.tsv — commit it, that is the point`);
+  } catch (e) {
+    // A failed write must be loud. Silently losing the row is the defect this whole function exists for.
+    console.log(`     *** COULD NOT WRITE ${LOG}: ${e.message} — capture this terminal by hand ***`);
+  }
+}
+const STARTED_UTC = new Date().toISOString();
 
 async function probe() {
   const t0 = Date.now();
@@ -71,12 +122,13 @@ async function probe() {
 
 console.log(`WATCHDOG — ${LIVE}`);
 console.log(`  polling every ${EVERY_MS / 1000}s · alarm after ${ALARM_S}s of continuous darkness`);
-console.log(`  waiting for the marker: /build carries "proofStorage"\n`);
+console.log(`  waiting for the marker: ${MARKER_DESC}${markerArg ? '' : '  (default — pass --marker if this deploy needs its own)'}\n`);
 
 let state = null;           // 'healthy' | 'dark'
 let darkSince = null;
 let baseline = null;
 let alarmed = false;
+let maxDarkMs = 0;
 
 for (;;) {
   const p = await probe();
@@ -85,6 +137,23 @@ for (;;) {
   if (baseline === null && p.ok) {
     baseline = { services: p.checks.services, mcpTools: p.checks.mcpTools, codeHash: p.codeHash, newBuild: p.newBuild };
     console.log(`${stamp()}  baseline: ${baseline.services} services · ${baseline.mcpTools} MCP tools · ${baseline.codeHash} · ${baseline.newBuild ? 'NEW build already live' : 'old build serving'}`);
+    console.log(`${stamp()}  marker: ${MARKER_DESC}`);
+
+    // REFUSE LOUDLY RATHER THAN WAIT FOREVER. If the marker is already true before the deploy starts,
+    // the success condition below can never fire, and this script used to simply loop in silence until
+    // whoever started it gave up and wrote their own. It happened three times. A marker that is already
+    // present is not a small configuration slip: it means this run cannot tell the old build from the
+    // new one, so anything it reports afterwards would be about nothing.
+    if (baseline.newBuild) {
+      console.log(`\n${'!'.repeat(72)}`);
+      console.log(`${stamp()}  REFUSING TO WATCH: the marker "${MARKER_DESC}" is ALREADY TRUE at baseline.`);
+      console.log('  This run could not distinguish the old container from the new one, so it would either');
+      console.log('  hang forever or declare success over the build that is already serving.');
+      console.log('  Pick something only THIS deploy can produce, then start again:');
+      console.log('    node gates/watchdog.mjs --marker build.someKeyThisDeployAdds');
+      console.log(`${'!'.repeat(72)}\n`);
+      process.exit(2);
+    }
   }
 
   if (now !== state) {
@@ -93,6 +162,7 @@ for (;;) {
       console.log(`${stamp()}  ⚠ DARK — ${p.error || `status ${p.status}`}. Clock started.`);
     } else {
       const downS = darkSince ? Math.round((Date.now() - darkSince) / 1000) : 0;
+      if (darkSince) maxDarkMs = Math.max(maxDarkMs, Date.now() - darkSince);
       console.log(`${stamp()}  ✓ ANSWERING again after ${downS}s · ${p.checks.services} services · ${p.checks.mcpTools} MCP tools · ${p.ms}ms`);
       darkSince = null;
       alarmed = false;
@@ -124,9 +194,12 @@ for (;;) {
   }
 
   if (p.ok && p.newBuild && baseline && !baseline.newBuild) {
+    const darkS = Math.round(maxDarkMs / 1000);
     console.log(`\n${stamp()}  ★ NEW BUILD IS LIVE and healthy.`);
     console.log(`     ${p.checks.services} services · ${p.checks.mcpTools} MCP tools · codeHash ${p.codeHash} (unchanged, as intended)`);
+    console.log(`     darkness: ${darkS}s${maxDarkMs ? '' : ' — the service answered every poll through the swap'}`);
     console.log('     Now verify by hand: /changelog carries today\'s entry, and /paper/1..7 still match the repo.');
+    recordDeploy({ darkS, services: p.checks.services, mcpTools: p.checks.mcpTools, codeHash: p.codeHash });
     process.exit(process.exitCode || 0);
   }
 

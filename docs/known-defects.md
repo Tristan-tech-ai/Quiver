@@ -18,6 +18,18 @@ matching no declared alternative at all. Their records are kept in place rather 
 what a defect looked like before it was closed is the part a reader cannot reconstruct afterwards.
 `/changelog` is the dated index of what has moved.
 
+> **How to read this page, because it is half history.** Both §1 fixes and the §3 fix are **live** —
+> deployed, verified against the endpoint at 10:38 UTC on 29 July 2026, and none of them moved the
+> build hash. The measured tables inside §1 and §3 are the *before* state and are labelled as such at
+> the point of use. If you want only the current behaviour, read the status line at the top of each
+> section and the *"What the live service answers today"* block at the foot of the page.
+>
+> **This page contradicted itself for part of 29 July**, and it is the one page where that costs most.
+> §1's status line said `side: "banana"` was refused while the closing section said it still returned
+> 91,139.24 and would need a moved build hash to fix. The closing section was the false one. It is
+> retained, quoted and marked at the foot of this page rather than deleted. The repair is written up in
+> `claim-repair.md`.
+
 ---
 
 ## 1. `side` and option `type` are matched as exact lowercase strings, and fail open to the riskier default
@@ -51,7 +63,13 @@ src/engine/perpGate.js:29     const sideSign = (s) => (s === 'short' || s === 's
 src/engine/optionsRisk.js:32  const type = p.type === 'put' ? 'put' : 'call';
 ```
 
-### What that does, measured
+### What that does, measured — BEFORE THE FIX
+
+> **Every table in this section is the historical record, not current behaviour.** These are the
+> numbers the live service returned *before* 29 July 2026. They are kept because they are the evidence
+> the defect was real and the measurement anyone can hold us to. **What the service returns today is at
+> the foot of this page**, under *"What the live service answers today"* — the bolded rows below no
+> longer reproduce.
 
 **`perp_gate`, over the free MCP endpoint.** Body
 `{side, entryPrice: 100000, size: 1, leverage: 10, maxLeverage: 40, markPrice: 100000}`:
@@ -95,7 +113,8 @@ Capitalise one word in the second leg:
 is "to see whether independently-sized bets are secretly ONE bet that blows up together" says the
 opposite of the truth about the simplest book there is.
 
-**`options_risk`.** Every `type` that is not the literal string `"put"` is priced as a **call**. Body
+**`options_risk`** — again, as it behaved BEFORE the fix. Every `type` that is not the literal string
+`"put"` was priced as a **call**. Body
 `{forward: 100000, positions: [{type, strike: 110000, expiryDays: 30, iv: 0.6, quantity: 1}]}`:
 
 | sent `type` | served as | portfolioValue | delta | self-checks |
@@ -107,6 +126,11 @@ opposite of the truth about the simplest book there is.
 
 The delta sign flips. A caller hedging a put book is handed the greeks of a call book — a position
 that moves the other way — and the mark-to-model value is wrong by 10,000 on a single leg.
+
+None of the four rows above reproduces today. `"PUT"` and `"Put"` price as puts; `"P"`, `"p"`,
+`"puts"`, `" put"` and `"banana"` are refused outright. The row listing `"banana"` under **call** is
+the strongest single piece of evidence on this page and also the one most likely to be misread — it
+records what the service did in the past tense, and only that.
 
 ### Every self-check passes, and that is the point
 
@@ -160,8 +184,11 @@ costs more trust than a documented wrong answer. We are not neutral about which 
 inverted risk number is worse than a changed hash. We are only claiming that changing the hash *while
 a reviewer is mid-verification* is worse than either, and that the window closes in days.
 
-**The fix, in full, for when the window opens.** It is four changes, not one, and only the third
-touches the hashed tree:
+**The fix, in full, for when the window opens — THE PLAN AS IT STOOD, AND ITS STEP 3 IS WRONG.** It
+was believed to be four changes, of which only the third touched the hashed tree. Step 3 was never
+needed and was never done; `"banana"` is refused today at the validation layer, outside the hash. The
+list is kept unedited because *"the fix has to live in the hashed tree"* is the assumption this page
+got wrong twice, and reading the reasoning is how the second occurrence was caught:
 
 1. `src/services.js` — declare `enum: ['long','short']` on perp-gate's `side` and
    `enum: ['call','put']` on the option-type item property. The repair layer (`src/util/repair.js`
@@ -369,22 +396,50 @@ curl -s https://quiver-production-c3a8.up.railway.app/mcp \
 
 Compare `liquidationPrice` against the same body with `"side":"short"`.
 
-**Which answer you get tells you which build you reached, and both are correct outcomes of this
-page.** The §1 fix is in the repository and has **not been deployed** — no deploy has been performed
-since it landed, and the changelog entry for it is written ahead of the deploy exactly as this
-project's other entries are. So:
+### What the live service answers today
 
-- **108,641.98 for both** — you reached a build carrying the fix. §1's case half is closed.
-- **91,139.24 for `"SHORT"`** — you reached the build that was live when this page was written. The
-  defect reproduces as described, and the fix is in `src/services.js`, `src/mcp.js` and
-  `src/util/repair.js` in the repository, held by `npm run gate:c`.
+**Both fixes are deployed.** Measured against the live endpoint at 10:38 UTC on 29 July 2026, on the
+free MCP surface — the one the command above uses:
 
-Either way, `{"side":"banana"}` still returns 91,139.24 on both builds. That half is genuinely still
-open and is not scheduled around judging: it needs `src/engine/` and a moved build hash.
+| you send | live answer | |
+|---|---|---|
+| `"side":"short"` | `liquidationPrice` **108,641.98** | the short's price |
+| `"side":"SHORT"` | `liquidationPrice` **108,641.98** | identical to the above, and the identical `contentHash` |
+| `"side":"banana"` | **refused** — `ok:false`, `unknownEnumValues`, *"Nothing was computed and you were not charged"* | not answered at all |
+
+`/build` reads `q1-e1fa99d08887d6cc`. **The hash did not move for either fix**, because neither one
+touched `src/engine/`: both shipped in `src/services.js`, `src/mcp.js` and `src/util/repair.js`.
+
+If you get **91,139.24 for `"SHORT"`**, or a priced answer for `"banana"`, you have reached a cached
+or older response — that is not the build this document describes, and the tables in §1 tell you
+exactly what you are looking at.
+
+### What this section used to say, and why it is worth keeping
+
+Until 29 July this section predicted the opposite, in two sentences that were false in three ways
+between them:
+
+> Either way, `{"side":"banana"}` still returns 91,139.24 on both builds. That half is genuinely still
+> open and is not scheduled around judging: it needs `src/engine/` and a moved build hash.
+
+`banana` is refused, not answered; it did not need `src/engine/`; and the hash did not move. The same
+page said so 355 lines earlier, at §1's status line. **A defect register that contradicts itself is
+worse than one that is merely out of date**, because the reader cannot tell which half to trust — and
+this is the page whose whole purpose is being trusted about bad news. It is recorded here rather than
+quietly deleted for the same reason every other superseded paragraph on this page is.
+
+The other retracted sentence claimed *"no deploy has been performed since it landed"*. Three had:
+28 July 17:20:59 UTC, 29 July 00:30:41 UTC, and 29 July ~09:30 UTC. See `deploy-manifest.md`.
+
+**Nothing here was measurable.** No checker reads a document against the endpoint it predicts, so
+these sentences could not go red however false they became. `claim-repair.md` proposes the gate that
+would have caught them.
 
 To reproduce the fix locally without the network, against whatever is checked out:
 
 ```
 npm run gate:c          # 10 checks, every service and every enum field, both surfaces
 npm run gate:c-revert   # puts each half of the fix back and shows the gate go red
+npm run gate:u          # 8 checks, the unrecognised-value half
+npm run gate:u-revert   # removes the guard from each surface in turn and shows gate U go red
 ```

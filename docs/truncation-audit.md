@@ -5,6 +5,22 @@
 (`cdeb06fc-e974-4d4a-9172-8033d0b77930`), re-derived without a cap.
 **Status:** findings only. Nothing here was fixed. `hackathon/paper/` was not touched.
 
+> **TWO HEADLINE FINDINGS ARE NOW CLOSED, 29 July 2026 (later).** Both were true when measured and both
+> were resolved the same day. They are left in place because this is a findings document and the
+> measurements are the point — but a reader must not take either as current:
+>
+> - **§1.1, "the judge-facing PDF on Google Drive is stale" — closed.** The file was re-uploaded.
+>   `curl -sIL` on the published link now returns `Content-Length: 935830`, the exact size of the
+>   current render, with `Last-Modified` 09:50 UTC on 29 July.
+> - **§1.5, "the live deploy is behind the working tree" — closed.** A deploy at roughly 09:30 UTC
+>   landed after the 08:50 UTC measurement recorded below. All seven paper parts, the typeset HTML,
+>   `/paper/full` and `/changelog` are byte-identical to the tree, verified per-part by sha256 and
+>   independently by `gates/preflight.mjs`.
+>
+> This document also correctly flagged, at §1.5, that the deploy manifest was telling readers the live
+> service "has not been touched since 28 July". That finding was read and not acted on for several
+> hours, which is recorded in the commit that eventually fixed it. Write-up: `claim-repair.md`.
+
 ---
 
 ## Headline — what bears on the deploy decision

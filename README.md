@@ -43,17 +43,25 @@ container serves, so the original plan was to build everything without deploying
 
 **That plan changed, and this paragraph used to claim otherwise.** It said the live endpoint had not
 been touched since the deadline. That was true when it was written and false by the time anyone read
-it: **two deploys have shipped**, on 29 July at 00:30 and 09:30 UTC. Both went out because leaving
-them undone was the larger risk — the first carried a mis-route signpost that had been telling callers
-with *correct* requests they had asked the wrong service, and the second carried a fix for inputs like
-`side: "SHORT"` being silently answered as a long, signed and billed.
+it: **three deploys have shipped** — 28 July at 17:20:59 UTC, and 29 July at 00:30:41 and roughly
+09:30 UTC. They went out because leaving them undone was the larger risk: they carried a mis-route
+signpost that had been telling callers with *correct* requests they had asked the wrong service, a fix
+for inputs like `side: "SHORT"` being silently answered as a long, signed and billed, and the corrected
+paper.
 
 The three-minute estimate did not survive contact either. **Measured darkness was 11 seconds on the
 first deploy and 0 seconds on the second** — the service answered every poll straight through the
-container swap. Both were run behind a watchdog that establishes a marker only the new build can
-produce, polls until it appears, and records any window where the service stopped answering; `gates/`
-holds it, along with a preflight that refuses to pass unless the codeHash, the service list, the
-endpoint and the advertised schemas are all unmoved.
+container swap. **The third was never timed.** All were run behind a watchdog that establishes a marker
+only the new build can produce, polls until it appears, and records any window where the service
+stopped answering; `gates/` holds it, along with a preflight that refuses to pass unless the codeHash,
+the service list, the endpoint and the advertised schemas are all unmoved.
+
+**This paragraph counted two deploys until 29 July, and gave the wrong darkness figure for both.** It
+listed only the two on 29 July and then reused the phrase "11 seconds on the first and 0 on the second"
+from a log where "first" and "second" meant different deploys — putting 11 seconds on one that had none
+and 0 on one nobody timed. The watchdog prints darkness and writes no file, so the two real figures
+survive only in commit messages written minutes after the fact; the third deploy's is simply unknown
+and is not guessed at here. `docs/deploy-manifest.md` carries the evidence table.
 
 The machine-readable paper stays at exactly seven parts, because the submitted entry hardcodes seven
 URLs. That has held through every change, and `npm run gate:y` now checks the section-to-part mapping

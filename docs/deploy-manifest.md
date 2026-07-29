@@ -1,10 +1,28 @@
 # What is waiting for a deploy
 
 > **SUPERSEDED, 29 July 2026.** This document was written while the plan was to ship nothing, and its
-> opening said the live service had not been touched since 28 July. **Two deploys have since gone out**,
-> at 00:30 and 09:30 UTC on 29 July, and the live service now carries everything listed below. Measured
-> darkness was 11 seconds on the first and 0 on the second, against the three-minute estimate that was
-> the whole reason for the no-deploy plan.
+> opening said the live service had not been touched since 28 July. **Three deploys have since gone
+> out**, and the live service now carries everything listed below.
+>
+> | # | when | darkness | how that is known |
+> |---|---|---|---|
+> | 1 | **28 Jul 17:20:59 UTC** (01:20 WITA 29 Jul) | **11 seconds** | `verification-log.md` §"The deploy, for the record"; commit `468c701`, *"deployed at 01:20 WITA, dark for 11 seconds"*; corroborated from a separate workstream by `148f8fb` |
+> | 2 | **29 Jul 00:30:41 UTC** | **0 seconds** | `verification-log.md` §V10; commit `af31f77`, *"second deploy, live at 00:30:41 UTC, and it never went dark at all"*, **committed 00:32:25 UTC — 1m44s after the stated go-live** |
+> | 3 | **29 Jul ~09:30 UTC** | **never measured** | no commit, no log section, no watchdog output; bracketed by a measurement at 08:50 UTC showing live *behind* the tree and one after it showing live byte-identical |
+>
+> **An earlier version of this banner said "two deploys … 11 seconds on the first and 0 on the second",
+> and both figures were attached to the wrong events.** That sentence was copied from the verification
+> log, where "first" and "second" meant deploys 1 and 2 above. Re-listing the deploys as *the two on
+> 29 July* silently re-bound those words: 11 seconds moved onto a deploy that had none, and 0 seconds
+> onto a deploy nobody timed. Nothing could catch it — the count and the darkness of a past deploy are
+> read by no checker, and no deploy log is committed.
+>
+> **What is settled and what is not.** The count, the order and the times are settled by commit
+> timestamps, which are evidence independent of anyone's recollection. The 11 and 0 second figures are
+> contemporaneous eyewitness records, not re-derivable measurements: `gates/watchdog.mjs` prints
+> darkness to stdout and writes no file, so the terminal that held both numbers is gone. Deploy 3's
+> darkness is not merely unrecorded but unknown, and this document does not assign it a number.
+> `claim-repair.md` proposes the committed deploy log that would end this.
 >
 > What still stands is the reasoning: what a deploy changes, what it does not, and what to check after.
 > That is why the list below is kept rather than rewritten. Read it as the record of what shipped.
@@ -53,8 +71,37 @@ npm run gate:r
 npm run gate:buyer
 ```
 
-Six checks and sixteen. Both proven able to fail by scripted revert: stub the router and 2 of 6 go
-red; stub the repair layer and 6 of 16 go red.
+Fifteen checks and sixteen, both proven able to fail by scripted revert — `npm run gate:r-revert` and
+`npm run gate:buyer-revert`. Measured, by the reverts themselves rather than asserted here:
+
+| gate | checks | reverts | distinct checks turned red |
+|---|---|---|---|
+| `gate:r` | 15 | 4 | **7** |
+| `gate:buyer` | 16 | 6 | **8** |
+
+**This sentence used to say both gates were proven able to fail, and it was false for half of it.**
+`gate:buyer` had no revert of any kind until 29 July 2026 — only `gates/gateBuyer-mistakes.mjs` and a
+single alias. Its sixteen checks had never been shown able to fail once, on the gate whose subject is
+the failure this project exists for: a reviewer's agent that sends a slightly wrong body and does not
+understand the answer. The sentence also miscounted `gate:r` as six checks when it has fifteen.
+
+That mattered more than a wrong number, because **this gate has already let a defect through**.
+`gates/gateP-paid-teaching.mjs:14` records it: every check of the teaching layer called `repairBody`
+and `correctedExample` directly, or went through `/mcp`, and not one ever put a `PAYMENT-SIGNATURE`
+header on a request — so a paying caller got the prose of a refusal and none of the retry, while the
+free caller got the corrected body. A gate that cannot fail cannot tell you which half of the surface
+it is standing on.
+
+`gateBuyer-revert.mjs` puts six defects back into `src/util/repair.js` and `src/util/routing.js` one
+at a time — a refusal that hands back plausible defaults instead of visible placeholders; the historical
+empty-example bug; `"64,000"` and `"64k"` parsed instead of refused; an alias overwriting the caller's
+own value; unwrapping firing on a wrapper key that is not alone; and the mis-route signpost losing the
+branch `routing.js` calls *"the case that actually cost two stars"*. Each must turn gateBuyer red
+**naming** the defect, and green again on restore. **Eight of the sixteen checks are covered; the other
+eight are named in the output as unreverted** — not proven sound, just not yet shown able to fail,
+which is the state the whole gate was in before.
+
+Five of the six defects are caught by gateBuyer alone; `gate:r` also catches the signpost one.
 
 **The MCP gap is closed**, and it was worth closing first. The free endpoint is where a caller
 explores, so it is where a caller is most likely to be wrong, and it was the one getting no help.

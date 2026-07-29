@@ -92,9 +92,15 @@ matching the numbers taken at deploy time. `gates/` sits outside `src/engine/`, 
 not move and no re-review is triggered; the live service was re-checked mid-work and still serves
 `q1-e1fa99d08887d6cc`.
 
-## The deploy, for the record
+## The deploy, for the record — DEPLOY 1 OF 3
 
-Went out at 17:20:59 UTC, 01:20 WITA, inside the agreed window.
+Went out at 17:20:59 UTC on **28 July**, 01:20 WITA on 29 July, inside the agreed window.
+
+> **Read the date, not just the clock.** 01:20 WITA is 17:20 UTC the *previous* day. This deploy is the
+> **first** of three, and the "11 seconds" below belongs to it. Two published documents lost that: they
+> listed only the two deploys that fall on 29 July by UTC date, then reused this log's own
+> "first / second" wording against the new list, moving 11 seconds onto the 00:30:41 deploy that had
+> zero. The full evidence table is in `deploy-manifest.md`.
 
 | | |
 |---|---|
@@ -116,8 +122,15 @@ correct: Phase A shipped switched off, pending a decision about a Railway volume
 ## V10 — second deploy, and it never went dark at all
 
 Out at 00:30:41 UTC on 29 July, on a fresh authorisation. **Zero seconds of darkness**, against 11
-seconds on the first deploy and a three-minute expectation before that. The service answered every
-single poll through the swap.
+seconds on the first deploy — 28 July 17:20:59 UTC, above — and a three-minute expectation before
+that. The service answered every single poll through the swap.
+
+> **A third deploy followed, at roughly 09:30 UTC on 29 July**, carrying the corrected paper. It has no
+> section in this log, no commit announcing it, and **no darkness measurement at all**: the watchdog
+> prints its figure to stdout and writes no file, and nobody captured it. Its existence is fixed only
+> by bracketing — the live service measured *behind* the tree at 08:50 UTC and byte-identical to it
+> afterwards. This log stops at V10 and that gap is the reason the deploy count was ambiguous enough
+> for two other documents to get it wrong.
 
 The safety belt was run fresh immediately before pressing, not trusted from earlier in the session:
 

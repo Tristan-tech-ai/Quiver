@@ -20,6 +20,7 @@
     "gate:r": "node --test gates/gateR-misroute.mjs",
     "gate:r-revert": "node gates/gateR-revert.mjs",
     "gate:buyer": "node --test gates/gateBuyer-mistakes.mjs",
+    "gate:buyer-revert": "node gates/gateBuyer-revert.mjs",
     "gate:d-hl": "node --test gates/gateD-hl-attest.mjs",
     "gate:d-hl-revert": "node gates/gateD-hl-revert.mjs",
     "gate:d3": "node --test gates/gateD3-dydx-input-attestation.mjs",

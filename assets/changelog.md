@@ -12,6 +12,66 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — four published claims had stopped being true, and the gate that guards buyers had never been shown able to fail
+
+Four things were wrong in documents a reviewer reads, and one of them was wrong in the worst possible
+place.
+
+**The defect register contradicted itself.** `docs/known-defects.md` is the page that exists to
+disclose our own bugs honestly, so an error there costs more than anywhere else. Its §1 status line
+said `side: "banana"` is now refused. Its closing section, 355 lines later, told a reader the same
+input "still returns 91,139.24 on both builds" and that fixing it "needs `src/engine/` and a moved
+build hash" — and separately that "no deploy has been performed since it landed". Re-measured against
+the live endpoint: `banana` is **refused** with an `unknownEnumValues` block, `side: "SHORT"` returns
+**108,641.98**, the fix shipped entirely outside the hashed tree in `src/util/repair.js`,
+`src/services.js` and `src/mcp.js`, `q1-e1fa99d08887d6cc` never moved, and three deploys had shipped.
+The page now states current behaviour at the top and at the foot, and every historical table is
+labelled at the point of use as the *before* state. The retracted sentences are quoted rather than
+deleted, because a defect register that hides its own corrections is not a defect register.
+
+**`docs/pdf-rerender.md` was wrong in the opposite direction.** It said the Google Drive link serves
+something that "is not this document", and that this was "not verifiable from here". Both false. One
+unauthenticated `curl -sIL` returns `HTTP 200`, `Content-Length: 935830` — exactly the current render —
+uploaded at 09:50 UTC. The second error produced the first: deciding a fact was unmeasurable is what
+stopped anyone looking, and the "measurement" that replaced it was a stale to-do list. The same page
+said the served paper was stale; all seven parts, the typeset HTML and this changelog are byte-identical
+to the repository, verified by sha256 and independently by `preflight`.
+
+**`docs/deploy-manifest.md` claimed a revert that did not exist.** It described both buyer gates as
+"proven able to fail by scripted revert". `gate:buyer` had none — sixteen checks that had never been
+shown able to fail once, on the gate whose whole subject is a reviewer's agent that does not understand
+a refusal. That gate has already let a defect through once (`gates/gateP-paid-teaching.mjs:14`: the
+paid surface got the prose of a refusal and none of the retry). The claim was not deleted; the revert
+was built. `gates/gateBuyer-revert.mjs` (`npm run gate:buyer-revert`) puts six defects back into
+`src/util/repair.js` and `src/util/routing.js` one at a time — plausible defaults instead of visible
+placeholders, the historical empty-example bug, `"64,000"` and `"64k"` parsed instead of refused, an
+alias overwriting the caller's own value, unwrapping firing on a wrapper key that is not alone, and the
+mis-route signpost losing the branch that catches a call which *succeeds* at the wrong shop. Each turns
+the gate red naming the defect and green again on restore. **Eight of the sixteen checks are covered,
+and the eight that are not are printed by name** — not proven sound, just not yet shown able to fail.
+
+**Three documents disagreed about the deploys.** The manifest and the README said two deploys with
+11 seconds of darkness on the 00:30 UTC one; `docs/verification-log.md` said that deploy had zero and
+put the 11 seconds on an earlier one. Settled from commit timestamps: there were **three** — 28 July
+17:20:59 UTC (11 seconds dark), 29 July 00:30:41 UTC (zero, and the commit announcing it lands 1m44s
+later), and 29 July ~09:30 UTC (**never timed**). The error was a copied sentence: "first" and "second"
+were re-bound when the list was rewritten as *the deploys on 29 July*, moving 11 seconds onto a deploy
+that had none. All three documents now agree, and none of them assigns the third deploy a number,
+because `gates/watchdog.mjs` prints darkness to stdout and writes no file.
+
+One thing found while building the revert and worth recording: the first version used `preflight` as
+its companion gate, and three consecutive runs over identical code reported "4 of 6 held by gateBuyer
+alone", then 2, then 3. `preflight` makes six live-service calls that fail as a cluster on any network
+hiccup. A companion that answers differently each run cannot support a published sentence, so it was
+replaced with `gate:r`, which makes none. The coverage figure was stable throughout.
+
+Documentation and one new gate. `src/` and `src/engine/` are untouched — the revert restores both files
+it edits and verifies them back to their starting sha256 before reporting. The build hash is unchanged
+at `q1-e1fa99d08887d6cc`, `npm test` is unchanged at 386 tests, 381 passing, 5 skipped, 0 failing, and
+nothing here was deployed. Full record in `docs/claim-repair.md`.
+
+---
+
 ## 29 July 2026 — the PDF a judge downloads was two corrections behind the paper it claims to be
 
 The four test-count corrections made earlier today were made in `assets/whitepaper.html`, which is
@@ -46,6 +106,14 @@ than today's corrections — the last upload anyone confirmed was 21 July. And t
 serves the pre-correction paper: the repository is right and pushed, the deploy that carries it is
 not done. `gates/preflight.mjs` already declares that gap by content hash on every run, which is why
 it passes; it is a deploy that has not happened, not a check that missed.
+
+**Both of those were closed later the same day, and this paragraph was left saying otherwise for
+several hours — while being served, by the very service it described as stale.** The Drive file was
+replaced: an anonymous `curl -sIL` on that link now returns 935,830 bytes, the exact size of the
+current render, uploaded at 09:50 UTC. And the deploy happened at roughly 09:30 UTC, after which all
+seven paper parts, the typeset HTML and this changelog are byte-identical to the repository —
+`preflight` reports *"7 byte-identical to live"*. Left in place, corrected here rather than rewritten,
+because a changelog that quietly edits its own history is worth less than one that shows it.
 
 Documentation and one rendered artifact only. `src/engine/` is untouched, the build hash is unchanged
 at `q1-e1fa99d08887d6cc`, and no content hash has moved for any request that already worked.

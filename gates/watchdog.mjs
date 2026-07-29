@@ -37,17 +37,61 @@ const EVERY_MS = 5000;
 //   --marker build.someNewKey        a dotted path into /build that must appear
 //   --marker index.services.length>22
 // and if none is given, the default is used and checked at baseline like any other.
+// A `/build` key is not always available, and this script was bypassed a FOURTH time because of it.
+// The deploy that shipped `elapsedMs` and `excludedFromContentHash` added nothing to `/build` at all —
+// both live inside the answer a service returns — so there was no dotted path to point at, and yet
+// another throwaway poller was written and `gates/deploy-log.tsv` stayed empty. A log nothing writes to
+// is not a record, so the marker forms have to cover where the evidence actually is.
+//
+//   --marker build.someNewKey                     a dotted path into /build
+//   --marker call:perp_gate:proof.elapsedMs       a dotted path into an MCP tool's ANSWER
+//
+// The call form needs a body. `--marker-args '{"entryPrice":64000,…}'` supplies one; without it the
+// tool is called with `{}`, which reaches the validator and stops — enough for a field the envelope
+// always carries, useless for anything behind a branch. It says which it used.
 const markerArg = (process.argv.find((a) => a.startsWith('--marker=')) || '').split('=')[1]
   || (process.argv.includes('--marker') ? process.argv[process.argv.indexOf('--marker') + 1] : null);
+const markerArgsRaw = (process.argv.find((a) => a.startsWith('--marker-args=')) || '').split('=').slice(1).join('=')
+  || (process.argv.includes('--marker-args') ? process.argv[process.argv.indexOf('--marker-args') + 1] : null);
+let MARKER_ARGS = {};
+if (markerArgsRaw) {
+  try { MARKER_ARGS = JSON.parse(markerArgsRaw); }
+  catch (e) { console.log(`FATAL: --marker-args is not JSON: ${e.message}`); process.exit(2); }
+}
 const MARKER_DESC = markerArg || 'build.proofStorage';
 const dig = (o, path) => path.split('.').reduce((v, k) => (v == null ? v : v[k]), o);
+const present = (v) => v !== undefined && v !== null && v !== false;
+
+const callMarker = markerArg && markerArg.startsWith('call:')
+  ? { tool: markerArg.split(':')[1], path: markerArg.split(':').slice(2).join(':') }
+  : null;
+
+// Reads /build. Returns false for a call-form marker, which is resolved separately against a live answer.
 const NEW_BUILD_MARKER = (build) => {
-  if (!build) return false;
+  if (!build || callMarker) return false;
   if (!markerArg) return Object.prototype.hasOwnProperty.call(build, 'proofStorage');
   const p = markerArg.startsWith('build.') ? markerArg.slice(6) : markerArg;
-  const v = dig(build, p);
-  return v !== undefined && v !== null && v !== false;
+  return present(dig(build, p));
 };
+
+// Resolves a `call:` marker by asking the service a real question and reading its answer. A failure to
+// reach it is NOT a false marker — it is darkness, and the caller already tracks that — so this returns
+// null rather than false and the caller leaves the marker undecided.
+async function callMarkerPresent() {
+  if (!callMarker) return null;
+  try {
+    const r = await fetch(`${LIVE}/mcp`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 9, method: 'tools/call', params: { name: callMarker.tool, arguments: MARKER_ARGS } }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const j = await r.json();
+    const text = j?.result?.content?.[0]?.text;
+    if (!text) return null;
+    return present(dig(JSON.parse(text), callMarker.path));
+  } catch { return null; }
+}
 
 const stamp = () => new Date().toISOString().slice(11, 19);
 
@@ -111,6 +155,11 @@ async function probe() {
     });
     const tools = await mcp.json();
     out.checks.mcpTools = tools?.result?.tools?.length || 0;
+
+    if (callMarker) {
+      const m = await callMarkerPresent();
+      if (m !== null) out.newBuild = m;   // null means unreachable, which is darkness, not absence
+    }
 
     out.ok = out.checks.build && out.checks.services > 0 && out.checks.paidReturns402 && out.checks.mcpTools > 0;
   } catch (e) {

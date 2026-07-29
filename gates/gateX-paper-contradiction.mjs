@@ -183,7 +183,33 @@ const CLAIMS = [
 // a correction table must be able to print the wrong sentence beside the right one, and a narrative
 // of past review rounds is a log even when it lives inside a published document.
 const HISTORY = /close of that round|suite stood at|stood at|later rounds have taken|test suite \d+\s*(?:→|->)|\d{2,4}\s*(?:→|->)\s*$/i;
-const isQuoted = (s, i) => /["“]\**\s*$/.test(s.slice(Math.max(0, i - 8), i));
+// Is the match INSIDE a quotation? Quoting a sentence in order to say it was wrong is not making the
+// claim, and this exemption exists so a correction can reproduce what it corrects.
+//
+// IT USED TO LOOK BACK EIGHT CHARACTERS, and that is not what "quoted" means. It caught a phrase that
+// opens a quotation and missed every phrase sitting deeper inside one. Two documents fired on exactly
+// that shape: `PDF_RERENDER.md:142` reproduces the superseded Table 2 caption inside a sentence of the
+// form *the old reads "… All currently pass." and the new reads …*, where the opening mark is far more
+// than eight characters before the words the rule matched. It has been red ever since, and the finding
+// was correct about the phrase and wrong about the document.
+//
+// Span-aware instead: count the quotation marks before the offset, and an odd count means the match is
+// inside an open quotation. Straight and typographic, double and single, all counted — the corpus is
+// markdown written by hand and HTML with entities decoded, so it carries all four.
+//
+// THE COST IS REAL AND ACCEPTED: an over-claim that a document genuinely makes, but happens to write
+// inside quotation marks, is now excused. That is the correct reading — a quoted claim is attributed,
+// not asserted — but it is a widening, so `gate:x-revert` must still show the rule catching an
+// unquoted over-claim, and it does.
+const isQuoted = (s, i) => {
+  const before = s.slice(0, i);
+  const doubles = (before.match(/["“”]/g) || []).length;
+  if (doubles % 2 === 1) return true;
+  // Single quotes only count when they are unambiguously quotation rather than an apostrophe: a
+  // typographic pair, or a straight quote that opens after whitespace. `don't` must not read as a quote.
+  const singles = (before.match(/[‘’]|(?<=^|\s)'/g) || []).length;
+  return singles % 2 === 1;
+};
 
 // The source of truth is HTML, so these prose rules have to read HTML — and raw markup lies to them
 // in two ways that the scripted revert caught immediately. §3.6 narrates its own former error as

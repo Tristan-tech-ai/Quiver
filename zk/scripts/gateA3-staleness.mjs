@@ -44,7 +44,28 @@ const live = universe.filter((u) => !u.isDelisted);
 const NAMED = ['BTC', 'ETH', 'SOL', 'HYPE', 'DOGE', 'XRP', 'BNB', 'AVAX', 'LINK', 'SUI'];
 const named = NAMED.map((n) => live.find((u) => u.name === n)).filter(Boolean);
 const spread = live.filter((u) => !NAMED.includes(u.name)).filter((_, i) => i % 6 === 0).slice(0, 30);
-const basket = [...named, ...spread];
+let basket = [...named, ...spread];
+
+// `--basket coarse` swaps the spread for the COARSEST-GRID assets in the universe — the ones whose
+// single tick is worth more than a ppm window sized on the majors. Those are exactly the assets the
+// tick floor exists for, and measuring the floor anywhere else measures nothing: a pooled tick
+// percentile over the whole basket is dominated by PAXG, whose tick is 0.25 ppm, and would recommend
+// thousands of ticks — which on an 800-ppm-per-tick asset is a window wider than the price.
+if (process.argv.includes('--basket') && process.argv[process.argv.indexOf('--basket') + 1] === 'coarse') {
+  const withTick = [];
+  for (let i = 0; i < live.length; i += 40) {
+    await Promise.all(live.slice(i, i + 40).map(async (u) => {
+      try {
+        const m = await rpc('eth_call', [{ to: '0x0000000000000000000000000000000000000806', data: '0x' + u32(u.perpIndex) }, 'latest'], { tries: 3 });
+        const raw = Number(BigInt(m));
+        if (raw > 0) withTick.push({ ...u, tickPpm: 1e6 / raw });
+      } catch { /* rate limit, not a property of the asset */ }
+    }));
+  }
+  withTick.sort((a, b) => b.tickPpm - a.tickPpm);
+  basket = [...withTick.slice(0, 30), ...named.slice(0, 4)];
+  console.log(`  coarse basket: tick from ${withTick[0].tickPpm.toFixed(0)} ppm (${withTick[0].name}) down to ${withTick[29].tickPpm.toFixed(1)} ppm (${withTick[29].name})`);
+}
 console.log(`  basket: ${basket.length} live perps — ${basket.slice(0, 12).map((b) => b.name).join(' ')} …\n`);
 
 const idx = basket.map((b) => b.perpIndex);
@@ -197,7 +218,33 @@ console.log(`    proving, and ${blockTime.toFixed(2)} s/block of inclusion.`);
 
 const t30 = tickTable.find((r) => r.lag === 30);
 const recommend = at30 ? at30.p999 : null;
-const recommendTicks = t30 ? Math.max(1, t30.p999) : 1;
+
+// windowTicks is NOT the pooled tick percentile. That figure is dominated by the FINE-grid end of the
+// basket — PAXG's tick is 0.25 ppm, so an ordinary move is thousands of its ticks — and applying it as
+// a floor to a coarse-grid asset whose tick is 800 ppm would open a window wider than the price. The
+// floor only ever matters where one tick is already wider than `windowPpm`, so it is measured among
+// exactly those assets and nowhere else.
+const bindingIdx = basket.map((b, k) => ({ k, name: b.name, tickPpm: tickPpm.find((t) => t.name === b.name)?.ppm ?? 0 }))
+  .filter((x) => x.tickPpm > (recommend ?? Infinity));
+let recommendTicks = 1;
+let ticksBasis = `no asset in this basket has a tick wider than the ${recommend}-ppm window, so the floor never binds here and 1 is the minimum that keeps the gate satisfiable elsewhere; rerun with --basket coarse to measure it where it does bind`;
+if (bindingIdx.length) {
+  const pooled = [];
+  for (let i = 0; i < samples.length; i++) {
+    let j = i + 1; while (j < samples.length && (samples[j].t - samples[i].t) < 30000) j++;
+    if (j >= samples.length) break;
+    for (const { k } of bindingIdx) {
+      const a = samples[i].hats[k], b = samples[j].hats[k];
+      if (a === 0n) continue;
+      pooled.push(Number((a > b ? a - b : b - a) / tickHat[k]));
+    }
+  }
+  pooled.sort((x, y) => x - y);
+  recommendTicks = Math.max(1, q(pooled, 0.999));
+  ticksBasis = `p99.9 of 30-second drift measured on the ${bindingIdx.length} basket assets whose tick exceeds ${recommend} ppm `
+    + `(${bindingIdx.slice(0, 4).map((x) => `${x.name} ${x.tickPpm.toFixed(0)}ppm`).join(', ')}), ${pooled.length} pairs, max ${pooled[pooled.length - 1]} ticks`;
+}
+console.log(`\n  windowTicks basis: ${ticksBasis}`);
 console.log(`\n  raw drift at 5 s p99.9  = ${at5?.p999} ppm      (a fresh read, one block of inclusion)`);
 console.log(`  raw drift at 10 s p99.9 = ${at10?.p999} ppm`);
 console.log(`  raw drift at 30 s p99.9 = ${at30?.p999} ppm      (the cache TTL alone)`);
@@ -244,7 +291,7 @@ fs.writeFileSync(path.join(BUILD, 'gateA3-staleness.json'), JSON.stringify({
   samples: samples.length, assets: idx.length, basket: basket.map((b) => b.name),
   blockTimeSec: blockTime, driftPpm: table, driftTicks: tickTable, tickPpm,
   perAssetWorst: Object.fromEntries([...perAssetWorst].map(([k, m]) => [k, Object.fromEntries(m)])),
-  pipeline, recommendWindowPpm: recommend, recommendWindowTicks: recommendTicks,
+  pipeline, recommendWindowPpm: recommend, recommendWindowTicks: recommendTicks, windowTicksBasis: ticksBasis,
   zeroWindowRefusals, checks: g.results,
 }, null, 2) + '\n', 'utf8');
 console.log(`\n  written to zk/build/gateA3-staleness.json`);

@@ -1,14 +1,14 @@
 {
-  "at": "2026-07-28T23:39:55.496Z",
+  "at": "2026-07-29T00:13:21.142Z",
   "passed": true,
   "chainId": 999,
-  "block": "41709677",
+  "block": "41711728",
   "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
-  "runtimeBytes": 4009,
+  "runtimeBytes": 4296,
   "assets": 232,
-  "exactAgreement": 126,
+  "exactAgreement": 119,
   "revertedOnUnknown": 5,
-  "markPxHatGas": "37603",
+  "markPxHatGas": "37645",
   "checks": [
     {
       "name": "running against chain 999",
@@ -32,6 +32,10 @@
     },
     {
       "name": "markPxRaw and szDecimals revert on the same input",
+      "pass": true
+    },
+    {
+      "name": "no asset the precompile answers for carries a zero mark",
       "pass": true
     },
     {

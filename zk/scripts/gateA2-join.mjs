@@ -196,23 +196,48 @@ g.record('the tick floor is the binding constraint somewhere, so it is not decor
 // ── 5. THE ONE THAT CAN FAIL: a real proof going stale in real time ───────────────────────────────
 // The build plan calls this "the one worth writing the gate around". It is built by holding an honest
 // proof and waiting for the market, not by moving a number.
-console.log(`\nStaleness in real time — holding the honest proof and waiting for the mark to move past the contract's own bound (up to ${DRIFT_WAIT}s):`);
-const held = { asset: BTC, hat: markNow, proofWords: honest.proofWords, pubWords: honest.pubWords, at: Date.now() };
+// Which assets are held is chosen from A3's per-asset measurement, not from taste. A window sized for
+// the whole universe is many times BTC's own 30-second drift, so watching BTC alone can sit for ten
+// minutes without breaching — that is a true fact about the window being too loose for a major, and it
+// is not a test of the refusal. So the watch also holds proofs on the assets A3 measured as the most
+// volatile, where a breach inside the window's own timescale is expected rather than hoped for.
+const a3file = path.join(BUILD, 'gateA3-staleness.json');
+const perAsset = fs.existsSync(a3file) ? (JSON.parse(fs.readFileSync(a3file, 'utf8')).perAssetWorst || {}) : {};
+const volatile = Object.entries(perAsset).map(([n, m]) => ({ n, w: m['30'] ?? 0 })).sort((a, b) => b.w - a.w)
+  .map((x) => universe.find((u) => u.name === x.n)).filter(Boolean).slice(0, 3);
+const watchlist = [{ idx: BTC, name: 'BTC', hat: markNow, proofWords: honest.proofWords, pubWords: honest.pubWords }];
+for (const v of volatile) {
+  if (v.perpIndex === BTC) continue;
+  try {
+    const h = await readHat(v.perpIndex);
+    const p = await proveLiquidation(position(h));
+    watchlist.push({ idx: v.perpIndex, name: v.name, hat: h, proofWords: p.proofWords, pubWords: p.pubWords });
+  } catch (e) { console.log(`  (${v.name} could not be proved: ${String(e.message).slice(0, 60)})`); }
+}
+console.log(`\nStaleness in real time — holding honest proofs on ${watchlist.map((w) => w.name).join(', ')} and waiting for any mark to move past the contract's own bound (up to ${DRIFT_WAIT}s):`);
+
+let held = watchlist[0];
 let breach = null;
 const tStart = Date.now();
-while ((Date.now() - tStart) / 1000 < DRIFT_WAIT) {
+const started = Date.now();
+while ((Date.now() - tStart) / 1000 < DRIFT_WAIT && !breach) {
   await new Promise((s) => setTimeout(s, 5000));
-  const a = await callPlantedRaw({ to: JOIN_AT, data: SEL.allowed + u32(held.asset), overrides });
-  const now = BigInt('0x' + a.result.replace(/^0x/, '').slice(0, 64));
-  const bound = BigInt('0x' + a.result.replace(/^0x/, '').slice(64, 128));
-  const d = now > held.hat ? now - held.hat : held.hat - now;
-  const ppm = (d * 1_000_000n) / now;
-  process.stdout.write(`\r    ${((Date.now() - tStart) / 1000).toFixed(0)}s elapsed · mark ${Number(now) / 1e9} · ${d} of ${bound} allowed on the grid (${ppm} ppm)      `);
-  if (d > bound) { breach = { ppm, now, elapsedSec: (Date.now() - held.at) / 1000 }; break; }
+  const line = [];
+  for (const w of watchlist) {
+    const a = await callPlantedRaw({ to: JOIN_AT, data: SEL.allowed + u32(w.idx), overrides });
+    if (!a.ok) continue;
+    const now = BigInt('0x' + a.result.replace(/^0x/, '').slice(0, 64));
+    const bound = BigInt('0x' + a.result.replace(/^0x/, '').slice(64, 128));
+    const d = now > w.hat ? now - w.hat : w.hat - now;
+    const ppm = (d * 1_000_000n) / now;
+    line.push(`${w.name} ${ppm}ppm/${(bound * 1_000_000n) / now}`);
+    if (d > bound) { held = w; breach = { ppm, now, elapsedSec: (Date.now() - started) / 1000 }; break; }
+  }
+  process.stdout.write(`\r    ${((Date.now() - tStart) / 1000).toFixed(0)}s · ${line.join(' · ')}          `);
 }
 console.log('');
 if (breach) {
-  const stale = await join(`the SAME proof, ${breach.elapsedSec.toFixed(0)}s later, mark ${breach.ppm} ppm away`, held.proofWords, held.pubWords, held.asset, 'MarkMismatch');
+  const stale = await join(`the SAME ${held.name} proof, ${breach.elapsedSec.toFixed(0)}s later, mark ${breach.ppm} ppm away`, held.proofWords, held.pubWords, held.idx, 'MarkMismatch');
   g.record('a proof whose mark has genuinely moved past the window is REFUSED', stale.ok,
     `refused after ${breach.elapsedSec.toFixed(0)}s of real market movement, ${breach.ppm} ppm · ${stale.err}`);
   // and it is refused for the RIGHT reason: the arithmetic is still perfectly good
@@ -221,7 +246,7 @@ if (breach) {
     stillGood.ok && BigInt(stillGood.result) === 1n,
     `verifyProof on the same proof: ${stillGood.ok ? BigInt(stillGood.result) === 1n : 'reverted'}`);
 } else {
-  const now = await readHat(held.asset);
+  const now = await readHat(held.idx);
   const d = now > held.hat ? now - held.hat : held.hat - now;
   g.record('a proof whose mark has genuinely moved past the window is REFUSED', false,
     `the mark did not move past the contract's own bound within ${DRIFT_WAIT}s (reached ${(d * 1_000_000n) / now} ppm). `

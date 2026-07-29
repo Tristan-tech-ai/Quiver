@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T23:35:32.371Z",
+  "at": "2026-07-29T00:37:52.466Z",
   "passed": true,
   "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
   "verifierBytes": 7270,
@@ -16,7 +16,7 @@
     "12500000",
     "58329113924051"
   ],
-  "proveMs": 1112,
+  "proveMs": 1200,
   "crossChain": [
     {
       "name": "honest proof",
@@ -42,15 +42,15 @@
   ],
   "refusedSignals": 8,
   "gas": {
-    "hyperevmVerify": "306420",
-    "xlayerVerify": "306420",
+    "hyperevmVerify": "304472",
+    "xlayerVerify": "304472",
     "hyperevmDeploy": "1636901"
   },
   "gasPriceWei": {
-    "hyperevm": "174568028",
+    "hyperevm": "100512800",
     "xlayer": "21000000"
   },
-  "deployCostHype": 0.000285750579601228,
+  "deployCostHype": 0.0001645295028328,
   "deployed": null,
   "checks": [
     {

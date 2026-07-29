@@ -123,7 +123,12 @@ export function documents() {
 // A dated log may say what was true when it was written. A PUBLISHED artifact may not: a reader
 // arrives at it today with no way to know it is a snapshot. Same distinction, and same path-based
 // drawing of it, as tools/docs-consistency.mjs — widened only by the two names this gate adds.
-const LOG = /(research[\\/](BUYER_|zk[\\/])|MISSION_CONTROL|CHECKPOINT|DEEP_UNDERCLAIM|D_PROGRESS|SNARK_PLAN|OUTREACH|DIRECTORY_PRS|COMMUNITY_KIT|CRASH_STUDY|RESEARCH_ANCHOR|ROADMAP_V2|X_POST|WRONG_ENDPOINT_AUDIT|QUIVER_ROADMAP\.md|changelog\.md|PAPER[-_]CONSISTENCY\.md|verification[-_]log|JUDGE_SWEEP|judge-sweep)/i;
+// DOCS[-_]COVERAGE joins on 29 July on exactly the precedent PAPER[-_]CONSISTENCY set, and for the
+// same reason: it is the dated report of the three blind spots closed in tools/docs-consistency.mjs,
+// and it cannot say what was wrong without printing "152 model-free tests" beside 386 twelve times.
+// This gate accused it, which is the gate working; classifying it is the only alternative to deleting
+// the record. Added additively, one token, and disclosed in the report it exempts.
+const LOG = /(research[\\/](BUYER_|zk[\\/])|MISSION_CONTROL|CHECKPOINT|DEEP_UNDERCLAIM|D_PROGRESS|SNARK_PLAN|OUTREACH|DIRECTORY_PRS|COMMUNITY_KIT|CRASH_STUDY|RESEARCH_ANCHOR|ROADMAP_V2|X_POST|WRONG_ENDPOINT_AUDIT|QUIVER_ROADMAP\.md|changelog\.md|PAPER[-_]CONSISTENCY\.md|DOCS[-_]COVERAGE|verification[-_]log|JUDGE_SWEEP|judge-sweep)/i;
 
 // Two further ways a document earns the right to quote an old number, both discovered by running
 // this gate and reading what it accused rather than by reasoning about it in advance.

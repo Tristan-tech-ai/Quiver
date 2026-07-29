@@ -11,8 +11,10 @@
 // and every document is checked against them. Nothing here is a hardcoded expectation; if the
 // service changes, this script's idea of the truth changes with it.
 //
-//   node tools/docs-consistency.mjs            # check
-//   node tools/docs-consistency.mjs --verbose  # also print every fact and where it was found
+//   node tools/docs-consistency.mjs            # check                    (npm run docs:check)
+//   node tools/docs-consistency.mjs --verbose  # also print every fact
+//   node tools/docs-consistency.mjs --list     # print the corpus and stop
+//   node gates/docs-coverage-revert.mjs        # prove it can fail        (npm run docs:revert)
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -38,6 +40,22 @@ const deployment = (() => {
   try { return JSON.parse(readFileSync(p, 'utf8')); } catch { return null; }
 })();
 
+// The paper's SHAPE — how many numbered tables it carries, and how many works it cites. Both are
+// advertised on the front page ("methods, ten tables and 44 references, every one of them cited")
+// and neither was read from anywhere until 29 July, when the widened walk opened `landing.html` for
+// the first time and the table count turned out to have been wrong since the 28th. Counted here, so
+// the next section that arrives with a table cannot leave the claim behind.
+const paperShape = (() => {
+  const p = join(SERVICE, 'assets', 'whitepaper.html');
+  if (!existsSync(p)) return { tables: 0, refs: 0 };
+  const h = readFileSync(p, 'utf8');
+  const i = h.indexOf('id="refs"');
+  return {
+    tables: (h.match(/<caption>\s*Table\s+\d+/gi) || []).length,
+    refs: i < 0 ? 0 : (h.slice(i).match(/<li\b/gi) || []).length,
+  };
+})();
+
 // The suite size, counted from the declarations rather than written down. The escape clause in the
 // string pattern is load-bearing: one test title contains an escaped apostrophe, and a naive
 // `(.*?)` stopped at it — giving 385 against the runner's 386 and an off-by-one that would have been
@@ -54,6 +72,8 @@ const SUITE_SIZE = (() => {
 
 const FACTS = {
   partCount: partFiles.length,
+  paperTables: paperShape.tables,
+  paperRefs: paperShape.refs,
   suiteSize: SUITE_SIZE,
   serviceCount: SERVICES.filter((s) => s.register !== false).length,
   buildId: _internal.buildId(),
@@ -65,13 +85,49 @@ const FACTS = {
 };
 
 // ── the documents ────────────────────────────────────────────────────────────────────────────────
+// `.html` is read as well as `.md`, and the cost of not doing so was not theoretical: `assets/
+// landing.html` — the service's own front page — published a six-entry index of the machine-readable
+// paper while seven parts were served, sent a judge to part 6 for artifacts that are in part 7, and
+// was live and wrong for days. The rule that catches it is thirty lines below and had been correct
+// the whole time; the walk simply never opened the file.
+const SKIP_DIR = new Set(['node_modules', '.git', 'field-test', 'reservoir-data', 'build']);
+// A snapshot is not a document. Four paths are excluded by name, and each is excluded because it is
+// a COPY of something rather than a source — holding a copy to currency means editing an artifact
+// whose whole value is that it records what was true when it was taken:
+//
+//   hackathon/.agents, hackathon/.claude   installed third-party skill packages. `skills-lock.json`
+//                                          records their upstream (`okx/onchainos-skills`) and a
+//                                          content hash — they are node_modules for skills, 244
+//                                          files we neither wrote nor publish.
+//   hackathon/judging/Quiver               the judge's clone. FINDINGS_LIVE.md names it as such:
+//   hackathon/judging/_scratch             "Clone: …\hackathon\judging\Quiver".
+//   hackathon/judging/quiver-whitepaper.html  the paper as it was RENDERED for that judging round —
+//                                          it still quotes 298 tests and build q1-3af04b595f397b54.
+//                                          The live copy of the same file is hackathon/paper/, which
+//                                          IS checked and IS current.
+//   hackathon/sentinel/vendor              the adversarial tester's vendored clone of the service.
+//   hackathon/sentinel/recon               captured HTTP responses (`body_build`, `hdr_paper.txt`,
+//                                          `github_readme.md`) — what the live service returned on
+//                                          the day, down to the headers.
+//
+// Measured, these hold 47 of the 47 findings a naive full walk produces, every one of them of the
+// form "this snapshot is older than today" — which is what a snapshot is. The reports ABOUT those
+// runs stay in the corpus and are handled as logs by the rule below, so nothing is hidden by being
+// dropped: it is classified instead.
+const VENDORED = new Set([
+  'hackathon/.agents', 'hackathon/.claude',
+  'hackathon/judging/Quiver', 'hackathon/judging/_scratch', 'hackathon/judging/quiver-whitepaper.html',
+  'hackathon/sentinel/vendor', 'hackathon/sentinel/recon',
+]);
+const rel = (p) => relative(ROOT, p).split(/[\\/]/).join('/');
 const walk = (d, out = []) => {
   if (!existsSync(d)) return out;
   for (const e of readdirSync(d)) {
-    if (e === 'node_modules' || e === '.git' || e === 'field-test' || e === 'reservoir-data') continue;
+    if (SKIP_DIR.has(e)) continue;
     const p = join(d, e);
+    if (VENDORED.has(rel(p))) continue;
     if (statSync(p).isDirectory()) walk(p, out);
-    else if (e.endsWith('.md')) out.push(p);
+    else if (e.endsWith('.md') || e.endsWith('.html')) out.push(p);
   }
   return out;
 };
@@ -81,22 +137,80 @@ const walk = (d, out = []) => {
 // fresh clone neither sibling exists, and the service IS the repository — so scan itself instead of
 // reporting nothing. A checker that silently examines zero documents passes every time.
 const hasSiblings = existsSync(join(ROOT, 'Quiver')) && existsSync(join(ROOT, 'hackathon'));
-const docs = hasSiblings
-  ? [
-      ...walk(join(ROOT, 'Quiver')),
-      ...readdirSync(join(ROOT, 'hackathon')).filter((f) => f.endsWith('.md')).map((f) => join(ROOT, 'hackathon', f)),
-    ]
-  : walk(SERVICE);
+
+// A DELIBERATE BLIND MODE. It exists for one caller — `npm run docs:revert` — and for one purpose:
+// a claim that this tool used to be blind to a defect has to be DEMONSTRATED, not asserted, and the
+// only way to demonstrate it is to put the defect back and run the old walk over it. Reimplementing
+// the old walk inside the revert script would prove that the reimplementation is blind, which is a
+// different and worthless statement. So the old walk stays here, reachable only by name.
+//
+//   - `.md` only, so `assets/landing.html` is never opened;
+//   - `hackathon/` at its top level only, so nothing under `hackathon/veritape/` is opened;
+//   - rule 7 off, because it did not exist.
+//
+// Setting this in ordinary use turns a 199-document check into a 138-document one that cannot see
+// the front page. It therefore announces itself on stderr on every run, and `docs:revert` asserts
+// that each defect PASSES here and FAILS by name in the default mode — so weakening the default
+// breaks the revert rather than quietly widening this hole again.
+const PRE_WIDENING = process.env.DOCS_CONSISTENCY_PRE_WIDENING === '1';
+if (PRE_WIDENING) console.error('!! DOCS_CONSISTENCY_PRE_WIDENING=1 — running the pre-29-July walk: .md only, hackathon top level only, no content-loss rule.');
+const oldWalk = (d, out = []) => {
+  if (!existsSync(d)) return out;
+  for (const e of readdirSync(d)) {
+    if (SKIP_DIR.has(e)) continue;
+    const p = join(d, e);
+    if (statSync(p).isDirectory()) oldWalk(p, out);
+    else if (e.endsWith('.md')) out.push(p);
+  }
+  return out;
+};
+const docs = !hasSiblings
+  // The fallback narrows too. Running the revert from the mirror, where neither sibling exists, the
+  // blind mode was still walking `.html` and going red on the defect it was supposed to be blind to —
+  // which reported a broken revert rather than a broken checker, and was only visible because the
+  // revert is run from BOTH trees.
+  ? (PRE_WIDENING ? oldWalk(SERVICE) : walk(SERVICE))
+  : PRE_WIDENING
+    ? [
+        ...oldWalk(join(ROOT, 'Quiver')),
+        ...readdirSync(join(ROOT, 'hackathon')).filter((f) => f.endsWith('.md')).map((f) => join(ROOT, 'hackathon', f)),
+      ]
+    : [...new Set([...walk(join(ROOT, 'Quiver')), ...walk(join(ROOT, 'hackathon'))])];
 if (!docs.length) {
   console.error('FAILED: found no documents to check — the paths this tool walks have moved.');
   process.exit(1);
+}
+// `--list` prints the corpus and stops. It exists so that gates/docs-coverage-revert.mjs can ask THIS
+// tool which files it reads, instead of reimplementing the walk and then proving things about the
+// reimplementation. Combined with DOCS_CONSISTENCY_PRE_WIDENING it answers the only question that
+// matters about a blind spot: was the file read at all?
+if (process.argv.includes('--list')) {
+  for (const d of docs) console.log(d);
+  process.exit(0);
 }
 
 // A dated log is allowed to say what was true when it was written — that is what a log is for. A
 // PUBLISHED artifact is not: a reader arrives at it today and has no way to know it is a snapshot.
 // Only the second class is held to currency, and the distinction is drawn by path rather than by
 // guessing from content, so adding a new log does not silently widen the exemption.
-const LOG = /(research[\\/](BUYER_|zk[\\/])|MISSION_CONTROL|CHECKPOINT|DEEP_UNDERCLAIM|D_PROGRESS|SNARK_PLAN|OUTREACH|DIRECTORY_PRS|COMMUNITY_KIT|CRASH_STUDY|RESEARCH_ANCHOR|ROADMAP_V2|X_POST|WRONG_ENDPOINT_AUDIT|QUIVER_ROADMAP.md)/;
+// PAPER_CONSISTENCY.md is a dated report of four stale figures that were corrected on 29 July 2026.
+// Its whole job is to print the wrong sentence beside the right one — "quotes 152 model-free tests",
+// "/paper/4 was … now …" — so holding it to currency would demand deleting the record of what was
+// fixed, which is the opposite of what this project claims to do. It is a log by this rule's own
+// definition, and it is named here rather than being allowed in by a content guess.
+// hackathon/judging/ and hackathon/sentinel/ join the list for the same reason, and only once the
+// corpus was widened far enough to read them. They are the write-ups of two adversarial sessions —
+// a live-access judging round and a five-day third-party buyer QA — each of which states the build
+// it was run against in its own header ("Build server saat verifikasi: q1-bce7e7bccb16ea1b", and a
+// captured `curl /build` response). Eleven findings, every one of them "you quote the hash you
+// tested". Holding those to today's hash would demand falsifying which build was measured, which is
+// worse than the staleness it would remove. The clones and captures those sessions worked over are
+// not in the corpus at all — see VENDORED above.
+// DOCS_COVERAGE.md joins on exactly the precedent PAPER_CONSISTENCY.md set, and it was added because
+// this rule accused it: it is the dated report of the three blind spots closed on 29 July, and it
+// cannot describe them without printing "152 model-free tests", "q1-3af04b595f397b54" and the old
+// table count beside the true ones. Named here rather than admitted by a content guess.
+const LOG = /(research[\\/](BUYER_|zk[\\/])|MISSION_CONTROL|CHECKPOINT|DEEP_UNDERCLAIM|D_PROGRESS|SNARK_PLAN|OUTREACH|DIRECTORY_PRS|COMMUNITY_KIT|CRASH_STUDY|RESEARCH_ANCHOR|ROADMAP_V2|X_POST|WRONG_ENDPOINT_AUDIT|QUIVER_ROADMAP.md|PAPER_CONSISTENCY.md|paper-consistency.md|DOCS_COVERAGE.md|docs-coverage.md|hackathon[\\/](judging|sentinel)[\\/])/;
 
 const problems = [];
 const note = (file, line, msg) => problems.push({ file: relative(ROOT, file), line, msg });
@@ -106,32 +220,63 @@ const lineOf = (s, idx) => s.slice(0, idx).split('\n').length;
 // record of what we got wrong cannot be published at all, which would be a strange thing for a
 // project whose argument is that it publishes what it got wrong. Markdown emphasis is allowed
 // between the quote mark and the text, which is where the first version of this let one through.
-const isQuoted = (s, i) => /["“]\**\s*$/.test(s.slice(Math.max(0, i - 6), i));
+// …and it has to see the number wherever it sits INSIDE the quotation, not only as its first word.
+// The six-character lookback catches `"386 tests"` and walks straight past
+// `| the page said | "methods, ten tables and 44 references" |`, which is the same row doing the same
+// job with the number four words in. So: a match is quoted if an odd number of quote marks precede it
+// on its own line. Quotes inside markup are already blanked by asProse(), so an HTML attribute cannot
+// open a quotation that swallows the rest of the line.
+const isQuoted = (s, i) => {
+  if (/["“]\**\s*$/.test(s.slice(Math.max(0, i - 6), i))) return true;
+  const before = s.slice(s.lastIndexOf('\n', i - 1) + 1, i);
+  return ((before.match(/"/g) || []).length % 2 === 1)
+    || ((before.match(/“/g) || []).length > (before.match(/”/g) || []).length);
+};
+
+// Now that `.html` is in the corpus, the prose rules below have to read markup the way a person
+// reads the rendered page — and raw markup lies to them in two specific ways gate X measured first.
+// §3.6 of the paper narrates its own former error as `calling that &ldquo;all pass&rdquo;`: the
+// quotation marks are ENTITIES, so the quoted-text exemption cannot see them, and a bold number
+// written `<strong>386</strong> model-free tests` puts a closing tag where the rule expects a space.
+//
+// Tags and entities are therefore blanked to runs of spaces OF EXACTLY THE SAME LENGTH, so every
+// byte offset — and therefore every line number this tool reports — is still the offset in the real
+// file, while the prose reads contiguously. Quote entities become a real quote character, because
+// the exemption they carry is the entire point of normalising them.
+const QUOTE_ENT = /^(?:ldquo|rdquo|quot|#8220|#8221|#34)$/i;
+const asProse = (s) => s
+  .replace(/<[^>]*>/g, (m) => ' '.repeat(m.length))
+  .replace(/&(#?\w+);/g, (m, name) => (QUOTE_ENT.test(name) ? '"' : ' ') + ' '.repeat(m.length - 1));
 
 for (const f of docs) {
-  const s = readFileSync(f, 'utf8');
+  const raw = readFileSync(f, 'utf8');
+  // For every `.md` file these are the same string, so no existing behaviour moves.
+  const s = f.endsWith('.html') ? asProse(raw) : raw;
   const isLog = LOG.test(f);
 
   // 1. Part URLs and part counts. The single most repeated miss: the count is fixed in one sentence
   //    while a LIST of part URLs two paragraphs down still stops at the old number.
-  const partRefs = [...s.matchAll(/\/paper\/(\d+)/g)].map((m) => Number(m[1]));
+  //    Read from `raw`, not from the prose view: on the front page half the references live in
+  //    `href="/paper/7"` and blanking the tag would delete exactly the reference whose absence is
+  //    the defect. A URL is structure, not prose.
+  const partRefs = [...raw.matchAll(/\/paper\/(\d+)/g)].map((m) => Number(m[1]));
   const maxRef = partRefs.length ? Math.max(...partRefs) : 0;
   if (maxRef && maxRef !== FACTS.partCount) {
-    note(f, lineOf(s, s.indexOf(`/paper/${maxRef}`)),
+    note(f, lineOf(raw, raw.indexOf(`/paper/${maxRef}`)),
       `references /paper/${maxRef} but the machine edition has ${FACTS.partCount} parts`);
   }
   // A document that ENUMERATES parts must enumerate all of them — but `/paper/1` … `/paper/7` is a
   // RANGE, not a gappy list, and flagging it would be the checker accusing correct prose. Ranges are
   // recognised by the ellipsis between two references and expanded before the gap test.
   const rangeCovered = new Set();
-  for (const m of s.matchAll(/\/paper\/(\d+)`?\s*(?:…|\.\.\.|–|—|-)\s*`?\/paper\/(\d+)/g)) {
+  for (const m of raw.matchAll(/\/paper\/(\d+)`?\s*(?:…|\.\.\.|–|—|-)\s*`?\/paper\/(\d+)/g)) {
     for (let i = Number(m[1]); i <= Number(m[2]); i++) rangeCovered.add(i);
   }
   const seen = new Set([...partRefs, ...rangeCovered]);
   if (seen.size >= 3) {
     const missing = [];
     for (let i = 1; i <= FACTS.partCount; i++) if (!seen.has(i)) missing.push(i);
-    if (missing.length) note(f, lineOf(s, s.indexOf('/paper/')),
+    if (missing.length) note(f, lineOf(raw, raw.indexOf('/paper/')),
       `enumerates parts but omits /paper/${missing.join(', /paper/')}`);
   }
   // Any qualifier is allowed between the number and "parts" — "six AI-readable parts", "six
@@ -237,6 +382,108 @@ for (const f of docs) {
         note(f, lineOf(s, mm.index), `states "${mm[0].slice(0, 60)}" — contradicted by ${FACTS.registry}`);
       }
     }
+  }
+
+  // 8. The paper's advertised shape. `assets/landing.html` sells the document as "methods, ten
+  //    tables and 44 references, every one of them cited". Measured on 29 July: eleven tables and
+  //    44 references. The sentence was CORRECT when it was written on 27 July — the paper had ten —
+  //    and went stale on the 28th when the roadmap section arrived carrying Table 11. Nothing read
+  //    it, because nothing opened `.html`, and it sits three lines above the six-versus-seven parts
+  //    defect that WAS found: the same paragraph, the same file, the same day, one line noticed and
+  //    the other not. A count that only a human compares is a count that drifts.
+  //
+  //    Held near paper context for the same reason rule 1's part-count is: "tables" and "references"
+  //    are ordinary English. Measured across the maximal 471-document corpus this shape occurs three
+  //    times — twice in the two copies of the front page, and once in QUIVER_SUBMISSION.md's
+  //    correction table as `| "66 references" | **73** | Stale. |`, which the quotation exemption
+  //    already covers and must, because that row exists to record what was wrong.
+  const WORD_N = { five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15 };
+  for (const m of isLog ? [] : s.matchAll(/\b(five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|\d{1,3})[ -](tables|references)\b/gi)) {
+    // `TEN-TABLES` is the name of a scenario in gates/docs-coverage-revert.mjs, not a claim about the
+    // paper, and this rule accused it within a minute of being written. An identifier is not prose:
+    // if the noun is not lower case, the phrase is a label. Narrow deliberately — "Ten tables" at the
+    // start of a sentence is still read, because only the NOUN's case is tested.
+    if (m[2] !== m[2].toLowerCase()) continue;
+    const word = m[1].toLowerCase();
+    const n = WORD_N[word] ?? Number(word);
+    const truth = m[2] === 'tables' ? FACTS.paperTables : FACTS.paperRefs;
+    if (!truth || n === truth) continue;
+    if (isQuoted(s, m.index)) continue;
+    const near = s.slice(Math.max(0, m.index - 160), m.index + 160);
+    if (!/paper|whitepaper|\/paper\/|documentation|machine[- ]readable/i.test(near)) continue;
+    // A CORRECTION is allowed to name the wrong count — "the front page said the paper had ten
+    // tables" is the record of this very fix, and a rule that forbade writing it down would forbid
+    // publishing the correction at all. Same shape and same window as the build-hash rule above,
+    // and it is a window rather than a whitelist because the correction usually names the old count
+    // first and the true one after. The defect itself survives it: the front page's own sentence —
+    // "methods, ten tables and 44 references, every one of them cited: /paper (typeset)" — carries
+    // none of these words, which is exactly what makes it a claim rather than a record.
+    if (/\bsaid\b|\bwas\b|\bwere\b|corrected|stale|no longer|used to|until|since|earlier|previously/i.test(near)) continue;
+    note(f, lineOf(s, m.index), `says "${m[0]}" of the paper; it has ${truth}`);
+  }
+
+  // 7. The document still says something. Every rule above asks whether a claim is TRUE; none asks
+  //    whether the sentence carrying it survived being written down. On 29 July a changelog entry
+  //    shipped to GitHub — and the changelog is served — with two empty table rows where the two
+  //    contract addresses belonged and sentences ending `unchanged at .` and `Full record in .`
+  //    where an inline code span had been. Cause: backticks inside a double-quoted `node -e`
+  //    argument are command substitution, so every code span in the markdown was executed as a
+  //    shell command and replaced by its empty output. This tool reported CONSISTENT over it,
+  //    across 138 documents, because a hole is not a wrong number and nothing here looked for one.
+  //
+  //    It is a rule of its own rather than a note on another because the failure is SILENT and the
+  //    document looks fine at a glance — the rows are still rows, the sentences still end in full
+  //    stops. It is not held off logs: a log with its evidence eaten out is not a record of
+  //    anything, and currency is not what is being asked about.
+  //
+  //    Four shapes, each drawn from that file and each measured against the whole 471-document
+  //    maximal corpus before being admitted, at zero false positives. Two further candidates were
+  //    measured and REJECTED for crying wolf: a row with SOME cells empty (136 hits, every one a
+  //    legitimate trailing gap in a wide table) and a backtick pair around whitespace (108 hits,
+  //    every one two adjacent code spans, `src/x402.js` `isChargeable()`).
+  const lines = PRE_WIDENING ? [] : raw.split('\n');
+  const fenced = new Array(lines.length).fill(false);
+  for (let i = 0, inFence = false; i < lines.length; i++) {
+    if (/^\s*(```|~~~)/.test(lines[i])) { inFence = !inFence; fenced[i] = true; continue; }
+    fenced[i] = inFence;
+  }
+  for (let i = 0; i < lines.length; i++) {
+    if (fenced[i]) continue;
+    const L = lines[i];
+    // (a) A table BODY row whose every cell is empty. The header row of a two-column table is
+    //     legitimately written `| | |` in this repository, so the delimiter row `|---|---|` above is
+    //     what distinguishes body from header — the damaged rows sat directly beneath one.
+    if (/^\s*\|/.test(L)) {
+      let delim = -1;
+      for (let j = i - 1; j >= 0 && /^\s*\|/.test(lines[j]); j--) {
+        if (/^\s*\|[\s:|-]+\|\s*$/.test(lines[j]) && lines[j].includes('-')) { delim = j; break; }
+      }
+      const cells = L.trim().replace(/^\|/, '').replace(/\|$/, '').split('|');
+      if (delim >= 0 && cells.length >= 2 && cells.every((c) => !c.trim())) {
+        note(f, i + 1, `table row has no content in any of its ${cells.length} cells — the row survived and what it said did not`);
+      }
+    }
+    // (b) An inline code span with no matching partner on its line — `` with nothing between it.
+    //     A run of exactly two backticks is legitimate markdown for a span that CONTAINS a backtick,
+    //     `` `${rel}:${utf8}` ``, and those come in pairs; an odd count is one that lost its content.
+    if ((L.match(/(?<!`)``(?!`)/g) || []).length % 2 === 1) {
+      note(f, i + 1, 'unmatched empty inline code span — a code span lost its contents');
+    }
+    // (c) A line that begins with a comma. `a wrong asset reverts `MarkMismatch`, a bent proof …`
+    //     lost its span and left the clause starting at the comma.
+    if (/^,[ \t]/.test(L)) note(f, i + 1, 'line begins with a comma — the clause before it is missing');
+  }
+  // (d) A sentence that ends on a word which cannot end one: `unchanged at .`, `Full record in .`.
+  //     Read from the prose view so `at <code>x</code>.` is not mistaken for a gap, and skipped
+  //     inside fenced blocks, where `git add .` and `cp x .` are ordinary and correct.
+  //     The SPACE between the word and the stop is the whole signal — "…that is what a log is for."
+  //     is ordinary English and `for` is in this list; `for .` is a hole. The stop must also open a
+  //     new sentence, because the damaged line was `unchanged at . Full record in .` and anchoring
+  //     to end-of-line would have caught only the second of the two.
+  for (const m of PRE_WIDENING ? [] : s.matchAll(/\b(?:at|in|on|to|of|by|for|from|with|into|via|under|over|and|or|the|an?|is|are|was|were|be|been|as|than|that|which|about|against|between|through|per)[ \t]+\.(?=\s*(?:$|[A-Z0-9"“(\[]))/gm)) {
+    const ln = lineOf(s, m.index);
+    if (fenced[ln - 1]) continue;
+    note(f, ln, `sentence ends "${m[0].trim()}" — the word after it is missing`);
   }
 }
 

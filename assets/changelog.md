@@ -12,6 +12,42 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the front page said the paper had ten tables, and nothing had ever opened it
+
+`tools/docs-consistency.mjs` reads every document in this repository and holds it against the running
+system. It read 138 of them, and it had never opened an `.html` file in its life — so the page a
+reader lands on first was outside the corpus entirely. Widened to read `.html` as well, and to walk
+the submission folder to the bottom rather than one level deep, it reads sixty-one more, and nothing
+it used to read was dropped. Its first pass over the front page found a count that had gone stale and
+stayed that way.
+
+`assets/landing.html` sold the paper as "methods, ten tables and 44 references, every one of them
+cited". The references are right. The tables were right too, on 27 July, when that sentence was
+written and the paper had ten of them. The roadmap section arrived on the 28th carrying Table 11 and
+the front page was not touched. It sits three lines above the six-versus-seven index that was found
+and fixed the day before — the same paragraph, in the same file, one line noticed and the other not.
+
+| | |
+|---|---|
+| the page said | "methods, ten tables and 44 references" |
+| the paper carries | eleven numbered tables, 44 references |
+| wrong since | 28 July 2026, when Table 11 arrived |
+
+The count is now read rather than remembered: the checker counts the paper's table captions and its
+reference list out of `assets/whitepaper.html` and holds every published claim about them to that.
+Two further blind spots closed in the same pass. `hackathon/` was walked one level deep, which is why
+this tree's own README sat 234 tests stale and unread. And a document could lose its content and
+still pass — which is how a changelog entry that shipped with two empty table rows and three inline
+code spans eaten by a shell was reported CONSISTENT earlier today, over 138 documents, by the tool
+whose job was to notice. `npm run docs:revert` puts all four defects back into the real files and
+requires the checker to name each one, then to go green again once they are restored.
+
+Documentation only. `src/engine/` is untouched, the build hash is unchanged at `q1-e1fa99d08887d6cc`,
+and no content hash has moved for any request that already worked. `npm test` is unchanged at 386
+tests, 381 passing, 5 skipped, 0 failing. Full record in `docs/docs-coverage.md`.
+
+---
+
 ## 29 July 2026 — the input a proof is about is now checked by the chain, not asserted by us
 
 A Plonk proof certifies that the arithmetic was done correctly on the inputs it was given. It says

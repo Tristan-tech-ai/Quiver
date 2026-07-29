@@ -56,7 +56,9 @@
     "gate:y": "node --test gates/gateY-paper-mapping.mjs",
     "gate:y-revert": "node gates/gateY-revert.mjs",
     "gate:u": "node --test gates/gateU-unknown-enum.mjs",
-    "gate:u-revert": "node gates/gateU-revert.mjs"
+    "gate:u-revert": "node gates/gateU-revert.mjs",
+    "docs:check": "node tools/docs-consistency.mjs",
+    "docs:revert": "node gates/docs-coverage-revert.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",

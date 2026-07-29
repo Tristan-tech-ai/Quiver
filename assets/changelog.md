@@ -12,6 +12,48 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the PDF a judge downloads was two corrections behind the paper it claims to be
+
+The four test-count corrections made earlier today were made in `assets/whitepaper.html`, which is
+what the service serves and what the repository publishes. They were not made in
+`paper/Quiver-Technical-Documentation.pdf`, because that file is not edited — it is rendered, and
+nobody re-rendered it. It was dated 28 July, so it predated both corrections and still said the suite
+held "386 automated tests … a further five", that "None of the 333 fails", that Table 2's invariants
+"All currently pass", and that "the 386" model-free properties can be verified offline.
+
+That copy is the most exposed of the three, not the least: the submission form publishes it as a
+Google Drive download, so a judge who takes the PDF rather than reading the page gets numbers the
+paper itself no longer makes.
+
+Re-rendered from the same source by the same script that produced the previous edition,
+`paper/render.cjs`, whose output is a browser print of the self-contained HTML. Fifty-six pages
+before and fifty-six after. That the count did not move is checked rather than hoped: the opening
+text of every one of the 56 pages is unchanged, exactly five pages differ, and a word-level diff of
+those five shows nothing edited but the corrections. The extra line they add was absorbed by
+whitespace that was already at the foot of §6.1, where Table 2 refuses to split across the page
+break — the same gap is in the old render.
+
+Then it was looked at, because grepping a source proves nothing about a rendered page. Seven pages
+rasterised and read: the title page, the three pages carrying the rewritten sentence, Table 2 with
+its corrected caption, the chart figure, and Appendix B. Table 2 came through with all thirteen rows
+and both columns; Figure 6 came through with every panel and no clipping. The `₮` in USD₮0 has broken
+in a render before, so it was magnified and checked rather than assumed — it is a properly formed
+tenge sign, on the same six pages as before.
+
+Two things this did **not** fix, both recorded because the record is worth more than a tidy entry.
+The Drive copy still has to be replaced by hand through *Manage versions*, and it is behind by more
+than today's corrections — the last upload anyone confirmed was 21 July. And the live service still
+serves the pre-correction paper: the repository is right and pushed, the deploy that carries it is
+not done. `gates/preflight.mjs` already declares that gap by content hash on every run, which is why
+it passes; it is a deploy that has not happened, not a check that missed.
+
+Documentation and one rendered artifact only. `src/engine/` is untouched, the build hash is unchanged
+at `q1-e1fa99d08887d6cc`, and no content hash has moved for any request that already worked.
+`npm test` is unchanged at 386 tests, 381 passing, 5 skipped, 0 failing. Full record in
+`docs/pdf-rerender.md`.
+
+---
+
 ## 29 July 2026 — the front page said the paper had ten tables, and nothing had ever opened it
 
 `tools/docs-consistency.mjs` reads every document in this repository and holds it against the running

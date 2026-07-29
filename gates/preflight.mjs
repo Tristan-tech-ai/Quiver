@@ -226,20 +226,58 @@ check('the proof-emitting set is the one that has been checked',
 
 // ── 4. the new code paths actually run ───────────────────────────────────────────────────────────
 // A 500 discovered in production is the failure this deploy is supposed to avoid, so every MCP tool is
-// called here with a body that exercises repair, and none of them may throw.
-let toolsRun = 0, toolsThrew = [];
+// called here and none of them may throw.
+//
+// THE EMPTY SET IS NOT ENOUGH, AND THE COMMENT HERE USED TO CLAIM IT WAS. It said each tool was called
+// "with a body that exercises repair" while the code sent `{ params: {} }` — a body that reaches the
+// validator and stops. It cannot enter a branch, so it cannot find a defect inside one.
+//
+// That is not hypothetical. `portfolio_gate` in account mode answered `fetchHlAccount is not defined`
+// in production for days: `mcp.js` called it and never imported it. This check ran green over it every
+// time, because `{}` never reaches the `account` branch. It was found by a judge sweep, not here.
+//
+// So each tool is now called TWICE: once with the empty set, which is a real question about whether a
+// bare call is survivable, and once with the body the service itself accepts, taken from the fixtures
+// the routing checks already maintain and already validate against each service's own `validate()`.
+// A tool with no fixture is REPORTED rather than skipped, because a silent skip is how this check
+// came to cover nine tools and examine almost none of them.
+const genuineFor = (toolName) => {
+  const svc = toolName.replace(/_/g, '-');
+  const forms = GENUINE[svc];
+  if (!forms) return null;
+  return Array.isArray(forms) ? forms[0] : forms;
+};
+
+let toolsRun = 0;
+const toolsThrew = [], noFixture = [];
 const toolList = await handleRpc({ jsonrpc: '2.0', id: 1, method: 'tools/list' });
 for (const t of toolList.result.tools) {
-  try {
-    const r = await handleRpc({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: t.name, arguments: { params: {} } } });
-    if (!r.result && !r.error) toolsThrew.push(`${t.name}: no result`);
-    else toolsRun++;
-  } catch (e) {
-    toolsThrew.push(`${t.name}: ${e.message}`);
+  const bodies = [{ label: 'empty', args: { params: {} } }];
+  const g = genuineFor(t.name);
+  if (g) bodies.push({ label: 'genuine', args: g });
+  else noFixture.push(t.name);
+
+  for (const b of bodies) {
+    try {
+      const r = await handleRpc({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: t.name, arguments: b.args } });
+      const text = r.result?.content?.[0]?.text || '';
+      // `isError` with a validation message is a correct refusal. An exception that escaped the handler
+      // and came back as a string is not, and that is the shape the account-mode crash took.
+      if (!r.result && !r.error) toolsThrew.push(`${t.name}/${b.label}: no result`);
+      else if (/is not defined|is not a function|Cannot read propert|undefined is not/.test(text)) {
+        toolsThrew.push(`${t.name}/${b.label}: ${text.slice(0, 90)}`);
+      } else toolsRun++;
+    } catch (e) {
+      toolsThrew.push(`${t.name}/${b.label}: ${e.message}`);
+    }
   }
 }
-check('every MCP tool survives a wrapped, empty argument set', toolsThrew.length === 0,
-  toolsThrew.length ? toolsThrew.join('; ') : `${toolsRun} tools called, none threw`);
+check('every MCP tool survives both an empty argument set and a body it actually accepts',
+  toolsThrew.length === 0,
+  toolsThrew.length ? toolsThrew.join('; ') : `${toolsRun} calls across ${toolList.result.tools.length} tools, none threw`);
+check('every MCP tool has a genuine fixture, so none of them was only probed with an empty body',
+  noFixture.length === 0,
+  noFixture.length ? `no fixture, examined with {} only: ${noFixture.join(', ')}` : `${toolList.result.tools.length} tools, all exercised with a real body`);
 
 // ── 5. the static assets a judge reads have not moved, or the difference is accounted for ────────
 //

@@ -171,10 +171,27 @@ for (const d of DEFECTS) {
     writeFileSync(d.file, text);
 
     // 1. the OLD walk, and what it was entitled to see
-    const wasRead = preCorpus.has(d.file);
+    // WHY THIS IS NOT `preCorpus.has(d.file)`, which is what it said and which never once matched.
+    // `--list` emits paths resolved against the checker's own ROOT, which lands in the MIRROR tree,
+    // while `d.file` is the working-tree copy being edited. Two absolute paths for the same document,
+    // never equal, so `wasRead` was always false and every case printed "it never opened this file" —
+    // including the changelog, which it read all along. The branch below was correct and unreachable,
+    // which is this project's own favourite defect wearing a different hat.
+    //
+    // Matched on the last two segments instead, and DELIBERATELY reporting `null` rather than guessing
+    // when that is ambiguous: a wrong explanation of why a check was blind is worse than no explanation.
+    const tail = (p) => p.replace(/\\/g, '/').split('/').slice(-2).join('/').toLowerCase();
+    const want = tail(d.file);
+    const matches = [...preCorpus].filter((p) => tail(p) === want);
+    const wasRead = matches.length === 1 ? true : matches.length > 1 ? null : false;
     const pre = run(true);
     const blind = pre.code === 0;
-    if (!wasRead) {
+    if (wasRead === null) {
+      detail.push(blind
+        ? '     pre-widening walk: GREEN — but whether it read this file is AMBIGUOUS from --list, so the kind of blindness is not claimed'
+        : `     pre-widening walk: RED\n${pre.out}`);
+      ok &&= blind;
+    } else if (!wasRead) {
       detail.push(blind
         ? '     pre-widening walk: GREEN — it never opened this file, which is the blind spot itself'
         : `     pre-widening walk: RED — it does not read this file, so it cannot have found this\n${pre.out}`);

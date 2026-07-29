@@ -60,6 +60,8 @@
     "gate:y-revert": "node gates/gateY-revert.mjs",
     "gate:u": "node --test gates/gateU-unknown-enum.mjs",
     "gate:u-revert": "node gates/gateU-revert.mjs",
+    "gate:v": "node --test gates/gateV-recipe-reproduces.mjs",
+    "gate:v-revert": "node gates/gateV-revert.mjs",
     "docs:check": "node tools/docs-consistency.mjs",
     "docs:revert": "node gates/docs-coverage-revert.mjs"
   },

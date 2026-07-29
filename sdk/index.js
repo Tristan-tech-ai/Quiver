@@ -71,20 +71,28 @@ export function createRiskBrain({ mode = 'local', baseUrl = 'https://quiver-prod
   // The result is hashed in its WIRE form (one JSON round-trip): res.json drops undefined-valued keys and
   // stringifies Dates, and the server commits to exactly that form — so verify() matches both a response
   // received over HTTP (round-trip is a no-op) and a locally-computed envelope still holding such values.
+  //
+  // AND IT STRIPS WHAT THE ENVELOPE SAYS TO STRIP. This function is the executable form of the recipe in
+  // `verifyContentHash`, so it inherited that recipe's defect exactly: it removed the envelope key and
+  // nothing else, while the host attaches `inputRepairs`, `routingNotice`, `howToFix` and `snark` as
+  // top-level siblings AFTER the hash is taken. Measured on the live service on 29 July 2026, a
+  // `perp_gate` call with its body wrapped in `params` — what an agent framework does by default — came
+  // back with `contentHashOk: false` on an untouched, honest response. The envelope now publishes the
+  // exact key names in `excludedFromContentHash`, and this reads them instead of assuming there are none.
+  // Absent (a locally built envelope, or a host older than this field) it degrades to the old behaviour,
+  // which is correct precisely when nothing was attached.
   function verify(envelope) {
     const p = envelope?.proof, o = envelope?.observation;
     if (!p && !o) return { valid: false, reason: 'no proof or observation envelope' };
     const clean = _internal.jsonClean;
-    let recomputed, env, kind;
-    if (p) {
-      const { proof, ...result } = envelope;
-      env = p; kind = 'proof';
-      recomputed = _internal.sha256(_internal.canonical({ engine: p.engine, codeHash: p.codeHash, inputs: p.inputs, result: clean(result) }));
-    } else {
-      const { observation, ...result } = envelope;
-      env = o; kind = 'observation';
-      recomputed = _internal.sha256(_internal.canonical({ engine: o.engine, codeHash: o.codeHash, observedAtUtc: o.observedAtUtc, inputs: o.inputs, result: clean(result) }));
-    }
+    const env = p || o;
+    const kind = p ? 'proof' : 'observation';
+    const drop = new Set([kind, ...(Array.isArray(env.excludedFromContentHash) ? env.excludedFromContentHash : [])]);
+    const result = {};
+    for (const k of Object.keys(envelope)) if (!drop.has(k)) result[k] = envelope[k];
+    const recomputed = _internal.sha256(_internal.canonical(p
+      ? { engine: p.engine, codeHash: p.codeHash, inputs: p.inputs, result: clean(result) }
+      : { engine: o.engine, codeHash: o.codeHash, observedAtUtc: o.observedAtUtc, inputs: o.inputs, result: clean(result) }));
     const contentHashOk = recomputed === env.contentHash;
     const selfChecksOk = (env.selfChecks || []).every((c) => c.pass !== false);
     return { valid: contentHashOk && selfChecksOk, contentHashOk, selfChecksOk, envelopeKind: kind };
@@ -98,7 +106,12 @@ export function createRiskBrain({ mode = 'local', baseUrl = 'https://quiver-prod
     const p = envelope?.proof;
     if (!p || !ENGINES[p.engine]) return { reproduced: false, reason: 'unknown engine or no proof' };
     const fresh = ENGINES[p.engine](p.inputs);
-    const { proof, live, ...expected } = envelope;   // strip proof + live (live is non-deterministic provenance)
+    // strip proof + live (live is non-deterministic provenance) + everything the envelope declares it
+    // attached after the hash was taken — the same list verify() reads, for the same reason: a
+    // `routingNotice` the host bolted on is no more part of the engine's output than `proof` is.
+    const drop = new Set(['proof', 'live', ...(Array.isArray(p.excludedFromContentHash) ? p.excludedFromContentHash : [])]);
+    const expected = {};
+    for (const k of Object.keys(envelope)) if (!drop.has(k)) expected[k] = envelope[k];
     const a = _internal.canonical(_internal.jsonClean(fresh));
     const b = _internal.canonical(_internal.jsonClean(expected));
     return { reproduced: a === b, engine: p.engine };

@@ -40,6 +40,7 @@ import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
 import { repairBody, correctedExample, enumViolations, enumRefusal } from './util/repair.js';
 import { timedRun } from './util/timing.js';
+import { sealContentHashRecipe } from './util/recipe.js';
 
 // ── Capability metadata (MCP 2025-06-18: title / annotations / outputSchema) ────────────────────────────
 // outputSchema property sets mirror the REAL top-level keys each engine returns (captured by running the
@@ -589,6 +590,16 @@ export async function handleRpc(msg) {
             out.howToFix = correctedExample(svc, args, missing);
           }
         }
+
+        // THE FOURTH SITE, for the third cross-cutting field — and the one where the miss was worst,
+        // because this is the free surface a judge tries first. The three attachments above sit
+        // OUTSIDE the preimage the engine hashed, and until this line the recipe beside them told a
+        // caller to recompute over the response minus `proof` alone. Measured on 29 July 2026:
+        // `risk_attest` failed its own instruction on a perfectly ordinary call, `perp_gate` failed
+        // it whenever `snark` or a wrapped body was involved. Sealed here rather than inside
+        // `timedRun`, because the siblings are attached after the timing and the seal has to see
+        // them. See src/util/recipe.js.
+        sealContentHashRecipe(out);
 
         const result = { content: [{ type: 'text', text: JSON.stringify(out, null, 2) }], isError: out?.ok === false };
         // MCP 2025-06-18: tools that declare outputSchema SHOULD return structuredContent on success.

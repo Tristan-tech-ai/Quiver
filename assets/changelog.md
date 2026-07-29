@@ -12,6 +12,59 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the verification recipe every response publishes did not reproduce the hash beside it
+
+Every enveloped response carries `proof.verifyContentHash`: a sentence telling a caller how to
+recompute `contentHash` themselves. It said to hash *"this response WITHOUT its `proof` key"*. The
+preimage the server actually commits to is `{engine, codeHash, [observedAtUtc,] inputs, result}` where
+`result` is the **engine's** return value, hashed before the envelope is attached — and this host
+attaches `inputRepairs`, `routingNotice`, `howToFix` and `snark` as top-level siblings *afterwards*.
+Following the published instruction therefore hashed keys the service never hashed.
+
+**Measured against the live endpoint.** A `perp_gate` call with its body wrapped in `params` — the
+single most common thing an agent framework does — published `8575ce5ae5bfae9c…`, the worked proof of
+Appendix C that the paper invites a reader to re-derive, and its own recipe followed verbatim gave
+`1d1fcfdb143b5fb5…`. The two agree only once the `inputRepairs` sibling is removed as well. Swept
+locally across both surfaces, **48 of 90** enveloped responses failed their own published instruction.
+
+This is the sharpest defect this project can have. The entire pitch is that a buyer re-derives the
+number instead of trusting the seller; a judge who follows the instruction gets a mismatch, reads the
+next sentence — *"a mismatch means the response was altered"* — and concludes the proof is fake.
+
+**The stored hashes were right; the sentence was wrong, and the sentence is what moved.** Relocating a
+sibling into the envelope would also have fixed the arithmetic and would have changed the response
+shape for every caller already parsing `inputRepairs`, `routingNotice` and `howToFix`. Instead each
+response now publishes the exact key names it attached after hashing, in
+`proof.excludedFromContentHash`, and inlines them into the recipe so it is executable as written:
+
+> …where result = this response WITHOUT its `proof` key **and WITHOUT the host-attached keys named in
+> `proof.excludedFromContentHash` = ["inputRepairs"]** (attached after the hash was taken, so they are
+> not in the preimage)…
+
+The list is **derived, never written down**: `proofEnvelope` returns `{...result, proof}`, so the
+envelope key is the last key of the hashed part and everything after it in insertion order was
+attached later. A twelfth sibling is named without anyone remembering to add it. The derivation is
+then checked rather than believed — every response recomputes its own hash from the recipe it is about
+to publish, before it is sent. `sdk/index.js` `verify()` and `reproduce()` had the same defect for the
+same reason and now read the same published list.
+
+Measured: **all 24** deterministic content hashes across both surfaces are byte-identical to their
+pinned values, `src/engine/` is untouched, and the build hash is still `q1-e1fa99d08887d6cc`. The
+Appendix C exhibit publishes `8575ce5ae5bfae9c…` and now reproduces from its own recipe in all five
+forms tested — plain and wrapped on the paid path, plain, wrapped and `snark: true` on the free one.
+
+`gates/gateV-recipe-reproduces.mjs` (`npm run gate:v`) is the half that was missing. It **parses each
+response's recipe** — the preimage field list, the envelope key, the exclusion list — and requires the
+result to equal the published hash, over every service and every input form on both surfaces, in the
+request shapes that actually cause a sibling to be attached. Nothing about which keys are siblings is
+written in the gate; a checker that knows what to strip agrees with the code by construction, which is
+how this survived. `npm run gate:v-revert` puts the defect back three ways — unseal it, and bolt a new
+sibling onto each surface after the seal — and requires the gate to go red naming the key each time.
+Under the first revert, which is the code exactly as it stood, `gate:l` **stays green**: it holds the
+four sibling names in a list and strips them itself, so it could not fail on what it hardcoded.
+
+---
+
 ## 29 July 2026 — the paper named a field a caller could hold us to, and nine services did not carry it
 
 Section 2.3 of the paper says, of the services it has just finished quoting latencies for: *"Every

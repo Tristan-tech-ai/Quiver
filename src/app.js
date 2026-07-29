@@ -9,6 +9,7 @@ import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
 import { suggestService, redirectLine } from './util/routing.js';
 import { repairBody, correctedExample } from './util/repair.js';
+import { sealContentHashRecipe } from './util/recipe.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { getProof, verificationKey, warmProver } from './util/snark.js';
@@ -410,7 +411,10 @@ app.get('/diag/scan', async (req, res) => {
   const v = svc.validate(body);
   if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error), routingNotice: suggestService(svc, req.body || {}, SERVICES) });
   try {
-    res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` }));
+    // Sealed like the paid path: this tester attaches no sibling of its own, but `snark` is attached
+    // INSIDE perp-gate's own handler, so an unsealed response here would publish a recipe that does
+    // not reproduce for exactly the call a verifier is most likely to make.
+    res.json(sealContentHashRecipe(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` })));
   } catch (e) {
     res.status(500).json({ svc: svc.name, error: 'engine_error', detail: String(e.message || e).slice(0, 400) });
   }
@@ -424,7 +428,7 @@ app.post('/diag/scanpost', async (req, res) => {
   if (!svc) return res.status(400).json({ error: 'unknown svc' });
   const v = svc.validate(req.body?.body || {});
   if (v.error) return res.status(400).json({ svc: svc.name, error: 'bad_input', note: refusalDetail(svc, v.error), routingNotice: suggestService(svc, req.body || {}, SERVICES) });
-  try { res.json(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` })); }
+  try { res.json(sealContentHashRecipe(await svc.run(v, { host: `${req.protocol}://${req.get('host')}` }))); }
   catch (e) { res.status(500).json({ svc: svc.name, error: 'engine_error', detail: String(e.message || e).slice(0, 400) }); }
 });
 
@@ -592,7 +596,14 @@ for (const s of SERVICES) {
         disclaimer: 'Quiver does not reroute a paid call. You asked this endpoint and this endpoint answered; the signpost is here so a caller can tell a wrong shop from a wrong answer.',
       };
     }
-    return answer;
+    // LAST, because it is the only place that can see everything this host attached. The two
+    // siblings above sit OUTSIDE the preimage the engine hashed, and the recipe the response
+    // publishes told a caller to recompute over "this response WITHOUT its `proof` key" and nothing
+    // else — so a caller who wrapped their body in `params` and followed the instruction got a
+    // mismatch, on the exhibit the paper invites them to re-derive. `sealContentHashRecipe` names
+    // what to strip, derives the names rather than repeating them here, and re-checks the hash
+    // before the response leaves. See src/util/recipe.js.
+    return sealContentHashRecipe(answer);
   });
   app.get(s.path, handler);   // unpaid GET probe -> 402 (was 404)
   app.post(s.path, handler);  // unpaid/empty POST -> 402 (was 400)

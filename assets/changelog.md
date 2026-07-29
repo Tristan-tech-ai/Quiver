@@ -12,6 +12,27 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — a symbol-mode perp-gate call can now carry a succinct proof, and says what it does not cover
+
+`perp-gate` built a Plonk proof only when the caller supplied every input. Pass a symbol instead and
+the entry price defaults to the venue's live mark, the answer ships as an OBSERVATION rather than a
+deterministic proof — correctly, because a live read is not re-runnable — and `snark: true` was
+silently ignored. So the proof existed only where its inputs were a private fact about the caller's
+position, and the one input a chain could corroborate existed only where there was no proof.
+
+Symbol mode now builds the proof too. **What changed is only what is added**: the envelope is still an
+observation, `deterministic` is still `false`, the SNARK is attached as a sibling exactly as it is on
+the other branch, and the content hash is taken before it and over the same inputs as before. No
+published proof moves, and the caller-supplied path is untouched to the byte.
+
+Because the proven entry price was **fetched rather than supplied**, the response says so in fields a
+program can read — `inputsWereFetchedLive`, `entryPriceSource`, `entryPriceVenue` — and states plainly
+what the SNARK does not cover: it proves the arithmetic over the integers it pins, and nothing about
+whether the entry price is really the venue's mark or whether that mark is honest. Covering the input
+is a separate on-chain step against the venue's own state, and it is not deployed; the response says
+that too rather than implying otherwise. The same disclosure is stored on the proof itself, so a third
+party fetching `/proof/<hash>` without ever seeing the answer is told as well.
+
 ## 29 July 2026 — the durable proof store can now be shared by every replica, and is still switched off
 
 Phase A claims a finished proof survives a redeploy **and a second replica**, and that `/proof/<hash>`

@@ -328,7 +328,92 @@ export const SERVICES = [
         // handlers below already branched this way; perp-gate now matches it.
         r.live = live;
         r.mathReproducibility = 'The liquidation MATH is deterministic and re-runnable: run the open perp-gate engine on observation.inputs (the venue values frozen at observedAtUtc) and every number reproduces exactly. What is NOT re-runnable is the venue read itself — mark price, funding and margin tiers move — so this ships as a committed observation rather than as a proof that claims to reproduce from scratch.';
-        return observationEnvelope('perp-gate', compute, r, config.version);
+        const obs = observationEnvelope('perp-gate', compute, r, config.version);
+        // A succinct proof on THIS branch too, when asked for — and the reason it took a document to
+        // justify four lines is that the two halves of the on-chain story were sitting on opposite
+        // sides of this `if`. The Plonk proof was built only below, where the caller supplied the
+        // entry price, so the number bound into the proof was a private fact about the caller's
+        // position that no chain can corroborate. The entry price that CAN be corroborated — the one
+        // HyperCore's own precompiles return — is filled in here, on the branch that was returning no
+        // proof at all. The join built against chain 999 was therefore correct and unreachable.
+        //
+        // WHAT IS AND IS NOT SEALED. The hard rule of this codebase is that a result carrying live
+        // provenance is never sealed as a deterministic proof, and it is enforced inside
+        // proofEnvelope rather than trusted to call sites. Nothing here weakens it: this stays an
+        // OBSERVATION envelope, `deterministic` stays false, and the snark is attached as a SIBLING
+        // of `observation`, exactly as it is a sibling of `proof` below. The contentHash was already
+        // taken, over `{engine, codeHash, observedAtUtc, inputs, result}`, so attaching this moves
+        // nothing; and `snark` was destructured out of the request above, so it never entered
+        // `compute` and cannot enter the hash. The two claims are different sizes and must not be
+        // confused: the SNARK proves the arithmetic over five pinned integers and is deterministic;
+        // the ENVELOPE commits a live read and is not. `doesNotProve` below says so in the response
+        // rather than only here, because the reader who needs it is holding the JSON, not the source.
+        if (wantSnark === true || wantSnark === 'true') {
+          // The maintenance rate is the reason this is not the one-line change it looks like.
+          // Hyperliquid symbol mode fills `marginTiers` and NO `maintMarginRate` — the engine picks
+          // the tier by notional and derives mmr = 0.5/maxLeverage itself — so a witness built from
+          // the echoed inputs alone comes back null and the proof is refused as "outside the circuit
+          // domain". Measured: HL symbol mode null, dYdX symbol mode fine, which is exactly backwards,
+          // because HyperCore attests Hyperliquid marks and holds nothing about dYdX. So the derived
+          // rate is supplied from `r.inputs.maintMarginRate`, which is the engine's own `mmr` at full
+          // precision — NOT one of the display-rounded echoes beside it (`size` is round(q,8) and
+          // `margin` is round(M,2); certifying either would prove a neighbouring position). It is
+          // published below as `maintenanceRateProven` so a reader can check it against public signal
+          // 6 without re-deriving it, and re-derive it from `observation.inputs.marginTiers` if they
+          // want to check us rather than take it.
+          const witnessInputs = obs.observation.inputs.maintMarginRate != null
+            ? obs.observation.inputs
+            : { ...obs.observation.inputs, maintMarginRate: r.inputs?.maintMarginRate };
+          // A position already at or below maintenance has no future liquidation threshold, so there
+          // is nothing for a proof to be about. Saying that costs one field; letting it through makes
+          // the store record "witness diverges from the served price by NaN", which is true and useless.
+          const provable = Number.isFinite(r.liquidationPrice);
+          const defaultedToMark = live.filled?._entryDefaultedToMark === true;
+          const hyperCoreHoldsThis = live.venue === 'hyperliquid' && defaultedToMark;
+          // Stored ON the proof, not only in this response. /proof/<hash> is free and is meant to be
+          // fetched by somebody who never saw this answer — that is a stated feature — and at that
+          // endpoint a proof whose entry price was read off a venue is indistinguishable from one the
+          // caller typed. So the distinction travels with the proof.
+          if (provable) {
+            buildInBackground(obs.observation.contentHash, witnessInputs, r.liquidationPrice, {
+              inputsWereFetchedLive: true,
+              entryPriceSource: defaultedToMark ? 'live-mark' : 'caller-supplied',
+              entryPriceVenue: live.venue,
+              observedAtUtc: obs.observation.observedAtUtc,
+              doesNotProve: 'This proof covers the arithmetic over the integers in publicSignals and nothing else. Public signal 4 — the entry price — was FETCHED from a venue rather than supplied by the caller, and the circuit has no term for a mark, a venue, an asset or a clock, so a verifying proof says nothing about whether that number was current or honest. Covering it is a separate on-chain step against the venue\'s own state; see the perp-gate response this hash came from.',
+            });
+          }
+          obs.snark = {
+            protocol: 'plonk',
+            status: provable ? 'building' : 'unavailable',
+            ...(provable
+              ? { retrieveAt: `/proof/${obs.observation.contentHash}`, verificationKey: '/proof/vk' }
+              : { reason: 'this answer carries no liquidation price to certify — the position is already at or below maintenance, so the threshold is behind it rather than ahead of it' }),
+            // The discriminator, machine-readable, because the distinction this whole field exists to
+            // preserve must not depend on a caller reading prose. True whenever the envelope is an
+            // observation: at least one number in the proven statement was FETCHED, not supplied.
+            inputsWereFetchedLive: true,
+            entryPriceSource: defaultedToMark ? 'live-mark' : 'caller-supplied',
+            entryPriceVenue: live.venue,
+            entryPriceProven: obs.observation.inputs.entryPrice,
+            maintenanceRateProven: witnessInputs.maintMarginRate,
+            observedAtUtc: obs.observation.observedAtUtc,
+            proves: 'The liquidation identity over the five integers pinned in the proof\'s public signals — margin, size, entry price, side and maintenance rate give this liquidation price on a 1e-9 grid, inside a tolerance the circuit publishes as a signal of its own. That statement is deterministic and checkable offline against /proof/vk, and it is the whole of what the SNARK says.',
+            doesNotProve: 'That the entry price it pins is the venue\'s mark, or that the venue\'s mark is right. The entry price here was FETCHED rather than supplied, and the circuit carries no mark, no venue, no asset and no clock — so nothing inside this proof attests where the number came from, and a proof that verifies says nothing about whether the input was current or honest. Covering the input is a separate step that has to happen on chain, against the venue\'s own state, inside a bounded staleness window; see markAttestation. Until that step runs, treat the entry price as a live read this service made and published, with observedAtUtc as its timestamp.',
+            markAttestation: {
+              appliesToThisAnswer: hyperCoreHoldsThis,
+              deployed: false,
+              mechanism: 'QuiverPerpVerifier.verifyPerpGate(proof, pubSignals, asset) on HyperEVM (chain 999) re-reads the mark from the HyperCore precompiles INSIDE the transaction and rejects the proof unless the chain\'s own mark is within max(4055 ppm, 1 tick) of public signal 4 — the entry price. The arithmetic and the input are then refused separately and namedly: ProofRejected against a bent proof, MarkMismatch against a stale one.',
+              window: '4055 ppm, the p99.9 of 30-second mark drift measured over the live perp universe; the 1-tick floor exists because on the coarsest-grid assets one tick is wider than that, and a window finer than the smallest representable move is unsatisfiable rather than strict.',
+              note: hyperCoreHoldsThis
+                ? 'The contract is written and gated against a real chain-999 node, and it is NOT deployed: it has no address and nothing here has been attested on chain. This field describes what would cover the input, not something that has happened.'
+                : live.venue === 'hyperliquid'
+                  ? 'Not applicable to this answer: the entry price is the caller\'s own, not the live mark, so there is nothing for HyperCore to corroborate. Omit entryPrice to have it default to the mark.'
+                  : `Not applicable to this answer: the mark came from ${live.venue}, and the HyperCore precompiles hold no ${live.venue} state. The attestation reaches Hyperliquid marks only.`,
+            },
+          };
+        }
+        return obs;
       }
       // Caller supplied every input: nothing was fetched, so the answer really is re-runnable.
       const env = proofEnvelope('perp-gate', compute, r, config.version);

@@ -39,7 +39,9 @@
     "gate:f-revert": "node gates/gateF-revert.mjs",
     "gate:t10": "node --test gates/gateT10-hl-premium-bound.mjs",
     "gate:t10-revert": "node gates/gateT10-revert.mjs",
-    "calibrate:t10": "node gates/calibrate-hl-premium-bound.mjs"
+    "calibrate:t10": "node gates/calibrate-hl-premium-bound.mjs",
+    "gate:s": "node --test gates/gateS-live-input-snark.mjs",
+    "gate:s-revert": "node gates/gateS-revert.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",

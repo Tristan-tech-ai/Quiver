@@ -197,13 +197,21 @@ const claimed = new Set();
  *
  * Returns a promise, and every caller on the request path deliberately ignores it — the whole point
  * is that the response does not wait for 703 ms of Plonk. It never rejects.
+ *
+ * `provenance` is OPTIONAL and is stored verbatim on the finished record. It exists because a proof
+ * outlives the answer it came from: /proof/<hash> is free and deliberately fetchable by a third party
+ * who never saw the response, and a proof whose entry price was READ FROM A VENUE looks, at that
+ * endpoint, exactly like one whose entry price the caller typed. The circuit cannot tell them apart —
+ * it has no term for where a number came from — so the distinction has to travel beside the proof or
+ * it does not travel at all. Callers who supplied every input pass nothing and their records are
+ * unchanged to the byte, which is what keeps every already-published proof reproducing.
  */
-export async function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
+export async function buildInBackground(contentHash, echoedInputs, liquidationPrice, provenance) {
   // The memory check is first and synchronous, so a repeat request costs no round trip at all.
   if (store.has(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
-    await buildOnce(contentHash, echoedInputs, liquidationPrice);
+    await buildOnce(contentHash, echoedInputs, liquidationPrice, provenance);
   } catch (e) {
     put(contentHash, { status: 'failed', error: String((e && e.message) || e).slice(0, 200) });
   } finally {
@@ -211,7 +219,7 @@ export async function buildInBackground(contentHash, echoedInputs, liquidationPr
   }
 }
 
-async function buildOnce(contentHash, echoedInputs, liquidationPrice) {
+async function buildOnce(contentHash, echoedInputs, liquidationPrice, provenance) {
   // A proof already in the durable store — built by an earlier process, or by another replica — must
   // not be re-proved. Hydrated into memory so the poll that follows costs nothing.
   const cold = await proofStore.read(contentHash);
@@ -251,6 +259,9 @@ async function buildOnce(contentHash, echoedInputs, liquidationPrice) {
       // exactly which number the proof is about.
       gapToServedPrice: w.gapToServed,
       verify: 'snarkjs plonk verify vk_plonk.json publicSignals proof — the verification key is published at /proof/vk',
+      // Spread, not assigned, so a record whose inputs were all supplied by the caller is byte-for-byte
+      // what it was before this field existed. Every published proof keeps reproducing on that basis.
+      ...(provenance ? { provenance } : {}),
     });
   })
     .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))

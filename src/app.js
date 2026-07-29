@@ -310,6 +310,13 @@ app.get('/proof/:contentHash', async (req, res) => {
     // for one deploy: the route was written before the field existed and silently dropped it.
     signalsAttestation: rec.signalsAttestation || null,
     verificationKey: '/proof/vk', verify: rec.verify,
+    // Present only when at least one number in the proven statement was READ FROM A VENUE rather than
+    // supplied by the caller — which is a distinction the circuit cannot carry, because it has no term
+    // for where a number came from. Spread rather than assigned, and placed immediately above the
+    // on-chain instruction on purpose: `onChain` is where a reader forms the belief that this is
+    // verifiable end to end, and for a live-read input it is the arithmetic that gets verified there,
+    // not the input. Every proof built before this field existed serialises exactly as it did.
+    ...(rec.provenance ? { provenance: rec.provenance } : {}),
     onChain: {
       contract: 'QuiverProofRegistry.submit(uint256[24] proof, uint256[8] publicSignals, bytes attestation)',
       note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The contract verifies the arithmetic itself and records the outcome; a bad proof is refused in public rather than reverted silently.',

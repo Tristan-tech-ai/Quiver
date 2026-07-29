@@ -30,7 +30,15 @@ const ZK = path.join(SCRIPTS, '..');
 // Artifacts a reader must find in the checkout, not just in the author's build directory.
 // padprobe is a measuring stick for zk/scripts/domain-scaling.mjs, not a Quiver statement, but it is
 // still an artifact a reader needs in order to reproduce the timing table.
-const CIRCUITS = ['kelly', 'concentration', 'divergence', 'constantproduct', 'padprobe', 'greeks', 'greeksfp', 'greekssigned', 'parity', 'portfoliogate'];
+// kellybatch1..4 are the WIDENED Kelly circuits: the same statement about 1, 2, 3 and 4 answers at
+// once, packed two answers to a public field element. kellybatch1 is not a batch and is not decoration
+// either — it is the like-for-like baseline the gas comparison needs, one answer published the batch's
+// way, so that "we stopped publishing two derivable numbers" cannot be counted as part of the
+// aggregation win. They share `circuits/kellybatch.circom`, which carries the templates and has no
+// main, so it is not in this list and is checked by the four that include it failing to compile
+// without it.
+const CIRCUITS = ['kelly', 'concentration', 'divergence', 'constantproduct', 'padprobe', 'greeks', 'greeksfp', 'greekssigned', 'parity', 'portfoliogate',
+  'kellybatch1', 'kellybatch2', 'kellybatch3', 'kellybatch4'];
 const REQUIRED_ARTIFACTS = CIRCUITS.flatMap((c) => [
   `build/${c}.r1cs`,
   `build/${c}_plonk.zkey`,

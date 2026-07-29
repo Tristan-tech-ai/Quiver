@@ -1,0 +1,110 @@
+{
+  "at": "2026-07-28T23:41:28.281Z",
+  "passed": true,
+  "batchesPerSize": 1200,
+  "totals": {
+    "batches": 3600,
+    "bets": 10800,
+    "diverged": 0
+  },
+  "perSize": {
+    "2": {
+      "kept": 1200,
+      "violations": 0,
+      "packFailures": 0,
+      "diverged": 0,
+      "tightestUsage": 0.9997149276908067,
+      "tightest": {
+        "p": 0.076356106,
+        "b": 39.42140165,
+        "f": 0.052926094500142545,
+        "served": 0.052926,
+        "residual": "19705081850"
+      }
+    },
+    "3": {
+      "kept": 1200,
+      "violations": 0,
+      "packFailures": 0,
+      "diverged": 0,
+      "tightestUsage": 0.999578235222163,
+      "tightest": {
+        "p": 0.795170691,
+        "b": 9.514367275,
+        "f": 0.773642269500211,
+        "served": 0.773642,
+        "residual": "4755177225"
+      }
+    },
+    "4": {
+      "kept": 1200,
+      "violations": 0,
+      "packFailures": 0,
+      "diverged": 0,
+      "tightestUsage": 0.9997149276908067,
+      "tightest": {
+        "p": 0.076356106,
+        "b": 39.42140165,
+        "f": 0.052926094500142545,
+        "served": 0.052926,
+        "residual": "19705081850"
+      }
+    }
+  },
+  "laneUse": {
+    "pHat": {
+      "bits": 30,
+      "ceiling": "1073741823",
+      "widest": "993231498",
+      "used": 0.9250189167680395
+    },
+    "bHat": {
+      "bits": 45,
+      "ceiling": "35184372088831",
+      "widest": "49981473284",
+      "used": 0.001420558910581389
+    },
+    "fHat": {
+      "bits": 45,
+      "ceiling": "35184372088831",
+      "widest": "979993808",
+      "used": 0.000027853099254571927
+    }
+  },
+  "tightestOverall": {
+    "N": 2,
+    "usage": 0.9997149276908067,
+    "memberIndex": 0,
+    "proved": true
+  },
+  "checks": [
+    {
+      "name": "the residual bound is never violated, at any batch size",
+      "pass": true
+    },
+    {
+      "name": "the sweep is discriminating, not vacuous",
+      "pass": true
+    },
+    {
+      "name": "the packing never corrupts a member",
+      "pass": true
+    },
+    {
+      "name": "no real answer comes close to overflowing its lane",
+      "pass": true
+    },
+    {
+      "name": "the packer REFUSES a field that would overflow its lane, and names the member",
+      "pass": true
+    },
+    {
+      "name": "the TIGHTEST batch the sweep found still proves and verifies",
+      "pass": true
+    },
+    {
+      "name": "the same batch one grid step past the bound is refused",
+      "pass": true
+    }
+  ]
+}

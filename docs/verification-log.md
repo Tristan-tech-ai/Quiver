@@ -113,6 +113,49 @@ V6 above now confirms the instability was never a defect at all.
 `proofStorage` reports itself `durable: false` with the instruction to set `QUIVER_PROOF_DIR`. That is
 correct: Phase A shipped switched off, pending a decision about a Railway volume.
 
+## V9 — historical dYdX attestation false-refused, and the gate that judged the fix is itself flaky
+
+`proveMarket` used bare `proveKey` for its three proofs, which pins `anchor.primary`, whichever RPC
+answered `status` first. That is usually publicnode, which prunes application state to about the last
+100 blocks while still serving `commit` headers millions of blocks deep. The two depths are unrelated,
+which is what made the failure so misleading.
+
+Reproduced before changing anything, tip 99,407,458 pinned to 99,123,400:
+
+| | |
+|---|---|
+| `openAnchor({height: H})` | succeeded, corroborators 3, primary publicnode |
+| `proveMarket(...)` | **failed**: `abci_query code 7 proof is unexpectedly empty` |
+| `proveKeyAny(...)` | succeeded via `dydx-dao-rpc.polkachu.com` |
+
+So every pinned attestation of market parameters false-refused, and the refusal read like the chain
+had lost the data rather than like we had asked the wrong node. After the change, BTC, ETH and SOL all
+prove at two-day depth with primary still publicnode, so the fallback is doing the work.
+
+**Two of my own explanations died on measurement, and saying so is the point.** When `gate:d3` went red
+after the change I wrote that the change had caused it, on one pre-change run passing against two
+post-change runs failing. That is a three-sample claim of causation.
+
+- *Latency*: dead. `anchor.primary` IS `providers[0]`, and `proveMarket` at tip runs 342 to 746 ms.
+- *Coverage*: dead. 40 of 40 markets prove either way, so the fallback admits no new market that could
+  blow a bound calibrated without it.
+
+And no third mechanism is available, because every proof roots into the same signature-verified
+`app_hash`, so a different provider cannot return a different value. **Ran the unchanged code six more
+times and it failed too.** Tally: with the fix 2 failures in 6 runs, without it 1 in 11. Both flake.
+
+The failing assertion reads `sampled-market worst case used 1666.7% of the 0.06 relative bound`. That
+is a relative error of exactly 1.0, the diagnostic shape for one side being zero, on a market whose
+premium samples move minute to minute while the test compares proven state against the live indexer.
+
+**So this is the same disease as V6 in a second test**, and worth naming rather than filing as luck: a
+check that compares anchored state against a moving live feed has a red that means either "the maths is
+wrong" or "the feed moved". V6 fixed that for archive availability. This one is unfixed and now
+measured, with a rate of roughly 1 run in 6.
+
+Final state: `gate:d3` 17 of 17, `gate:d3c` 14 of 14, `src/engine/` untouched so the codeHash does not
+move and needs no batched re-sync.
+
 ## V8 — the OKX listing read fresh, and the one-star fear did not come true
 
 Read from the registry itself rather than from any note: `agent service-list --agent-id 5152`, at

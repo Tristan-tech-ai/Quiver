@@ -1019,16 +1019,46 @@ const normTicker = (s) => {
  * funding inputs are market-INDEPENDENT: proving them once per anchor and passing the result in costs
  * four queries for a whole batch, while folding them into this function would cost four per market.
  */
+// ALL THREE PROOFS GO THROUGH `proveKeyAny`, AND USED TO GO THROUGH BARE `proveKey`. That difference
+// is the whole reason historical attestation did not work.
+//
+// `proveKey` defaults to `anchor.primary`, which is whichever RPC answered `status` first. Measured on
+// 28 July, that is usually publicnode, which prunes APPLICATION state to roughly the last 100 blocks
+// while still serving `commit` headers millions of blocks deep. The two depths are unrelated, and that
+// is what made the failure so misleading.
+//
+// Reproduced at two-day depth, tip 99,407,458 pinned to 99,123,400:
+//   openAnchor({height: H})  succeeded, corroborators 3, primary publicnode
+//   proveMarket(...)         failed: "abci_query code 7 proof is unexpectedly empty; ensure height
+//                            has not been pruned"
+//   proveKeyAny(...)         succeeded via dydx-dao-rpc.polkachu.com
+//
+// So every pinned or historical attestation of market parameters FALSE-REFUSED, and the refusal read
+// like the chain had lost the data rather than like we had asked the wrong node. A refusal that names
+// the wrong cause is worse than a refusal, because it sends the reader somewhere there is nothing to
+// find. The funding path already used `proveKeyAny` and was never affected; this one was simply never
+// updated to match.
+//
+// THIS DOES NOT WEAKEN THE CLAIM, which is the only reason it is allowed. `proveKeyAny` is a loop over
+// `proveKey`, and `proveKey` still requires every proof to root into the app_hash of the anchor whose
+// signatures were verified. A provider that answers is carrying bytes, not asserting anything: one
+// that returned a forged value would produce a proof that fails the root check, and one that returns
+// nothing is skipped in favour of the next. Trying more of them cannot lower the bar, it can only find
+// a node that still holds the state.
+//
+// The CHECKPOINTED path already solved this a different way, by reordering `anchor.providers` and
+// `anchor.primary` to nodes measured to serve state at the anchored height. Do not add a second fix
+// there. The gap was only ever on the plain pinned path.
 export async function proveMarket(anchor, { ticker, perpetualId, fundingCtx = null, timeoutMs = 15000 }) {
   const want = normTicker(ticker);
-  const perpProof = await proveKey(anchor, STORES.perpetual, KEYS.perpetual(perpetualId), { timeoutMs });
+  const perpProof = await proveKeyAny(anchor, STORES.perpetual, KEYS.perpetual(perpetualId), { timeoutMs });
   const perp = decodePerpetual(perpProof.value);
   if (normTicker(perp.ticker) !== want) {
     throw new Error(`dydx-attest: Perp:${perpetualId} is ticker "${perp.ticker}" on chain, not "${want}" — refusing rather than guessing the id mapping`);
   }
   const [priceProof, tierProof] = await Promise.all([
-    proveKey(anchor, STORES.price, KEYS.price(perp.marketId), { timeoutMs }),
-    proveKey(anchor, STORES.liqTier, KEYS.liqTier(perp.liquidityTier), { timeoutMs }),
+    proveKeyAny(anchor, STORES.price, KEYS.price(perp.marketId), { timeoutMs }),
+    proveKeyAny(anchor, STORES.liqTier, KEYS.liqTier(perp.liquidityTier), { timeoutMs }),
   ]);
   const price = decodeMarketPrice(priceProof.value);
   if (price.id !== perp.marketId && price.id !== 0) {

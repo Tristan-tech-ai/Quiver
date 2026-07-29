@@ -1,0 +1,85 @@
+{
+  "at": "2026-07-28T23:35:32.371Z",
+  "passed": true,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "verifierBytes": 7270,
+  "xlayerVerifier": "0x59F6Aa860eE0d26Db873f7c7015CE869170b3b25",
+  "bytecodeIdenticalToXLayer": true,
+  "liquidationPrice": 58329.113924051,
+  "publicSignals": [
+    "362500000000000000",
+    "1012500000000000000",
+    "6400000000000",
+    "1000000000",
+    "64000000000000",
+    "1",
+    "12500000",
+    "58329113924051"
+  ],
+  "proveMs": 1112,
+  "crossChain": [
+    {
+      "name": "honest proof",
+      "xlayer": true,
+      "hyperevm": true,
+      "expect": true,
+      "agree": true
+    },
+    {
+      "name": "bent proof point",
+      "xlayer": false,
+      "hyperevm": false,
+      "expect": false,
+      "agree": true
+    },
+    {
+      "name": "liquidation price moved one grid step",
+      "xlayer": false,
+      "hyperevm": false,
+      "expect": false,
+      "agree": true
+    }
+  ],
+  "refusedSignals": 8,
+  "gas": {
+    "hyperevmVerify": "306420",
+    "xlayerVerify": "306420",
+    "hyperevmDeploy": "1636901"
+  },
+  "gasPriceWei": {
+    "hyperevm": "174568028",
+    "xlayer": "21000000"
+  },
+  "deployCostHype": 0.000285750579601228,
+  "deployed": null,
+  "checks": [
+    {
+      "name": "this build reproduces the verifier already live on X Layer, byte for byte",
+      "pass": true
+    },
+    {
+      "name": "the proof verifies off chain against the published key",
+      "pass": true
+    },
+    {
+      "name": "it is a proof about the same position X Layer already holds",
+      "pass": true
+    },
+    {
+      "name": "the selector is derived from the compiled ABI, not typed in",
+      "pass": true
+    },
+    {
+      "name": "every case gives the same answer on both chains, and the answer expected",
+      "pass": true
+    },
+    {
+      "name": "every perturbed public signal is refused on HyperEVM",
+      "pass": true
+    },
+    {
+      "name": "the two chains price the same computation the same way, to within calldata rules",
+      "pass": true
+    }
+  ]
+}

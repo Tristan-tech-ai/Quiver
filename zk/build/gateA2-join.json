@@ -1,0 +1,69 @@
+{
+  "at": "2026-07-28T23:47:42.978Z",
+  "passed": true,
+  "windowPpm": "200",
+  "windowSource": "command line",
+  "btcMarkHat": "63863000000000",
+  "publicSignals": [
+    "37500000000000000",
+    "1012500000000000000",
+    "6386300000000",
+    "1000000000",
+    "63863000000000",
+    "1",
+    "12500000",
+    "58204253164557"
+  ],
+  "joinGas": null,
+  "gasPriceWei": "186544558",
+  "realDriftBreach": {
+    "ppm": "375",
+    "elapsedSec": 5.485
+  },
+  "checks": [
+    {
+      "name": "the planted contract carries the measured window in its own bytecode",
+      "pass": true
+    },
+    {
+      "name": "the proof binds the precompile mark exactly, with no rounding in between",
+      "pass": true
+    },
+    {
+      "name": "an honest proof whose price matches the live mark VERIFIES",
+      "pass": true
+    },
+    {
+      "name": "a proof submitted against a different asset is refused",
+      "pass": true
+    },
+    {
+      "name": "a bent proof is refused even when the price is right",
+      "pass": true
+    },
+    {
+      "name": "an unanswerable asset is refused rather than compared against zero",
+      "pass": true
+    },
+    {
+      "name": "a price one grid step outside the contract's own bound is refused, by construction",
+      "pass": true
+    },
+    {
+      "name": "a price inside the window is still accepted, so the gate is a window and not a wall",
+      "pass": true
+    },
+    {
+      "name": "the tick floor is the binding constraint somewhere, so it is not decoration",
+      "pass": true
+    },
+    {
+      "name": "a proof whose mark has genuinely moved past the window is REFUSED",
+      "pass": true
+    },
+    {
+      "name": "the stale proof is refused for its INPUT, not its arithmetic — verifyProof still returns true",
+      "pass": true
+    }
+  ]
+}

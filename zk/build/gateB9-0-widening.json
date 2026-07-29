@@ -1,0 +1,416 @@
+{
+  "at": "2026-07-28T23:53:22.175Z",
+  "passed": true,
+  "timingRuns": 7,
+  "sizes": [
+    {
+      "N": 2,
+      "circuit": "kellybatch2",
+      "r1cs": 743,
+      "plonk": 1664,
+      "domain": 2048,
+      "publicSignals": 1,
+      "proveMs": 714,
+      "times": [
+        704,
+        707,
+        711,
+        714,
+        727,
+        737,
+        738
+      ]
+    },
+    {
+      "N": 3,
+      "circuit": "kellybatch3",
+      "r1cs": 1236,
+      "plonk": 2854,
+      "domain": 4096,
+      "publicSignals": 2,
+      "proveMs": 1420,
+      "times": [
+        1362,
+        1385,
+        1402,
+        1420,
+        1430,
+        1447,
+        1502
+      ]
+    },
+    {
+      "N": 4,
+      "circuit": "kellybatch4",
+      "r1cs": 1486,
+      "plonk": 3328,
+      "domain": 4096,
+      "publicSignals": 2,
+      "proveMs": 1453,
+      "times": [
+        1404,
+        1436,
+        1438,
+        1453,
+        1464,
+        1466,
+        1479
+      ]
+    }
+  ],
+  "timing": [
+    {
+      "label": "kelly",
+      "N": 1,
+      "r1cs": 372,
+      "plonk": 718,
+      "domain": 1024,
+      "publicSignals": 5,
+      "proveMs": 376,
+      "times": [
+        354,
+        362,
+        372,
+        376,
+        384,
+        392,
+        396
+      ]
+    },
+    {
+      "label": "kellybatch1",
+      "N": 1,
+      "r1cs": 493,
+      "plonk": 1190,
+      "domain": 2048,
+      "publicSignals": 1,
+      "proveMs": 720,
+      "times": [
+        690,
+        706,
+        711,
+        720,
+        720,
+        726,
+        760
+      ]
+    },
+    {
+      "label": "kellybatch2",
+      "N": 2,
+      "r1cs": 743,
+      "plonk": 1664,
+      "domain": 2048,
+      "publicSignals": 1,
+      "proveMs": 714,
+      "times": [
+        704,
+        707,
+        711,
+        714,
+        727,
+        737,
+        738
+      ]
+    },
+    {
+      "label": "kellybatch3",
+      "N": 3,
+      "r1cs": 1236,
+      "plonk": 2854,
+      "domain": 4096,
+      "publicSignals": 2,
+      "proveMs": 1420,
+      "times": [
+        1362,
+        1385,
+        1402,
+        1420,
+        1430,
+        1447,
+        1502
+      ]
+    },
+    {
+      "label": "kellybatch4",
+      "N": 4,
+      "r1cs": 1486,
+      "plonk": 3328,
+      "domain": 4096,
+      "publicSignals": 2,
+      "proveMs": 1453,
+      "times": [
+        1404,
+        1436,
+        1438,
+        1453,
+        1464,
+        1466,
+        1479
+      ]
+    }
+  ],
+  "domainExponent": 0.975115067977602,
+  "provingBreakEven": [
+    {
+      "N": 2,
+      "batchMs": 714,
+      "separateLiveMs": 752,
+      "ratioVsLive": 0.949468085106383,
+      "separatePackedMs": 1440,
+      "ratioVsPacked": 0.49583333333333335
+    },
+    {
+      "N": 3,
+      "batchMs": 1420,
+      "separateLiveMs": 1128,
+      "ratioVsLive": 1.2588652482269505,
+      "separatePackedMs": 2160,
+      "ratioVsPacked": 0.6574074074074074
+    },
+    {
+      "N": 4,
+      "batchMs": 1453,
+      "separateLiveMs": 1504,
+      "ratioVsLive": 0.9660904255319149,
+      "separatePackedMs": 2880,
+      "ratioVsPacked": 0.5045138888888889
+    }
+  ],
+  "batch": [
+    {
+      "p": 0.901193484,
+      "b": 46.197290853,
+      "served": 0.899055,
+      "pHat": "901193484",
+      "bHat": "46197290853",
+      "fHat": "899054689",
+      "residual": "-18689942135",
+      "boundUsage": 0.8091358514710953
+    },
+    {
+      "p": 0.29219142,
+      "b": 6.706904557,
+      "served": 0.186657,
+      "pHat": "292191420",
+      "bHat": "6706904557",
+      "fHat": "186657105",
+      "residual": "1806626545",
+      "boundUsage": 0.5387363215462557
+    },
+    {
+      "p": 0.36204545,
+      "b": 16.008877076,
+      "served": 0.322195,
+      "pHat": "362045450",
+      "bHat": "16008877076",
+      "fHat": "322195400",
+      "residual": "-1922453800",
+      "boundUsage": 0.24017347261440114
+    },
+    {
+      "p": 0.855638989,
+      "b": 46.357180361,
+      "served": 0.852525,
+      "pHat": "855638989",
+      "bHat": "46357180361",
+      "fHat": "852524887",
+      "residual": "22923449178",
+      "boundUsage": 0.988992384760543
+    }
+  ],
+  "publicSignals": {
+    "2": [
+      "9373325101751603509548782920007423794983048529029809394150079405836"
+    ],
+    "3": [
+      "9373325101751603509548782920007423794983048529029809394150079405836",
+      "12172198063175417300751083659274"
+    ],
+    "4": [
+      "9373325101751603509548782920007423794983048529029809394150079405836",
+      "42811083581250434534665169142251600895461269956864700304584095326218"
+    ]
+  },
+  "tamper": [
+    {
+      "step": 1,
+      "member": 0,
+      "boundUsage": 1.1908641485289047,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 0
+    },
+    {
+      "step": 1,
+      "member": 1,
+      "boundUsage": 2.538736321546256,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 1
+    },
+    {
+      "step": 1,
+      "member": 2,
+      "boundUsage": 1.7598265273855989,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 2
+    },
+    {
+      "step": 1,
+      "member": 3,
+      "boundUsage": 2.988992384760543,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 3
+    },
+    {
+      "step": 2,
+      "member": 0,
+      "boundUsage": 3.1908641485289047,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 0
+    },
+    {
+      "step": 2,
+      "member": 1,
+      "boundUsage": 4.5387363215462555,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 1
+    },
+    {
+      "step": 2,
+      "member": 2,
+      "boundUsage": 3.759826527385599,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 2
+    },
+    {
+      "step": 2,
+      "member": 3,
+      "boundUsage": 4.988992384760543,
+      "proved": false,
+      "err": "Error: Assert Failed.",
+      "namedIndex": 3
+    }
+  ],
+  "circomErrorNamesMember": false,
+  "checks": [
+    {
+      "name": "the packing round-trips: unpack(pack(answers)) === answers at N=2",
+      "pass": true
+    },
+    {
+      "name": "the odd batch's spare lane is empty, so the encoding is canonical at N=2",
+      "pass": true
+    },
+    {
+      "name": "the honest 2-answer proof verifies against the published key",
+      "pass": true
+    },
+    {
+      "name": "the public signals ARE the packed answers at N=2",
+      "pass": true
+    },
+    {
+      "name": "every member is individually readable from the public signals at N=2",
+      "pass": true
+    },
+    {
+      "name": "every perturbed public signal is rejected at N=2",
+      "pass": true
+    },
+    {
+      "name": "a bent proof point is rejected at N=2",
+      "pass": true
+    },
+    {
+      "name": "the packing round-trips: unpack(pack(answers)) === answers at N=3",
+      "pass": true
+    },
+    {
+      "name": "the odd batch's spare lane is empty, so the encoding is canonical at N=3",
+      "pass": true
+    },
+    {
+      "name": "the honest 3-answer proof verifies against the published key",
+      "pass": true
+    },
+    {
+      "name": "the public signals ARE the packed answers at N=3",
+      "pass": true
+    },
+    {
+      "name": "every member is individually readable from the public signals at N=3",
+      "pass": true
+    },
+    {
+      "name": "every perturbed public signal is rejected at N=3",
+      "pass": true
+    },
+    {
+      "name": "a bent proof point is rejected at N=3",
+      "pass": true
+    },
+    {
+      "name": "the packing round-trips: unpack(pack(answers)) === answers at N=4",
+      "pass": true
+    },
+    {
+      "name": "the odd batch's spare lane is empty, so the encoding is canonical at N=4",
+      "pass": true
+    },
+    {
+      "name": "the honest 4-answer proof verifies against the published key",
+      "pass": true
+    },
+    {
+      "name": "the public signals ARE the packed answers at N=4",
+      "pass": true
+    },
+    {
+      "name": "every member is individually readable from the public signals at N=4",
+      "pass": true
+    },
+    {
+      "name": "every perturbed public signal is rejected at N=4",
+      "pass": true
+    },
+    {
+      "name": "a bent proof point is rejected at N=4",
+      "pass": true
+    },
+    {
+      "name": "an aggregate containing a tampered member cannot be proven at all",
+      "pass": true
+    },
+    {
+      "name": "the refusal NAMES the tampered member, from the public signals alone",
+      "pass": true
+    },
+    {
+      "name": "the naming is discriminating: an honest batch names nobody",
+      "pass": true
+    },
+    {
+      "name": "proving cost follows the evaluation DOMAIN, not the constraint count",
+      "pass": true
+    },
+    {
+      "name": "the proving-time break-even is measured, and it is NOT monotonic in N",
+      "pass": true
+    },
+    {
+      "name": "the measured scaling matches domain-scaling.mjs's law of domain^1.01",
+      "pass": true
+    },
+    {
+      "name": "every batch fits the ceremony file on hand",
+      "pass": true
+    }
+  ]
+}

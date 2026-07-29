@@ -1,0 +1,42 @@
+{
+  "at": "2026-07-28T23:39:55.496Z",
+  "passed": true,
+  "chainId": 999,
+  "block": "41709677",
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "runtimeBytes": 4009,
+  "assets": 232,
+  "exactAgreement": 126,
+  "revertedOnUnknown": 5,
+  "markPxHatGas": "37603",
+  "checks": [
+    {
+      "name": "running against chain 999",
+      "pass": true
+    },
+    {
+      "name": "the precompile is NOT block-scoped: a 20,000-block-old tag tracks `latest`",
+      "pass": true
+    },
+    {
+      "name": "every asset: the contract's integer agrees with a direct precompile read",
+      "pass": true
+    },
+    {
+      "name": "the on-chain decode and the 1e9 scaling are EXACT for every asset, checked against the bytes the precompile returned in the same call",
+      "pass": true
+    },
+    {
+      "name": "an asset with no answer REVERTS rather than returning zero",
+      "pass": true
+    },
+    {
+      "name": "markPxRaw and szDecimals revert on the same input",
+      "pass": true
+    },
+    {
+      "name": "a valid asset still answers",
+      "pass": true
+    }
+  ]
+}

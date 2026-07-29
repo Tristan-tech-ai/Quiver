@@ -1,0 +1,282 @@
+{
+  "at": "2026-07-28T23:54:19.921Z",
+  "passed": true,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "txBase": 21000,
+  "calldataPricing": {
+    "nonZero": 16,
+    "zero": 4
+  },
+  "single": {
+    "circuit": "kelly",
+    "publicSignals": 5,
+    "plonk": 718,
+    "domain": 1024,
+    "acceptGas": 271038,
+    "acceptSamples": [
+      270720,
+      270720,
+      271038,
+      271662,
+      272910
+    ],
+    "acceptSpread": 2190,
+    "rejectGas": 573,
+    "calldataGas": 13592,
+    "totalGas": 305630,
+    "deployedSize": 6552,
+    "calldataBytes": 932
+  },
+  "singlePacked": {
+    "circuit": "kellybatch1",
+    "publicSignals": 1,
+    "plonk": 1190,
+    "domain": 2048,
+    "acceptGas": 268416,
+    "acceptSamples": [
+      265810,
+      267890,
+      268416,
+      268722,
+      269554
+    ],
+    "acceptSpread": 3744,
+    "rejectGas": 573,
+    "calldataGas": 12624,
+    "totalGas": 302040,
+    "deployedSize": 5723,
+    "calldataBytes": 804
+  },
+  "noiseProbe": {
+    "circuit": "kelly",
+    "otherBetAcceptGas": 271246,
+    "spread": 2190
+  },
+  "batches": {
+    "2": {
+      "circuit": "kellybatch2",
+      "publicSignals": 1,
+      "plonk": 1664,
+      "domain": 2048,
+      "acceptGas": 267890,
+      "acceptSamples": [
+        266226,
+        267682,
+        267890,
+        268624,
+        269040
+      ],
+      "acceptSpread": 2814,
+      "rejectGas": 573,
+      "calldataGas": 12768,
+      "totalGas": 301658,
+      "deployedSize": 5721,
+      "calldataBytes": 804
+    },
+    "3": {
+      "circuit": "kellybatch3",
+      "publicSignals": 2,
+      "plonk": 2854,
+      "domain": 4096,
+      "acceptGas": 269579,
+      "acceptSamples": [
+        269065,
+        269163,
+        269579,
+        269579,
+        271561
+      ],
+      "acceptSpread": 2496,
+      "rejectGas": 573,
+      "calldataGas": 13028,
+      "totalGas": 303607,
+      "deployedSize": 5986,
+      "calldataBytes": 836
+    },
+    "4": {
+      "circuit": "kellybatch4",
+      "publicSignals": 2,
+      "plonk": 3328,
+      "domain": 4096,
+      "acceptGas": 268857,
+      "acceptSamples": [
+        268747,
+        268747,
+        268857,
+        268955,
+        269689
+      ],
+      "acceptSpread": 942,
+      "rejectGas": 573,
+      "calldataGas": 13184,
+      "totalGas": 303041,
+      "deployedSize": 5988,
+      "calldataBytes": 836
+    }
+  },
+  "comparison": [
+    {
+      "N": 2,
+      "batchExec": 267890,
+      "batchTotal": 301658,
+      "separatePackedTotal": 604080,
+      "savedVsPacked": 302422,
+      "savedPctVsPacked": 50.063236657396374,
+      "separateLiveTotal": 611260,
+      "savedVsLive": 309602,
+      "savedPctVsLive": 50.64980532015836
+    },
+    {
+      "N": 3,
+      "batchExec": 269579,
+      "batchTotal": 303607,
+      "separatePackedTotal": 906120,
+      "savedVsPacked": 602513,
+      "savedPctVsPacked": 66.49373151458968,
+      "separateLiveTotal": 916890,
+      "savedVsLive": 613283,
+      "savedPctVsLive": 66.88730382052373
+    },
+    {
+      "N": 4,
+      "batchExec": 268857,
+      "batchTotal": 303041,
+      "separatePackedTotal": 1208160,
+      "savedVsPacked": 905119,
+      "savedPctVsPacked": 74.91714673553172,
+      "separateLiveTotal": 1222520,
+      "savedVsLive": 919479,
+      "savedPctVsLive": 75.21177567647155
+    }
+  ],
+  "perAnswer": [
+    {
+      "N": 2,
+      "perAnswer": 150829,
+      "ratio": 0.4993676334260363,
+      "domain": 2048
+    },
+    {
+      "N": 3,
+      "perAnswer": 101202.33333333333,
+      "ratio": 0.3350626848541032,
+      "domain": 4096
+    },
+    {
+      "N": 4,
+      "perAnswer": 75760.25,
+      "ratio": 0.2508285326446828,
+      "domain": 4096
+    }
+  ],
+  "reader": {
+    "deployedBytes": 1016,
+    "readOneMemberGas": 760,
+    "naming": [
+      {
+        "tampered": 0,
+        "named": 0,
+        "gas": 1759
+      },
+      {
+        "tampered": 1,
+        "named": 1,
+        "gas": 3139
+      },
+      {
+        "tampered": 2,
+        "named": 2,
+        "gas": 4463
+      },
+      {
+        "tampered": 3,
+        "named": 3,
+        "gas": 5843
+      }
+    ],
+    "honestName": -1
+  },
+  "runtimeBytesPerPublicInput": 265,
+  "checks": [
+    {
+      "name": "ONE answer, kelly.circom (live shape, 5 signals): the honest proof verifies and every tampered submission is refused",
+      "pass": true
+    },
+    {
+      "name": "ONE answer, kelly.circom (live shape, 5 signals): the verifier fits EIP-170",
+      "pass": true
+    },
+    {
+      "name": "ONE answer, packed (1 signal): the honest proof verifies and every tampered submission is refused",
+      "pass": true
+    },
+    {
+      "name": "ONE answer, packed (1 signal): the verifier fits EIP-170",
+      "pass": true
+    },
+    {
+      "name": "2 answers, widened: the honest proof verifies and every tampered submission is refused",
+      "pass": true
+    },
+    {
+      "name": "2 answers, widened: the verifier fits EIP-170",
+      "pass": true
+    },
+    {
+      "name": "3 answers, widened: the honest proof verifies and every tampered submission is refused",
+      "pass": true
+    },
+    {
+      "name": "3 answers, widened: the verifier fits EIP-170",
+      "pass": true
+    },
+    {
+      "name": "4 answers, widened: the honest proof verifies and every tampered submission is refused",
+      "pass": true
+    },
+    {
+      "name": "4 answers, widened: the verifier fits EIP-170",
+      "pass": true
+    },
+    {
+      "name": "ONE answer, kelly.circom, a DIFFERENT bet (error-bar probe): the honest proof verifies and every tampered submission is refused",
+      "pass": true
+    },
+    {
+      "name": "ONE answer, kelly.circom, a DIFFERENT bet (error-bar probe): the verifier fits EIP-170",
+      "pass": true
+    },
+    {
+      "name": "the gas measurement carries an error bar smaller than the effect being measured",
+      "pass": true
+    },
+    {
+      "name": "widening beats separate proofs at every batch size Quiver can assemble",
+      "pass": true
+    },
+    {
+      "name": "the win is aggregation, not a change of what gets published",
+      "pass": true
+    },
+    {
+      "name": "cost per answer falls monotonically across the range Quiver can assemble",
+      "pass": true
+    },
+    {
+      "name": "the packing is nowhere near the template ceiling that killed the 100-answer design",
+      "pass": true
+    },
+    {
+      "name": "every member of the accepted batch is readable on chain, and is the answer that went in",
+      "pass": true
+    },
+    {
+      "name": "an accepted batch names nobody, so the on-chain reader is not a function that always accuses",
+      "pass": true
+    },
+    {
+      "name": "a tampered member is NAMED on chain, not merely refused",
+      "pass": true
+    }
+  ]
+}

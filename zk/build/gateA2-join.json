@@ -1,24 +1,35 @@
 {
-  "at": "2026-07-28T23:47:42.978Z",
+  "at": "2026-07-29T06:18:20.992Z",
   "passed": true,
-  "windowPpm": "200",
-  "windowSource": "command line",
-  "btcMarkHat": "63863000000000",
+  "windowPpm": "4055",
+  "windowSource": "gateA3-staleness.json (2026-07-28T23:50:47.497Z, 892 samples over 900s)",
+  "btcMarkHat": "64058000000000",
   "publicSignals": [
-    "37500000000000000",
+    "21888242871839275222246405745257275088548364400416034343697904186575808495617",
     "1012500000000000000",
-    "6386300000000",
+    "6405800000000",
     "1000000000",
-    "63863000000000",
+    "64058000000000",
     "1",
     "12500000",
-    "58204253164557"
+    "58381974683544"
   ],
-  "joinGas": null,
-  "gasPriceWei": "186544558",
+  "joinGas": "327404",
+  "verifyOnlyGas": "307103",
+  "gasPriceWei": "280000000",
+  "tickFloorBinds": {
+    "assets": 1,
+    "of": 177,
+    "worst": [
+      {
+        "name": "HMSTR",
+        "ppm": 5952
+      }
+    ]
+  },
   "realDriftBreach": {
-    "ppm": "375",
-    "elapsedSec": 5.485
+    "ppm": "4478",
+    "elapsedSec": 289.828
   },
   "checks": [
     {
@@ -51,6 +62,10 @@
     },
     {
       "name": "a price inside the window is still accepted, so the gate is a window and not a wall",
+      "pass": true
+    },
+    {
+      "name": "the tick-floor survey read enough of the universe to mean anything",
       "pass": true
     },
     {

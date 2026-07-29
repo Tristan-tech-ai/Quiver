@@ -1,8 +1,16 @@
 # What is waiting for a deploy
 
-Everything built since the deadline is repo-only. The live service has not been touched since 28 July
-2026 and still serves the submitted build. This is the list of what a deploy would actually change,
-what it would not, and what to check afterwards.
+> **SUPERSEDED, 29 July 2026.** This document was written while the plan was to ship nothing, and its
+> opening said the live service had not been touched since 28 July. **Two deploys have since gone out**,
+> at 00:30 and 09:30 UTC on 29 July, and the live service now carries everything listed below. Measured
+> darkness was 11 seconds on the first and 0 on the second, against the three-minute estimate that was
+> the whole reason for the no-deploy plan.
+>
+> What still stands is the reasoning: what a deploy changes, what it does not, and what to check after.
+> That is why the list below is kept rather than rewritten. Read it as the record of what shipped.
+
+Everything built since the deadline was repo-only while this was written. This is the list of what a
+deploy would actually change, what it would not, and what to check afterwards.
 
 **Nothing here changes the published `codeHash`.** Every file touched is under `src/util/`, `src/app.js`
 or `src/mcp.js`; the hash walks `src/engine/` only, and `q1-e1fa99d08887d6cc` is unchanged locally and
@@ -57,10 +65,19 @@ explores, so it is where a caller is most likely to be wrong, and it was the one
 |---|---|
 | `src/util/proofStore.js` (new) | a finished proof survives a redeploy and a second replica |
 | `src/app.js` | `/build` reports `proofStorage`; the 404 body stops promising "a redeploy clears them" when it no longer does |
+| `src/server.js` | drains in-flight proof writes on SIGTERM, bounded at five seconds |
 
-**Off unless `QUIVER_PROOF_DIR` is set.** Deploying without setting it changes nothing at all, which
-makes it the safest thing on this list. Turning it on needs a persistent volume on Railway, which is a
-configuration decision rather than a code one. `npm run gate:a` and `npm run gate:a-revert`.
+**Off unless `QUIVER_PROOF_S3_BUCKET` or `QUIVER_PROOF_DIR` is set.** Deploying without setting either
+changes nothing at all, which makes it the safest thing on this list. Turning it on is entirely
+configuration: a bucket and a role, no code change and no endpoint change.
+
+The Railway-volume route was measured and dropped. Railway's own reference says "Replicas cannot be
+used with volumes", one volume per service, region-pinned — so a volume delivers the redeploy half of
+the Phase A claim and silently fails the replica half, which is the worse failure because the endpoint
+would go on advertising both. The store therefore has an S3 backend beside the filesystem one, chosen
+by environment; see `PHASE_A_S3.md` for what is proven against an emulator and MinIO and what remains
+unproven without real AWS credentials. `npm run gate:a` (11 cases, both backends) and
+`npm run gate:a-revert` (five scripted reverts).
 
 ## Group 3 — not for deploy
 

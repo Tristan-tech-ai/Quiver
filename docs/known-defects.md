@@ -12,17 +12,31 @@ This page exists because the alternative is worse. A project whose thesis is *do
 re-derive the number* cannot hold a defect back until after it is judged. What follows is the list of
 things a reviewer would be right to mark us down for, written by us, with the reproduction steps.
 
-Each section carries its own status line. **§1 and §2 are unfixed and disclosed; §3 was fixed on
-29 July 2026** and its record is kept in place rather than deleted, because what a defect looked like
-before it was closed is the part a reader cannot reconstruct afterwards. `/changelog` is the dated
-index of what has moved.
+Each section carries its own status line. **§2 is unfixed and disclosed; §1 and §3 were fixed outright
+on 29 July 2026** — §1 in two passes on the same day, first for a miscased value and then for a value
+matching no declared alternative at all. Their records are kept in place rather than deleted, because
+what a defect looked like before it was closed is the part a reader cannot reconstruct afterwards.
+`/changelog` is the dated index of what has moved.
 
 ---
 
 ## 1. `side` and option `type` are matched as exact lowercase strings, and fail open to the riskier default
 
-**Status: NOT FIXED. Scheduled to be fixed immediately after judging closes.** The reason it is not
-fixed today is at the bottom of this section, and it is a trade-off, not an excuse.
+**Status: FIXED, 29 July 2026, on both surfaces — in two passes on the same day.** First for a
+miscased value (`side: "SHORT"` now answers as the short it means), then for a value matching no
+declared alternative at all (`side: "banana"` is now **refused**, naming the field and listing what
+would work, rather than served as a long). Neither pass touched `src/engine/`; the build hash is still
+`q1-e1fa99d08887d6cc`. Everything below describes the state before the fixes and is left standing;
+what changed and what it cost are at the end of this section. The write-ups are
+`CASE_SENSITIVITY_FIX.md` and `UNKNOWN_ENUM_REFUSAL.md`.
+
+**The reason this section previously said the fix was impossible without moving the build hash was
+wrong, and the correction is the interesting part.** It read: *"Both lines are inside `src/engine/`,
+the directory the build hash covers."* Both lines are — but the *substitution* those lines perform can
+be prevented before the engine is ever called, by declaring the alternatives in the schema the repair
+layer already consults. The four-part fix listed at the bottom of this section had it right in its own
+step 1 and then treated step 3 as load-bearing for the whole thing. It was not: steps 1 and 2 close
+the case half completely, and they touch no hashed file.
 
 ### The answer is wrong
 
@@ -121,7 +135,13 @@ interpretation step, and none of them can see an error that happens before it.
 `ok` is `true` and every check passes, so a paying caller is charged for the inverted answer. This is
 derived from the source rather than observed through a settlement, and is labelled as such.
 
-### Why it is not fixed
+### Why it was held — the reasoning as it stood, and where it was wrong
+
+The paragraph below is the argument this page made on the morning of 29 July. It is kept because it
+is the mistake worth publishing: not a wrong number, but a **wrong assumption about where a fix has to
+live**, which held a wrong risk answer in place for longer than it needed to be. The premise that
+`isChargeable()` bills for it and that every self-check passes is correct and unchanged; the
+conclusion that nothing could be done outside `src/engine/` is what did not survive.
 
 Because **the fix moves the codeHash, and the served changelog promises `q1-e1fa99d08887d6cc` will
 not move while judging runs.** Both lines are inside `src/engine/`, the directory the build hash
@@ -159,6 +179,93 @@ Note also that `src/mcp.js:76` already advertises `side: { enum: ['long','short'
 client. `handleRpc` repairs against the `SERVICES` entry rather than the `TOOLS` entry, so **the enum
 the MCP server publishes is decorative and unenforced** — a client that trusts the advertised schema
 is being told a constraint that is not applied.
+
+### What shipped, 29 July 2026
+
+Steps 1 and 2 of that list, plus the same treatment applied to every other field of the same shape.
+**Step 3 was not needed for the case half and was not done: `src/engine/` is byte-identical to the
+published mirror and the build hash is still `q1-e1fa99d08887d6cc`.** Step 4 is therefore moot.
+
+Every row in the tables above that differs only by capitalisation now returns **the same content hash
+as the correctly-cased body it meant** — not a similar answer, the identical signed artifact.
+`"SHORT"`, `"Short"` and `"SELL"` all return 108,641.98 on both surfaces; the hedged book reports net
+0 again; `"PUT"` and `"Put"` price as puts with delta −0.680134.
+
+Nine fields were declared, across six services, after sweeping all 22 for string fields whose
+description enumerated alternatives in prose: `perp-gate.side`, `perp-gate.venue`,
+`portfolio-gate.positions[].side`, `portfolio-gate.betaTier`, `options-risk.positions[].type`,
+`poly-fill.action`, `options-desk.focus`, `chart-press.quality`, `chart-press.theme`. Three of those
+were defects nobody had reported: `poly-fill` quoted a seller the **buy** side of the market on
+`action: "SELL"` (60c for 166.7 shares instead of 40c for 250), `betaTier: "SEVERE"` silently returned
+the default stress table instead of the validated tier, and `options-desk` with `focus: "ALL"`
+returned *strictly less* than sending nothing at all. Eleven further candidates were deliberately left
+alone because their consumer already folds case; each is listed with the file:line that does so, as an
+equality a new field cannot slip past.
+
+`repairBody` also learned to descend into array items, which is where option `type` and portfolio-leg
+`side` live — enums alone would have fixed `perp-gate` and left the other two untouched.
+
+**Nothing that was already correct moved.** Swept across all 22 services — 31 fixture forms and 14
+deterministic content hashes, captured from the unmodified repository and re-measured against the
+fixed one — the two runs are byte-identical. One honest exception, measured rather than argued: a
+miscased spelling that happened to land on the default branch anyway (`side: "LONG"`,
+`venue: "HYPERLIQUID"`) now hashes as the canonical value while its served numbers stay identical.
+No canonically-cased request moved.
+
+### The second pass, later the same day: a value matching NO declared alternative
+
+The paragraph that stood here said this was still open and needed an engine change:
+
+> A value that is not a case-variant of a declared alternative — `"banana"`, `"p"`, `"puts"` — is
+> still passed through and still hits the engine's fail-open default. Closing that needs
+> `perpGate.js:29`, `portfolioGate.js:30` and `optionsRisk.js:32` to refuse, which does move the build
+> hash.
+
+**Wrong for the second time in this section, in the same way.** `repair.js` will not coerce `"banana"`
+to a nearest neighbour, and it should not — that would invent a value the caller never wrote. But
+**refusing invents nothing**, and refusing happens at the validation layer, which is outside the
+hashed tree. `q1-e1fa99d08887d6cc` did not move.
+
+Measured before the change: **all 63 illegal-value rows were served** — nine declared enum fields ×
+seven illegal spellings, on both surfaces. `side: "banana"`, `"lng"`, `"p"`, `"SHORTT"`, `""`,
+`"long "` and `"null"` each returned 91,139.24 under a *distinct* content hash — seven separate signed
+artifacts attesting a long position to a caller who never wrote the word. The hedged book doubled to
+net 200,000 on any of them; any `type` but `put` priced as a call at delta +0.319866.
+
+All 63 are now refused, on both surfaces, with a message that names the field (`positions[1].side`,
+not just "side"), quotes back what was sent, lists every legal value, and hands over a corrected body
+with the offending value replaced by a placeholder. The refusal is free: `ok:false` on MCP, and HTTP
+400 thrown before `/settle` on the paid path.
+
+Three of the four call sites that reach an engine go through `s.validate`, so one wrapper at the foot
+of `services.js` closed the paid route and both gated diag testers. The fourth, `handleRpc`, **never
+calls `validate()` at all** and carries the guard explicitly — a fix written in `services.js` alone
+would have left the free surface still answering `side:"banana"` as a long.
+
+One enum value was added: `perp-gate.side` gained `'-1'`, because `perpGate.js:29` honours the string
+and answers it correctly at 108,641.98. Omitting it would have converted a correct answer into a
+refusal, which is worse than the defect. `perp-gate`'s advertised `inputSchema` grew 145 bytes; the
+other twenty-one are byte-identical, and the OKX registry surface (service count, endpoint, agent
+identity, codeHash) is untouched. Full write-up: `UNKNOWN_ENUM_REFUSAL.md`.
+
+**What is still open.** Nothing in this class, at the surfaces. The three fail-open lines remain in
+the engines and are simply unreachable with an unrecognised value — defence at one layer rather than
+two. A non-string value (`side: 42`, `side: {}`) still reaches the default, deliberately: the guard
+matches `repairBody`'s reach, and widening it would have refused the number `-1`, which the engine
+honours correctly.
+
+Held by `gates/gateC-case-sensitivity.mjs` (`npm run gate:c`, 10 checks) for the case half, and
+`gates/gateU-unknown-enum.mjs` (`npm run gate:u`, 8 checks) for the unrecognised-value half. Both
+sweep every service and every enum field on both surfaces, and both assert the published numbers as
+hardcoded values so that removing an enum makes the check go red rather than go quiet. Gate C test 7,
+which used to assert the pass-through was deliberate, now asserts its opposite.
+
+`gates/gateC-revert.mjs` and `gates/gateU-revert.mjs` (`npm run gate:c-revert`, `npm run gate:u-revert`)
+put each half of each fix back and show the gates fail — and show `preflight` and `gateBuyer` stay
+green over the same defect, which is why it survived this long: gateBuyer's whole subject is what
+buyers get wrong about inputs, and it checks miscased **keys** while never once checking the **value**.
+Gate U's third revert is the one that is not about the defect: it makes the guard *over-fire*, and
+requires the gate to catch a refusal that fires on input the engine answers correctly.
 
 ---
 
@@ -260,5 +367,24 @@ curl -s https://quiver-production-c3a8.up.railway.app/mcp \
                     "maxLeverage":40,"markPrice":100000}}}'
 ```
 
-Compare `liquidationPrice` against the same body with `"side":"short"`. If the two differ, §1
-reproduces. If they do not, §1 has been fixed and this page is stale — check `/changelog`.
+Compare `liquidationPrice` against the same body with `"side":"short"`.
+
+**Which answer you get tells you which build you reached, and both are correct outcomes of this
+page.** The §1 fix is in the repository and has **not been deployed** — no deploy has been performed
+since it landed, and the changelog entry for it is written ahead of the deploy exactly as this
+project's other entries are. So:
+
+- **108,641.98 for both** — you reached a build carrying the fix. §1's case half is closed.
+- **91,139.24 for `"SHORT"`** — you reached the build that was live when this page was written. The
+  defect reproduces as described, and the fix is in `src/services.js`, `src/mcp.js` and
+  `src/util/repair.js` in the repository, held by `npm run gate:c`.
+
+Either way, `{"side":"banana"}` still returns 91,139.24 on both builds. That half is genuinely still
+open and is not scheduled around judging: it needs `src/engine/` and a moved build hash.
+
+To reproduce the fix locally without the network, against whatever is checked out:
+
+```
+npm run gate:c          # 10 checks, every service and every enum field, both surfaces
+npm run gate:c-revert   # puts each half of the fix back and shows the gate go red
+```

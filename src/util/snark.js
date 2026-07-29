@@ -32,6 +32,83 @@ const scale = require('./scale.cjs');
 const ZK = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'assets', 'zk');
 const PROTOCOL = 'plonk';
 
+// ── the three constants the divergence guard is built from ───────────────────────────────────────
+//
+// Each is a property of a rounding that actually happens somewhere, not a tuned threshold. None of
+// them is a tolerance anybody chose: change one and you are describing a different machine.
+
+// Half a grid step. `scale.canonicalLiquidationPrice` solves the identity exactly over the encoded
+// integers and then rounds ONCE onto the 1/SCALE grid, half away from zero, so the price the circuit
+// carries is within this of the exact rational — with equality reachable, at a tie.
+const HALF_STEP = 0.5 / Number(scale.SCALE);
+
+// Half an ulp, relatively. A double that survives the round trip through `toFixed(9)` — which is
+// exactly the rounding `scale.toScaled` performs — is the nearest double to a 9-decimal value, so it
+// sits at most half its own ulp from the number the circuit was handed. For everything else the grid
+// can be half a step away, which is enormously larger.
+const HALF_ULP = Number.EPSILON / 2;
+
+// Half of the last digit the engine displays a price at: `liquidationPrice: round(pLiq, 2)`. This is
+// NOT the agreement tolerance any more — that is the whole point of this file's guard — but it is
+// still the width of the only number the engine publishes, so a position the 1e-9 grid cannot pin
+// more tightly than this is one no proof can honestly be said to be about.
+const DISPLAY_HALF_UNIT = 0.005;
+
+// The engine's display rounding, reproduced: `round(x, 2)` in src/engine/stats.js is
+// `Number(Number(x).toFixed(dp))`. Written out rather than imported so this file keeps its
+// dependencies (scale.cjs, attest, proofStore) and the engine keeps having no importers below it;
+// gates/gateW-divergence-guard.mjs asserts the two agree over the live universe and over a
+// half-million synthetic positions, which is the only version of this claim worth anything.
+const displayRound = (x) => Number(Number(x).toFixed(2));
+
+/**
+ * How far a float can sit from the 1e-9 grid the circuit encodes it onto.
+ *
+ * Two cases and they differ by seven orders of magnitude, which is why this is not just `HALF_STEP`
+ * everywhere: the served paths run every input through `gridSnapFields` first, so `entryPrice`,
+ * `size` and `maintMarginRate` normally arrive already ON the grid and cost nothing to encode. The
+ * one that does not is `margin`, because the engine derives it from leverage and the quotient lands
+ * wherever it lands. Charging every input half a step would make the bound below dominated by an
+ * error that is not there.
+ */
+function encodingError(x) {
+  if (typeof x !== 'number' || !Number.isFinite(x)) return NaN;
+  if (Math.abs(x) >= 1e21) return HALF_STEP;   // toFixed goes exponential past this and toScaled with it
+  return Number(x.toFixed(scale.SCALE_DECIMALS)) === x ? Math.abs(x) * HALF_ULP : HALF_STEP;
+}
+
+/**
+ * How far encoding the inputs can have moved the liquidation price — measured over the whole box the
+ * encoding could have landed in, not linearised.
+ *
+ * THE OBVIOUS VERSION OF THIS IS WRONG AND WAS MEASURED WRONG. A first-order sensitivity sum —
+ * |dP/dM|·h + |dP/dq|·h + … — is the natural way to write this bound and it fails: at a size near the
+ * grid step itself the perturbation is a third of the value, Taylor says nothing, and 153 of 357,138
+ * sampled positions exceeded a bound derived that way. So no derivatives. The price is a Möbius
+ * function of each input separately, so between poles it is monotone in each, so its extremes over an
+ * axis-aligned box are attained at the box's CORNERS — all sixteen are evaluated and the largest
+ * excursion is the bound. A box that straddles a pole (zero size, or a maintenance rate reaching the
+ * side sign) has no finite bound, and says so, rather than reporting a small number from two finite
+ * corners that happen to sit either side of an infinity.
+ *
+ * `pLiq` is the engine's own unrounded price, passed in rather than recomputed, so the excursion is
+ * measured from the same double the caller will compare against.
+ */
+function encodingShift({ M, q, P0, s, mmr, pLiq }) {
+  const hM = encodingError(M), hq = encodingError(q), hP = encodingError(P0), hR = encodingError(mmr);
+  if (!(hM >= 0 && hq >= 0 && hP >= 0 && hR >= 0)) return Infinity;
+  if (!(q - hq > 0)) return Infinity;                                  // the box contains zero size
+  if (!(Math.abs(s - (mmr + hR)) > 0 && Math.abs(s - (mmr - hR)) > 0)) return Infinity;
+  let worst = 0;
+  for (const dM of [-hM, hM]) for (const dq of [-hq, hq]) for (const dP of [-hP, hP]) for (const dR of [-hR, hR]) {
+    const v = scale.engineLiquidationPrice({ M: M + dM, q: q + dq, P0: P0 + dP, s, mmr: mmr + dR });
+    if (!Number.isFinite(v)) return Infinity;
+    const d = Math.abs(v - pLiq);
+    if (d > worst) worst = d;
+  }
+  return worst;
+}
+
 // One long-lived worker. Spawning per proof would pay the snarkjs import and the 5.3MB zkey read
 // every time; keeping one alive pays it once and leaves the main thread untouched either way.
 let worker = null;
@@ -172,8 +249,49 @@ export function witnessFor(echoedInputs, liquidationPrice) {
   const pLiqHat = scale.canonicalLiquidationPrice(enc);
   if (pLiqHat <= 0n) return null;
   const full = { ...enc, pLiqHat };
-  const gap = Math.abs(scale.fromScaled(pLiqHat) - Number(liquidationPrice));
-  return { witness: scale.toWitnessInput(full), encoded: full, gapToServed: gap };
+  const certified = scale.fromScaled(pLiqHat);
+  const gap = Math.abs(certified - Number(liquidationPrice));
+
+  // THE ENGINE'S PRICE, UNROUNDED — and not re-derived here to get it.
+  //
+  // Comparing the witness against `liquidationPrice` alone cannot work below about a dollar, and no
+  // choice of tolerance fixes that: the served price is `round(pLiq, 2)`, so the comparison carries
+  // an absolute half-cent of display rounding whatever the price is, and half a cent of a $0.24
+  // liquidation is two percent. Widening the tolerance makes it worse and scaling it by magnitude
+  // does not help, because the rounding being measured is not proportional to anything. The rounding
+  // has to leave the comparison, which means having the price before it was rounded.
+  //
+  // The rounding happens inside src/engine/perpGate.js and the engine must not change, so the
+  // unrounded price is recomputed from the same echoed inputs — and re-deriving an engine expression
+  // outside the engine is a defect class this repository has shipped three times, most recently a
+  // `constantproduct` encoder that rearranged the algebra into a mathematically equal, numerically
+  // different form and was wrong by 64 grid steps. So nothing is re-derived. The expression used is
+  // `scale.engineLiquidationPrice`, which is already written down in the normative scale file, in the
+  // engine's own order, for exactly this purpose: "(s * q * P0 - M) / (q * (s - mmr))". Its four
+  // operands are the operands the engine used — `margin` above is derived q*P0 then /leverage, in
+  // that order, for the reason the comment there gives.
+  const enginePrice = scale.engineLiquidationPrice({ M: margin, q: size, P0: entryPrice, s, mmr: maintMarginRate });
+
+  // What the circuit's price is allowed to differ from that by, derived rather than chosen: the one
+  // grid rounding the canonical solve performs, plus however far encoding the inputs could have moved
+  // the answer, plus the floating point of evaluating the expression at all. The last term is the
+  // only generous one — it is sixteen ulps against a bound that is normally 5e-10 — and it is there
+  // because a guard that fires on its own arithmetic noise is the defect being fixed, not a fix.
+  const shift = encodingShift({ M: margin, q: size, P0: entryPrice, s, mmr: maintMarginRate, pLiq: enginePrice });
+  const denom = Math.abs(size * (s - maintMarginRate));
+  const fp = 8 * Number.EPSILON
+    * ((Math.abs(size * entryPrice) + Math.abs(margin)) / denom + Math.abs(enginePrice) + (Number.isFinite(shift) ? shift : 0));
+
+  return {
+    witness: scale.toWitnessInput(full), encoded: full,
+    // Unchanged, and still published on the finished proof: it is the distance to the number a reader
+    // is holding, which is what `gapToServedPrice` has always meant. It is no longer what the guard
+    // decides on, because it cannot tell display rounding from divergence.
+    gapToServed: gap,
+    enginePrice,
+    gapToEngine: Math.abs(certified - enginePrice),
+    encodingBound: HALF_STEP + shift + fp,
+  };
 }
 
 // Proving costs ~700ms of one core, and the MCP endpoint that can now ask for it is FREE. At the
@@ -226,13 +344,55 @@ async function buildOnce(contentHash, echoedInputs, liquidationPrice, provenance
   if (cold) { store.set(contentHash, cold); return; }
   const w = witnessFor(echoedInputs, liquidationPrice);
   if (!w) { put(contentHash, { status: 'unavailable', error: 'this position is outside the circuit domain' }); return; }
-  // Refuse rather than certify a position that is not the one that was answered. The served price is
-  // rounded to 2dp, so half a cent is the honest ceiling for agreement; anything past it means the
-  // witness and the engine parted ways, and publishing that proof would be publishing a lie that
-  // verifies. This is the check that makes the margin derivation above safe to have.
-  const DISPLAY_ROUNDING = 0.005;
-  if (!(w.gapToServed <= DISPLAY_ROUNDING)) {
-    put(contentHash, { status: 'unavailable', error: `witness diverges from the served price by ${w.gapToServed} — refusing to certify a different position` });
+  // Refuse rather than certify a position that is not the one that was answered. This is the check
+  // that makes the margin derivation above safe to have, and it used to be one line —
+  // `gapToServed <= 0.005`, half a cent, sized off the engine's 2dp display rounding. Correct
+  // reasoning, and it stopped being a guard below a dollar: measured over the live Hyperliquid
+  // universe at ~$5,000 notional, 189 of 232 perps liquidate below $1, the gaps fill [0, 0.005]
+  // almost uniformly with a median of 2.6e-3, and RUNE was REFUSED a proof with nothing wrong with
+  // it — its unrounded price landed a hair above a half-cent boundary, the display rounded one way
+  // and the grid the other, and the guard read the arithmetic of its own tolerance as tampering.
+  // On the majority of the universe it could no longer tell display rounding from divergence at all.
+  //
+  // Three questions now, in the order a reader would ask them, each with its own refusal so the
+  // stored record says which one failed.
+  const served = Number(liquidationPrice);
+
+  // 1. Is there an answer to be a proof OF? A position already at or below maintenance has no future
+  //    liquidation threshold and the engine returns no price for one. The old guard reached this as
+  //    `refusing to certify a different position, by NaN`, which is true and teaches nothing.
+  if (!Number.isFinite(served)) {
+    put(contentHash, { status: 'unavailable', error: 'this answer carries no liquidation price to certify — the position is at or below maintenance, so the threshold is behind it rather than ahead of it' });
+    return;
+  }
+
+  // 2. Does the witness describe the position the engine PRICED? Asked against the engine's own
+  //    display rounding rather than against a tolerance: the recomputed price, rounded the way the
+  //    engine rounds it, must be the number that was served. This is the whole of what the old
+  //    half-cent check could ever detect — a witness built on different inputs — and it is asked
+  //    here as an equality, so the boundary case that refused RUNE cannot arise.
+  if (displayRound(w.enginePrice) !== served) {
+    put(contentHash, { status: 'unavailable', error: `witness prices this position at ${w.enginePrice}, which displays as ${displayRound(w.enginePrice)}; the answer served ${served} — refusing to certify a different position` });
+    return;
+  }
+
+  // 3. Can the 1e-9 grid pin this position at all? For a size near the grid step itself, or a
+  //    maintenance rate reaching the side sign, encoding the inputs moves the price further than the
+  //    engine's own display width — and a proof whose certified price could sit a whole displayed
+  //    unit from the answer is not a proof of the answer, however honest the arithmetic. The old
+  //    guard refused most of these as a side effect of its absolute ceiling; this refuses them for
+  //    the reason, and refuses 7,733 more that the ceiling happened to wave through.
+  if (!(w.encodingBound <= DISPLAY_HALF_UNIT)) {
+    put(contentHash, { status: 'unavailable', error: `the 1e-9 grid cannot pin this position tighter than ±${w.encodingBound} — wider than the ${DISPLAY_HALF_UNIT} the answer is displayed to, so no proof of it would be a proof of this answer` });
+    return;
+  }
+
+  // 4. And does the circuit's integer solve actually agree with that price? Grid resolution now, not
+  //    display resolution: 5e-10 where the inputs are already snapped, against the 5e-3 this used to
+  //    allow — for a $0.24 liquidation that is four million times tighter. The worst honest position
+  //    in the live universe uses 95% of this bound and none exceeds it; see DIVERGENCE_HEADROOM.md.
+  if (!(w.gapToEngine <= w.encodingBound)) {
+    put(contentHash, { status: 'unavailable', error: `witness diverges from the engine's own price by ${w.gapToEngine}, past the ±${w.encodingBound} the encoding admits — refusing to certify a different position` });
     return;
   }
   if (queued >= MAX_QUEUED) {
@@ -273,3 +433,11 @@ async function buildOnce(contentHash, echoedInputs, liquidationPrice, provenance
 export function verificationKey() {
   try { return JSON.parse(readFileSync(join(ZK, 'vk_plonk.json'), 'utf8')); } catch { return null; }
 }
+
+/**
+ * The pieces the divergence guard is assembled from, exposed so gates/gateW-divergence-guard.mjs can
+ * measure them rather than infer them from refusals. Nothing on a served path reads this — it exists
+ * because the alternative is a gate that checks the guard by watching what it happens to reject,
+ * which is how a bound stops being measurable and starts being asserted.
+ */
+export const _internal = { displayRound, encodingError, encodingShift, HALF_STEP, HALF_ULP, DISPLAY_HALF_UNIT };

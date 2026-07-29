@@ -12,6 +12,59 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the input a proof is about is now checked by the chain, not asserted by us
+
+A Plonk proof certifies that the arithmetic was done correctly on the inputs it was given. It says
+nothing about whether those inputs were true. That gap is the sharpest thing anyone can point at in
+this whole design, and it is named in the paper rather than hidden.
+
+A contract on HyperEVM now closes it for perp liquidation. It reads the mark price from HyperCore
+precompiles itself and refuses a proof whose entry price has drifted outside a measured window, so
+the number the proof is about is checked by the chain rather than claimed by the seller.
+
+| | |
+|---|---|
+|  |  |
+|  |  |
+| chain | 999, HyperEVM |
+| cost | 2,608,958 gas, about one and a half cents |
+| window | 4,055 ppm, measured at p99.9 of 30-second drift, not chosen |
+
+Verified against the deployed bytecode: an honest proof returns true, a wrong asset reverts
+, a bent proof reverts . The refusal is provably about the INPUT and not
+the arithmetic, because a proof held past the window is still accepted by  while the join
+refuses it.
+
+This is post-submission work and changes nothing about the service the paper describes. The engine
+build hash is unchanged at . Full record in .
+
+---
+
+## 29 July 2026 — the front page said the paper was smaller than it is, and sent you to the wrong part
+
+Documentation only. `src/engine/` is untouched, the build hash is unchanged at
+`q1-e1fa99d08887d6cc`, and no content hash has moved.
+
+The index on this service's landing page listed **six** entries while seven parts were being served.
+It had been wrong here for days. It also described part 4 as carrying "related work" — that is §9,
+which is in part 5 — and told a reader with two minutes to spare to read part 6 for the checkable
+artifacts, which are in part 7. Every other place that publishes the mapping (the paper's own index,
+the README table, the submission) was correct; this one was left behind when the document grew a
+seventh part.
+
+Nothing caught it, and the reason is worth writing down: `tools/docs-consistency.mjs` has exactly the
+right rule — a document that enumerates the parts must enumerate *all* of them — and walks only
+`.md` files, so it never opened `assets/landing.html`.
+
+The mapping is now a committed contract. `gates/paper-mapping.json` records which sections belong to
+which part and the exact wording every publication uses for each, and `npm run gate:y` holds four
+independent records to it: what the text actually packs into, the generated
+`whitepaper.parts.json`, the part files on disk, and all five places the mapping is published.
+`npm run gate:y-revert` puts each defect back and requires the gate to refuse by name — including the
+one that matters most: adding 465 bytes to §6 moves §8 *Limitations* out of part 4 into part 5 while
+the part **count** stays at seven, so every count-based check in this repository stays green through
+it. The count was never the contract. The mapping is.
+
 ## 29 July 2026 — an unrecognised value is refused instead of being answered as something else
 
 `src/engine/` is untouched, the build hash is unchanged at `q1-e1fa99d08887d6cc`, and no content

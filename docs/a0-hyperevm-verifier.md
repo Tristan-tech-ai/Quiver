@@ -2,6 +2,30 @@
 
 **Written 29 July 2026.** Workstream A of `PHASE_D_BUILD_PLAN.md`, steps A0 through A3.
 
+> ## DEPLOYED, 29 July 2026, chain 999
+>
+> | | |
+> |---|---|
+> | `PlonkVerifier` | [`0xaFf7663e57BfF86605503E0aE0Bcde4B07524900`](https://hyperevmscan.io/address/0xaFf7663e57BfF86605503E0aE0Bcde4B07524900) · tx `0xf800fc70657f16fd55ae66fa7965ff7c406f29929526cffac029db0243810a04` · 1,622,854 gas |
+> | `QuiverPerpVerifier` | [`0x139C116C3cDE9C750aA61fB75fa282C9e4a4E3a6`](https://hyperevmscan.io/address/0x139C116C3cDE9C750aA61fB75fa282C9e4a4E3a6) · tx `0xaeb186c27114a8f6bbb51dcbd8008f9829e9f847f56ad0703cf51d82d0a138f2` · 986,104 gas |
+> | total | 2,608,958 gas against a 2,631,781 estimate · 0.0002608958 HYPE at the 0.1 gwei floor |
+> | `windowPpm` | 4,055, the staleness window gate A3 measured rather than chose |
+> | machine-readable record | `zk/build/hyperevm-deployment.json` |
+>
+> **Checked against the DEPLOYED bytecode, not against `eth_call` with state overrides**, which is what
+> every rehearsal in this document used: an honest proof at the live mark returns `true`, a wrong asset
+> reverts `MarkMismatch`, a bent proof reverts `ProofRejected`. Every gate prediction held on the real
+> contract.
+>
+> **A past join cannot be re-verified by replay.** The precompiles are not block-scoped, as §3 below
+> establishes, so the transaction hashes above are the only evidence these calls ever have. That is why
+> they are written down here rather than left in a build artifact.
+>
+> Deployed from `0x2c2f7FadEA346324BC2248Efc857d650Cf5d68A1`, a wallet Tristan created and controls.
+> The three earlier addresses this document names could not sign: one had its key removed by the 27 July
+> key-hygiene pass, and onchainos manages neither it nor chain 999 at all. HYPE sent to the first of them
+> on a recommendation that was never checked is permanently stranded.
+
 Everything below was measured on chain 999 against the real HyperCore precompiles. Numbers inherited
 from the build plan were re-derived rather than repeated; the verify gas and the gas price were both
 understated, and one assumption in the plan's own sketch — that the precompile can be read "at this

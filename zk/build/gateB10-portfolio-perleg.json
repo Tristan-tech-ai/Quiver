@@ -1,0 +1,107 @@
+{
+  "at": "2026-07-29T23:14:40.337Z",
+  "passed": true,
+  "legs": 11,
+  "ceiling": {
+    "wideN3": {
+      "r1cs": 2053,
+      "plonk": 3970,
+      "domain": 4096
+    },
+    "wideN4": {
+      "r1cs": 2736,
+      "plonk": 5295,
+      "domainNeeded": 8192,
+      "ptauNeeded": "2^13",
+      "buildableOnDisk": false
+    },
+    "perLeg": {
+      "r1cs": 651,
+      "plonk": 1267,
+      "domain": 2048,
+      "ptauSufficient": "2^11"
+    }
+  },
+  "ranking": {
+    "engineNamed": 10,
+    "byRatio": 10,
+    "byPrice": 3,
+    "priceRankingIsWrong": true
+  },
+  "perLeg": {
+    "gas": "2968446",
+    "proveMsPerLeg": 748,
+    "proveMsSerial": 8228,
+    "proveMsParallel": 793
+  },
+  "sameProcessThreeLegs": {
+    "wideOneProofMs": 1634,
+    "perLegSerialMs": 2220,
+    "perLegParallelMs": 742
+  },
+  "wide3LegVerifyGas": "291708",
+  "gasByLegCount": [
+    {
+      "legs": 1,
+      "gas": "276448"
+    },
+    {
+      "legs": 3,
+      "gas": "815487"
+    },
+    {
+      "legs": 4,
+      "gas": "1086248"
+    },
+    {
+      "legs": 6,
+      "gas": "1625200"
+    },
+    {
+      "legs": 8,
+      "gas": "2161535"
+    },
+    {
+      "legs": 11,
+      "gas": "2968446"
+    }
+  ],
+  "refusalSweep": [
+    {
+      "legs": 4,
+      "books": 200,
+      "accepted": 195,
+      "acceptedPct": 97.5,
+      "refusedLegs": 5,
+      "totalLegs": 800,
+      "orderingSplits": 0,
+      "reasons": {
+        "divergedPct": 5
+      }
+    },
+    {
+      "legs": 6,
+      "books": 200,
+      "accepted": 192,
+      "acceptedPct": 96,
+      "refusedLegs": 8,
+      "totalLegs": 1200,
+      "orderingSplits": 0,
+      "reasons": {
+        "divergedPct": 8
+      }
+    },
+    {
+      "legs": 11,
+      "books": 200,
+      "accepted": 189,
+      "acceptedPct": 94.5,
+      "refusedLegs": 14,
+      "totalLegs": 2200,
+      "orderingSplits": 0,
+      "reasons": {
+        "divergedPct": 14
+      }
+    }
+  ]
+}

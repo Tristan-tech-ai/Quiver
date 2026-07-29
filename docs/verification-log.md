@@ -113,6 +113,51 @@ V6 above now confirms the instability was never a defect at all.
 `proofStorage` reports itself `durable: false` with the instruction to set `QUIVER_PROOF_DIR`. That is
 correct: Phase A shipped switched off, pending a decision about a Railway volume.
 
+## V10 — second deploy, and it never went dark at all
+
+Out at 00:30:41 UTC on 29 July, on a fresh authorisation. **Zero seconds of darkness**, against 11
+seconds on the first deploy and a three-minute expectation before that. The service answered every
+single poll through the swap.
+
+The safety belt was run fresh immediately before pressing, not trusted from earlier in the session:
+
+| | |
+|---|---|
+| suite | 381 pass, 0 fail |
+| `gate:r` | 15 / 0 |
+| `gate:buyer` | 16 / 0 |
+| `gate:a` · `gate:a-revert` | 5 / 0 · PASSED, so the durability gate can still fail |
+| `gate:d3` · `gate:d3c` | 17 / 0 · 14 / 0 |
+| clone portability | PASSED |
+| boot | imports clean |
+| documents | CONSISTENT, 115 |
+| **preflight** | **PASSED — safe to deploy** |
+
+**The watchdog needed a new marker and the old one would have lied.** `gates/watchdog.mjs` waits for
+`/build.proofStorage`, which has been live since the previous deploy, so it would have declared success
+on its first poll having proven nothing about which container answered. The marker used instead was
+behavioural and specific to what was shipping: send `perp_gate` a genuine size-gate body, which the old
+code answered silently and the new code answers with a `routingNotice` naming size-gate. Baseline
+confirmed it absent before the deploy, which is what makes it evidence.
+
+Post-deploy, every claim checked against the running service:
+
+| | |
+|---|---|
+| services · MCP tools · paid path | 22 · 9 · 402 |
+| codeHash | `q1-e1fa99d08887d6cc`, unmoved, so no re-review |
+| agent id | 5152 |
+| changelog | live and repo byte-identical, 9,795 bytes |
+| paper parts | **7 of 7 byte-identical** |
+
+And the fix itself, which is the reason this deploy was worth making. Correct calls to `size-gate`,
+`treasury-risk` and `lp-risk` stay silent. `portfolio-gate` and `event-vol`, which were flagging their
+OWN correct calls in production, are silent now. Genuine mis-routes redirect: a size-gate body sent to
+`perp_gate` is told to use `size_gate`, and a treasury body sent to `size_gate` is told `treasury-risk`.
+
+`proofStorage` still reports `durable: false`. Phase A remains shipped switched off, pending a decision
+about a Railway volume that is Tristan's to make.
+
 ## V9 — historical dYdX attestation false-refused, and the gate that judged the fix is itself flaky
 
 `proveMarket` used bare `proveKey` for its three proofs, which pins `anchor.primary`, whichever RPC

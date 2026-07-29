@@ -1,0 +1,53 @@
+{
+  "at": "2026-07-29T23:25:35.036Z",
+  "passed": true,
+  "proveMs": 991,
+  "plonkConstraints": 1776,
+  "r1csPublic": 13,
+  "domainSize": 2048,
+  "call": {
+    "volatility": 0.05,
+    "horizonPeriods": 30,
+    "feeAprPct": 20,
+    "periodsPerYear": 365,
+    "capitalUsd": 100000
+  },
+  "servedBreakevenSigma": 0.06648,
+  "certifiedSigma": 0.066483755,
+  "bracket": {
+    "lo": 0.132598876953125,
+    "hi": 0.13260650634765625,
+    "halvings": 17,
+    "doublings": 0,
+    "vStar": 0.13260269165039062
+  },
+  "midResidual": "1",
+  "widthSlack": "563",
+  "rootResidual": "-1632999250",
+  "rootTolerance": "5989025360",
+  "rootBoundUsed": 0.5453305510798505,
+  "acceptGas": "277953",
+  "rejectGas": "573",
+  "verifierBytes": 8330,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "publicSignals": [
+    "1",
+    "563",
+    "21888242871839275222246405745257275088548364400416034343698204186574175496367",
+    "5989025360",
+    "16438356",
+    "132598877",
+    "132606506",
+    "132602692",
+    "983561748",
+    "983560810",
+    "66483755",
+    "30",
+    "8192"
+  ],
+  "doesNotProve": [
+    "eLoHat and eHiHat are the 401-point quadrature, supplied as public inputs and not certified here",
+    "monotonicity of E[IL] in v, which is what makes the straddled root unique",
+    "the fee arithmetic, the concentration factor, or the verdict string"
+  ]
+}

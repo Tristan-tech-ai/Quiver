@@ -1,0 +1,80 @@
+{
+  "at": "2026-07-29T23:33:04.064Z",
+  "passed": true,
+  "geometricRestatement": {
+    "samples": 4000,
+    "worstGap": 5.218048215738236e-15,
+    "atV": 4.631557781598176,
+    "exponentialsPerPass": 2,
+    "engineExponentialsPerPass": 802
+  },
+  "subGrid": [
+    {
+      "stride": 1,
+      "nodes": 401,
+      "worstGap": 5.551115123125783e-16,
+      "mismatches": 0,
+      "of": 3000
+    },
+    {
+      "stride": 2,
+      "nodes": 201,
+      "worstGap": 1.299990670666773e-10,
+      "mismatches": 0,
+      "of": 3000
+    },
+    {
+      "stride": 4,
+      "nodes": 101,
+      "worstGap": 3.649800739413678e-10,
+      "mismatches": 0,
+      "of": 3000
+    },
+    {
+      "stride": 5,
+      "nodes": 81,
+      "worstGap": 4.702484512897342e-10,
+      "mismatches": 0,
+      "of": 3000
+    },
+    {
+      "stride": 8,
+      "nodes": 51,
+      "worstGap": 2.8447105560047703e-8,
+      "mismatches": 3,
+      "of": 3000
+    },
+    {
+      "stride": 10,
+      "nodes": 41,
+      "worstGap": 3.7089615623209227e-7,
+      "mismatches": 37,
+      "of": 3000
+    },
+    {
+      "stride": 16,
+      "nodes": 26,
+      "worstGap": 0.000028856544583066857,
+      "mismatches": 350,
+      "of": 3000
+    },
+    {
+      "stride": 20,
+      "nodes": 21,
+      "worstGap": 0.00015112663664806902,
+      "mismatches": 468,
+      "of": 3000
+    }
+  ],
+  "constraints": {
+    "divergence": 463,
+    "lpbracket": 932,
+    "lpexpectation": 36613
+  },
+  "ptauCeiling": 4096,
+  "timesOver": 8.938720703125,
+  "ptauPowerNeeded": [
+    16,
+    17
+  ]
+}

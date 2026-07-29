@@ -1,0 +1,49 @@
+{
+  "at": "2026-07-29T23:33:17.394Z",
+  "passed": true,
+  "samples": 600,
+  "certified": 562,
+  "refusedByEncoder": 3,
+  "strayedFromServed": 0,
+  "engineReturnedNull": 35,
+  "noBracket": 0,
+  "refusalReasons": {
+    "g(lo) > 0 does not survive the grid": 3
+  },
+  "monotonicity": {
+    "samples": 20001,
+    "nonDecreasingSteps": 0,
+    "range": [
+      1e-8,
+      10000
+    ]
+  },
+  "transcendentalCalls": {
+    "realizedIlOnly": {
+      "exp": 802,
+      "sqrt": 408
+    },
+    "plusExpectedDivergence": {
+      "exp": 1604,
+      "sqrt": 810
+    },
+    "fullCall": {
+      "exp": 163608,
+      "sqrt": 82016
+    },
+    "quadraturePassesPerFullCall": 204
+  },
+  "halvings": {
+    "min": 12,
+    "max": 25,
+    "enginePerforms": 200
+  },
+  "tightestRootBound": 0.9633053384524423,
+  "smallestRejectedSigmaPerturbation": "2",
+  "worst": {
+    "sigma": 0.129854598,
+    "horizonPeriods": 304,
+    "residual": "-38990552384",
+    "tolerance": "80951596192"
+  }
+}

@@ -12,6 +12,53 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the refusal a PAYING caller gets, and a fetched mark that claimed to be re-runnable
+
+Two changes, both caller-visible, both outside `src/engine/`. The build hash is unchanged at
+`q1-e1fa99d08887d6cc` and no content hash on any request that already worked has moved.
+
+**1. A paid refusal now carries the corrected body, not just the complaint.** `src/app.js` builds a
+refusal as an error carrying two halves: prose naming what went wrong, and a machine-readable object
+holding `howToFix` (a body that would work, with the caller's own values kept), `routingNotice` (the
+service that fits, with its endpoint, price and a retry) and `repairsApplied`. The x402 wrapper
+serialised only the prose and dropped the object, so a caller who **paid** and got the shape wrong
+received a bare refusal while a free MCP caller received the corrected body. The whole buyer-defence
+effort was sitting on the surface that does not bill, and the listing points at the paid endpoints for
+13 of the 22 services. Before, on `POST /api/perp-gate` with `{side:"long", entryPrice:64000}`:
+`{error, detail}` and nothing else. Now: the same `{error, detail}` **plus** the `howToFix` object,
+byte-identical to the one the free surface returns for the same body. The 402 challenge, the
+advertised `inputSchema` on both rails and the MCP `tools/list` bytes are untouched. Billing is
+untouched in both directions and this is measured rather than argued: a caller-mistake refusal returns
+before `/settle` is ever called, so a refusal that teaches is still free; a delivered answer still
+settles and still hashes identically.
+
+**2. `portfolio-gate` no longer seals a fetched mark inside a `deterministic: true` proof.** A leg
+naming an asset without a `markPrice` has one read from Hyperliquid at request time. That number went
+into `proof.inputs` under `deterministic: true` with no `observedAtUtc`, no source and no `live`
+block — the defect §11.5 of the paper records fixing on `perp-gate` symbol mode, one branch over. Such
+a call now returns the **observation** envelope instead: `kind: OBSERVATION`, `deterministic: false`,
+an `observedAtUtc`, a `live.filled` block naming each fetched value and the venue it came from, and a
+`mathReproducibility` note. Fixed on both surfaces at once — the paid HTTP path and the free MCP tool
+— from one shared helper, because the record of this defect is four fixes at four call sites.
+
+**The shape change, stated plainly.** A `portfolio-gate` call whose legs are enriched from the venue
+returns `observation` where it used to return `proof`, so its `contentHash` moves and its envelope key
+changes. That was measured over all 22 services against the unmodified repository: **13 deterministic
+content hashes identical, exactly one row moved** — `portfolio-gate` with an un-marked leg, from
+`proof(deterministic:true)` to `observation(deterministic:false)`. A call that supplies `markPrice` and
+a maintenance-margin source on every leg fetches nothing, keeps the deterministic proof envelope, and
+returns the same `contentHash` it always did (`f491b453…` on the reference body, before and after,
+identical on both surfaces). Account mode already shipped an observation and is unchanged.
+
+Both fixes are held by gates that were shown to fail: `gates/gateP-paid-teaching.mjs` drives the real
+payment middleware end to end and requires the paid refusal to carry the *same* teaching object as the
+free one; `gates/gateP-sealed-provenance.mjs` sweeps all 22 services and all 9 MCP tools and refuses
+any `deterministic: true` envelope that echoes a value the caller did not supply.
+`gates/gateP-revert.mjs` puts each defect back and shows the owning gate go red — and shows the two
+older gates that ought to have caught them stay green, which is why they survived this long.
+
+---
+
 ## 29 July 2026 — a defect we have NOT fixed, said plainly: `side: "SHORT"` returns the wrong answer
 
 An outside reviewer swept the live service and found a defect in the worst possible place. We
@@ -46,12 +93,12 @@ defensible because it is disclosed here instead of discovered.** An inverted ris
 defect than a changed hash; what makes us hold is changing the hash underneath a reviewer who is
 mid-verification. **It will be fixed immediately after judging closes.**
 
-Two smaller disclosures from the same sweep, also unfixed: **12 of the 13 observation services ship
+One smaller disclosure from the same sweep is also unfixed: **12 of the 13 observation services ship
 `selfChecks: []`** while `/` and `/llms.txt` say every answer carries a self-checked proof (true of 9
-of 22 — the envelopes themselves are scrupulous about this; the summary line overreaches); and
-`portfolio_gate` **seals a live Hyperliquid mark it fetched into a `deterministic: true` proof with no
-`observedAtUtc`, no `live` block and no `mathReproducibility` note** — the same defect §11.5 records
-fixing on `perp-gate` symbol mode.
+of 22 — the envelopes themselves are scrupulous about this; the summary line overreaches). A second
+one from that sweep — `portfolio_gate` sealing a fetched Hyperliquid mark inside a
+`deterministic: true` proof — **has since been fixed**; see the entry above it for what changed and
+what moved.
 
 The full write-up, with the reproduction commands and the exact four-part fix, is in
 `KNOWN_DEFECTS.md` in the repository.

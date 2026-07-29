@@ -33,6 +33,45 @@ import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapter
 
 const EVM = /^0x[0-9a-fA-F]{40}$/;
 const SOL = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+
+// Which per-leg fields `enrichPortfolioLegs` actually FETCHED, measured by diffing the legs the
+// caller sent against the legs that came back — never by asking the adapter to self-report.
+//
+// WHY THIS EXISTS. portfolio-gate in explicit-positions mode calls the same live Hyperliquid context
+// perp-gate's symbol mode does: a leg naming an asset but no `markPrice` has one filled in from the
+// venue. That value then travelled into `proof.inputs` inside an envelope marked `deterministic: true`
+// with no `observedAtUtc` and no provenance of any kind, so a caller comparing their request against
+// the echoed inputs found a number they never sent, from nowhere, sealed as re-runnable. §11.5 of the
+// paper records finding and fixing exactly this on perp-gate symbol mode; this is the branch next
+// door, which is where this codebase's defects keep living. The rule the fix restores is the one
+// `proofEnvelope` already enforces — a result carrying live provenance is not a proof — and the only
+// thing missing was the provenance itself, so attaching it routes the answer to the honest envelope
+// without a second pattern being invented for it.
+//
+// Measured, not declared: a self-reporting adapter is a claim, and a diff of what went in against
+// what came out is evidence. Fields listed explicitly because they are the ones the enricher can
+// fill; a new one that is not in this list would go undisclosed, so the list is asserted against the
+// enricher's own behaviour in gates/gateP-paid-teaching.mjs.
+const ENRICHABLE_LEG_FIELDS = ['markPrice', 'entryPrice', 'maintMarginRate', 'maxLeverage', 'marginTiers'];
+export function legsFetchedLive(sent, enriched) {
+  const filled = [];
+  const before = Array.isArray(sent) ? sent : [];
+  const after = Array.isArray(enriched) ? enriched : [];
+  for (const [idx, leg] of after.entries()) {
+    const was = before[idx] || {};
+    const fields = {};
+    for (const k of ENRICHABLE_LEG_FIELDS) {
+      // `== null` on purpose: a leg that arrived with `markPrice: null` did not supply one either, and
+      // the enricher fills it. Treating a null as "supplied" would let a fetched value ride inside a
+      // path the caller technically sent, which is the one way this disclosure could be evaded.
+      if (was[k] == null && leg && leg[k] != null) fields[k] = k === 'marginTiers' ? `${leg[k].length} notional tiers` : leg[k];
+    }
+    if (Object.keys(fields).length) {
+      filled.push({ leg: idx, asset: String(leg.asset || leg.symbol || '').toUpperCase() || undefined, venue: String(leg.venue || 'hyperliquid').toLowerCase(), fetched: fields });
+    }
+  }
+  return filled;
+}
 const CHAINS = new Set(['ethereum', 'solana', 'base', 'bsc', 'xlayer', 'polygon', 'arbitrum']);
 
 const tokenIn = {
@@ -581,9 +620,33 @@ export const SERVICES = [
       const positions = await enrichPortfolioLegs(base.positions);   // fill live mark/leverage/tiers per leg (one cached fetch)
       const input = { ...base, positions };
       const r = portfolioGate(input);
+      // EXPLICIT-POSITIONS MODE, and the defect this branch used to carry. A leg that named an asset
+      // but no mark had one FETCHED from the venue and sealed into `proof.inputs` under
+      // `deterministic: true`, with no observedAtUtc and no source — the same defect §11.5 records
+      // fixing on perp-gate symbol mode, one handler up. Disclosed the same way it is disclosed
+      // there: a `live` block on the result, which routes this to the observation envelope that can
+      // carry a wall-clock read honestly. A call whose legs were all supplied fills nothing, gets no
+      // `live` block, and stays a deterministic proof with its contentHash exactly where it was.
+      let legFills = null;
+      if (!live) {
+        const fetchedLegs = legsFetchedLive(base.positions, positions);
+        if (fetchedLegs.length) {
+          legFills = fetchedLegs;
+          live = {
+            source: 'hyperliquid live perp context (keyless public API) — per-leg mark, margin tiers and max leverage',
+            venues: [...new Set(fetchedLegs.map((f) => f.venue))],
+            legsEnriched: fetchedLegs.length,
+            ofLegs: positions.length,
+            filled: fetchedLegs,
+            note: 'These per-leg values were READ FROM THE VENUE, not supplied by the caller. They are frozen into observation.inputs so the maths re-runs, and the envelope is an OBSERVATION rather than a proof because the read itself is not re-runnable. Supply markPrice and a maintenance-margin source on every leg to get a deterministic proof envelope back.',
+          };
+        }
+      }
       if (live) {
         r.live = live;
-        r.mathReproducibility = 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the frozen book snapshot fetched at observedAtUtc) and every risk number reproduces. The SNAPSHOT itself is a committed live observation — re-fetch Hyperliquid clearinghouseState for this address to independently check what the book looks like now.';
+        r.mathReproducibility = legFills
+          ? 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the legs as they stood at observedAtUtc, including the venue values listed in live.filled) and every risk number reproduces exactly. What is NOT re-runnable is the venue read — the marks and margin tiers listed in live.filled move — so this ships as a committed observation rather than as a proof that claims to reproduce from scratch.'
+          : 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the frozen book snapshot fetched at observedAtUtc) and every risk number reproduces. The SNAPSHOT itself is a committed live observation — re-fetch Hyperliquid clearinghouseState for this address to independently check what the book looks like now.';
         return observationEnvelope('portfolio-gate', input, r, config.version);
       }
       return proofEnvelope('portfolio-gate', input, r, config.version);

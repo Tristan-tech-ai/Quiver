@@ -75,6 +75,35 @@ export function settleDecision(sdata) {
   return 'failed';
 }
 
+// The teaching half of a refusal, and the line that used to throw it away.
+//
+// `src/app.js` builds a refusal as an Error whose MESSAGE names what went wrong and whose `detail`
+// OBJECT carries the machine-readable half: `howToFix` (a body that would work, with the caller's own
+// values kept and the gaps as visible placeholders), `routingNotice` (the service that fits, with its
+// endpoint, price and a retry line) and `repairsApplied` (the shape fixes made before the refusal).
+// The free MCP path attaches all three. THIS path serialised `String(e.message)` into a field it also
+// called `detail` and dropped the object entirely — so the surface that BILLS was the one surface with
+// no corrected body on it. The OKX listing points at these paid endpoints for 13 of the 22 services,
+// and the whole buyer-defence effort had been built on the surface that does not bill.
+//
+// Three properties this function has to hold, all asserted in gates/gateP-paid-teaching.mjs rather
+// than reasoned about here:
+//   · `error` and `detail` are written FIRST and never overwritten, so nothing a handler puts in
+//     `detail` can rename the status code or replace the message.
+//   · `undefined` members are dropped, so `repairsApplied: undefined` stays absent rather than
+//     becoming `null` in the JSON.
+//   · nothing here reaches a proof envelope. A refusal carries no contentHash, and this path returns
+//     BEFORE /settle is ever called — so a refusal that teaches is still a refusal that is free.
+// Only a 4xx carries the teaching: a 5xx is our fault, not the caller's, and has nothing to correct.
+export function refusalBody(e, status, code) {
+  const body = { error: code, detail: String(e?.message || e).replace(/^bad_input:\s*/, '') };
+  const teach = status >= 400 && status < 500 ? e?.detail : null;
+  if (teach && typeof teach === 'object' && !Array.isArray(teach)) {
+    for (const [k, v] of Object.entries(teach)) if (v !== undefined && !(k in body)) body[k] = v;
+  }
+  return body;
+}
+
 function paymentRequirements(net, { priceUsdt, resourceUrl, description, inputSchema }) {
   const req = {
     scheme: 'exact',
@@ -230,7 +259,9 @@ export function paid({ priceUsdt, description, inputSchema }) {
       // (`bad_input`) and must not masquerade as a server fault (500) that trips buyer monitoring.
       const status = Number.isInteger(e?.status) ? e.status : 500;
       const code = status >= 400 && status < 500 ? 'bad_input' : 'engine_error';
-      return res.status(status).json({ error: code, detail: String(e.message || e).replace(/^bad_input:\s*/, '') });
+      // …and it carries the corrected body with it. See refusalBody above for why this line existed
+      // in its shorter form for so long, and what a paying caller was getting instead.
+      return res.status(status).json(refusalBody(e, status, code));
     }
 
     // 2b) An input the engine rejected (ok:false) is not a delivered result — do NOT settle. The caller

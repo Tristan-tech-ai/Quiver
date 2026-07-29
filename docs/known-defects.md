@@ -12,6 +12,11 @@ This page exists because the alternative is worse. A project whose thesis is *do
 re-derive the number* cannot hold a defect back until after it is judged. What follows is the list of
 things a reviewer would be right to mark us down for, written by us, with the reproduction steps.
 
+Each section carries its own status line. **§1 and §2 are unfixed and disclosed; §3 was fixed on
+29 July 2026** and its record is kept in place rather than deleted, because what a defect looked like
+before it was closed is the part a reader cannot reconstruct afterwards. `/changelog` is the dated
+index of what has moved.
+
 ---
 
 ## 1. `side` and option `type` are matched as exact lowercase strings, and fail open to the riskier default
@@ -184,9 +189,10 @@ name them.
 
 ## 3. `portfolio_gate` seals an undisclosed live venue read inside a `deterministic: true` proof
 
-**Status: NOT FIXED.** This is the same defect §11.5 of the paper records finding and fixing on
-`perp-gate` symbol mode. `portfolio-gate` was not given the same treatment on the explicit-positions
-path.
+**Status: FIXED, 29 July 2026, on both surfaces.** The record of what was wrong is kept below because
+this is the same defect §11.5 of the paper records finding and fixing on `perp-gate` symbol mode, and
+`portfolio-gate` was the branch next door — which is the pattern worth publishing, not the individual
+bug. What changed, and what a caller sees now, is at the end of this section.
 
 Sent, over free MCP — one leg, no mark price:
 
@@ -220,11 +226,24 @@ measurement) is far below the hypothetical entry (100,000), the textbook example
 output is null and a reviewer trying the obvious example is told their hypothetical book is already
 liquidated. The per-leg `statusNote` explains it well; nothing at the top level does.
 
-**The fix**, when the window opens: return an observation envelope with `observedAtUtc`, a `live`
-block and a `mathReproducibility` note whenever any leg's mark was fetched — exactly as `perp-gate`
-symbol mode now does. It is outside `src/engine/` and does not move the build hash; it is held only
-because it changes the envelope *kind* on a response shape a reviewer may be mid-way through
-verifying, and that is a judging-window argument, not an engineering one.
+**The fix, shipped 29 July 2026.** A call whose legs were enriched from the venue now returns the
+**observation** envelope — `kind: OBSERVATION`, `deterministic: false`, an `observedAtUtc`, a
+`live.filled` block naming every fetched value and the venue it came from, and a
+`mathReproducibility` note — exactly as `perp-gate` symbol mode does. Which values were fetched is
+*measured*, by diffing the legs the caller sent against the legs that came back, rather than
+self-reported by the adapter. Applied to the paid HTTP handler and the free MCP tool at the same time
+from one shared helper (`legsFetchedLive` in `src/services.js`), because the history of this defect is
+four fixes at four call sites.
+
+The cost was the one this section previously held it for, and it is now measured rather than feared:
+the envelope *kind* changes on exactly the calls that were lying. Swept across all 22 services against
+the unmodified repository, **13 deterministic content hashes are identical and exactly one row moved**
+— `portfolio-gate` with an un-marked leg, `proof(deterministic:true)` → `observation(deterministic:false)`.
+A call that supplies `markPrice` and a maintenance-margin source on every leg fetches nothing and
+returns the identical `contentHash` it always did. `gates/gateP-sealed-provenance.mjs` now sweeps all
+22 services and all 9 MCP tools and fails any `deterministic: true` envelope that echoes a value the
+caller did not supply; `gates/gateP-revert.mjs` puts the defect back on each surface in turn and shows
+that gate go red while preflight stays green.
 
 ---
 

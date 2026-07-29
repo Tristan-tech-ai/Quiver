@@ -36,7 +36,7 @@ import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapter
 import { config } from './config.js';
 import { buildInBackground } from './util/snark.js';
 import { gridSnapFields } from './util/grid.js';
-import { SERVICES } from './services.js';
+import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
 import { repairBody, correctedExample } from './util/repair.js';
 
@@ -216,9 +216,31 @@ const TOOLS = [
       const positions = await enrichPortfolioLegs(base.positions);
       const input = { ...base, positions };
       const r = portfolioGate(input);
+      // The branch next door, on the surface that keeps being the last one fixed. Explicit-positions
+      // mode fetches a mark for any leg that named an asset without one, and that fetched number was
+      // sealed into `proof.inputs` under `deterministic: true`. Same disclosure as services.js, from
+      // the same shared helper, so the two surfaces cannot drift into two different answers about
+      // whether the same number was supplied or read. See legsFetchedLive in src/services.js.
+      let legFills = null;
+      if (!live) {
+        const fetchedLegs = legsFetchedLive(base.positions, positions);
+        if (fetchedLegs.length) {
+          legFills = fetchedLegs;
+          live = {
+            source: 'hyperliquid live perp context (keyless public API) — per-leg mark, margin tiers and max leverage',
+            venues: [...new Set(fetchedLegs.map((f) => f.venue))],
+            legsEnriched: fetchedLegs.length,
+            ofLegs: positions.length,
+            filled: fetchedLegs,
+            note: 'These per-leg values were READ FROM THE VENUE, not supplied by the caller. They are frozen into observation.inputs so the maths re-runs, and the envelope is an OBSERVATION rather than a proof because the read itself is not re-runnable. Supply markPrice and a maintenance-margin source on every leg to get a deterministic proof envelope back.',
+          };
+        }
+      }
       if (live) {
         r.live = live;
-        r.mathReproducibility = 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the frozen book snapshot fetched at observedAtUtc) and every risk number reproduces. The SNAPSHOT itself is a committed live observation.';
+        r.mathReproducibility = legFills
+          ? 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the legs as they stood at observedAtUtc, including the venue values listed in live.filled) and every risk number reproduces exactly. What is NOT re-runnable is the venue read — the marks and margin tiers listed in live.filled move — so this ships as a committed observation rather than as a proof that claims to reproduce from scratch.'
+          : 'The risk MATH is deterministic and re-runnable: run the open portfolio-gate engine on observation.inputs (the frozen book snapshot fetched at observedAtUtc) and every risk number reproduces. The SNAPSHOT itself is a committed live observation.';
         return observationEnvelope('portfolio-gate', input, r, config.version);
       }
       return proofEnvelope('portfolio-gate', input, r, config.version);

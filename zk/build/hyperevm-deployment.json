@@ -1,0 +1,23 @@
+{
+  "at": "2026-07-29T07:21:52.456Z",
+  "chainId": 999,
+  "rpc": "https://rpc.hyperliquid.xyz/evm",
+  "verifier": "0xaFf7663e57BfF86605503E0aE0Bcde4B07524900",
+  "join": "0x139C116C3cDE9C750aA61fB75fa282C9e4a4E3a6",
+  "windowPpm": "4055",
+  "deployVerifierTx": "0xf800fc70657f16fd55ae66fa7965ff7c406f29929526cffac029db0243810a04",
+  "deployVerifierGas": "1622854",
+  "deployVerifierGasPriceWei": "100000000",
+  "deployJoinTx": "0xaeb186c27114a8f6bbb51dcbd8008f9829e9f847f56ad0703cf51d82d0a138f2",
+  "deployJoinGas": "986104",
+  "deployJoinGasPriceWei": "100000000",
+  "totalCostHype": "0.0002608958",
+  "deployer": "0x2c2f7FadEA346324BC2248Efc857d650Cf5d68A1",
+  "btcMarkHat": "64431000000000",
+  "liveResults": {
+    "honest": true,
+    "wrongAsset": "REVERT MarkMismatch",
+    "bent": "REVERT ProofRejected"
+  },
+  "explorer": "https://hyperevmscan.io/address/0x139C116C3cDE9C750aA61fB75fa282C9e4a4E3a6"
+}

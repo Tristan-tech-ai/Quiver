@@ -24,19 +24,19 @@ the number the proof is about is checked by the chain rather than claimed by the
 
 | | |
 |---|---|
-|  |  |
-|  |  |
+| `QuiverPerpVerifier` | `0x139C116C3cDE9C750aA61fB75fa282C9e4a4E3a6` |
+| `PlonkVerifier` | `0xaFf7663e57BfF86605503E0aE0Bcde4B07524900` |
 | chain | 999, HyperEVM |
 | cost | 2,608,958 gas, about one and a half cents |
 | window | 4,055 ppm, measured at p99.9 of 30-second drift, not chosen |
 
 Verified against the deployed bytecode: an honest proof returns true, a wrong asset reverts
-, a bent proof reverts . The refusal is provably about the INPUT and not
-the arithmetic, because a proof held past the window is still accepted by  while the join
+`MarkMismatch`, a bent proof reverts `ProofRejected`. The refusal is provably about the INPUT and not
+the arithmetic, because a proof held past the window is still accepted by `verifyProof` while the join
 refuses it.
 
 This is post-submission work and changes nothing about the service the paper describes. The engine
-build hash is unchanged at . Full record in .
+build hash is unchanged at `q1-e1fa99d08887d6cc`. Full record in `docs/a0-hyperevm-verifier.md`.
 
 ---
 

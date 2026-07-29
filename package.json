@@ -42,6 +42,7 @@
     "calibrate:t10": "node gates/calibrate-hl-premium-bound.mjs"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1097.0",
     "@coinbase/x402": "^2.1.0",
     "@resvg/resvg-js": "^2.6.2",
     "echarts": "^6.1.0",

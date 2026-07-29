@@ -263,7 +263,7 @@ honest but was not a fix — and "held in memory" is not a property anything on 
 
 A proof is immutable and is already named by its own content hash, so this is a lookup change, not a
 design change. [`src/util/proofStore.js`](src/util/proofStore.js) writes a finished proof under its
-hash and reads it back on a memory miss. Two decisions are worth stating because they are the ones
+hash and reads it back on a memory miss. Three decisions are worth stating because they are the ones
 that could have been wrong:
 
 - **Only `ready` is persisted.** A `building` record is a fact about a process, not about arithmetic.
@@ -271,29 +271,43 @@ that could have been wrong:
   working on and every later reader polls forever. `failed` and `unavailable` are excluded for the
   same reason: a refusal is a judgement made by one build of the code, and a fixed prover should not
   keep serving the old refusal.
-- **Off unless configured.** No `QUIVER_PROOF_DIR`, no behaviour change of any kind. `/build` now
-  reports which of the two worlds a deploy is in, and the 404 body says the matching thing rather
-  than the reassuring one.
+- **Off unless configured.** Neither `QUIVER_PROOF_S3_BUCKET` nor `QUIVER_PROOF_DIR`, no behaviour
+  change of any kind. `/build` reports which of the three worlds a deploy is in, and the 404 body says
+  the matching thing rather than the reassuring one.
+- **An object store, not a volume.** The claim is that a proof survives a redeploy *and a second
+  replica*. A Railway volume cannot carry the second half — Railway's own reference says "Replicas
+  cannot be used with volumes", one volume per service, region-pinned — so a volume would have
+  delivered half the claim while the endpoint advertised both. The store therefore has an S3 backend
+  beside the filesystem one, chosen by environment. The filesystem backend was **kept**: it is the one
+  anyone can exercise from a clone with no credentials, which is what keeps the gate runnable
+  unattended. Details, and what is and is not proven without real AWS keys, in
+  [`docs/PHASE_A_S3.md`](docs/PHASE_A_S3.md).
 
 ```bash
-npm run gate:a          # builds a proof in one process, kills it, reads it from another
-npm run gate:a-revert   # removes the feature, proves the gate goes red, restores it
+npm run gate:a          # builds a proof in one process, kills it, reads it from another — both backends
+npm run gate:a-revert   # removes the feature five separate ways, proves the gate goes red each time
 ```
 
 `gate:a` spawns a real child process, waits for it to exit, then reads the proof from a second,
 unrelated pid. It carries its own negative control: a third process with no store configured must
 **not** find the same proof, otherwise the gate would be measuring the prover instead of the store.
-`gate:a-revert` is the part that makes the green result mean something. It neuters the durable write,
-reruns the gate, and requires **3 of 5 failures**, then restores the file and requires 5 of 5 passes.
-A gate that is red in both states is broken, not strict, so both halves are checked.
+A fourth process boots the whole service and is asked for `/proof/<hash>` over HTTP — because the
+store is asynchronous, and a route that reads it without awaiting would answer 200 with an empty body
+that reads exactly like a cache miss. Eleven cases, every one run against both backends.
 
-**Not yet shipped, again plainly:** the live service still runs memory-only, which you can confirm
-yourself — `curl .../build` has no `proofStorage` key, because that key only exists in code that has
-not been deployed. Turning it on is one environment variable plus a shared volume, and it is a deploy,
-so it waits. These five tests deliberately sit in `gates/` rather than `test/`: the paper is served
-live and states the size of the model-free suite, and moving that number in the repo while the live
-paper keeps the old one would create exactly the staleness this project keeps auditing for. When the
-durable store ships, the gate moves into `test/` and the paper's count moves with it, in one deploy.
+`gate:a-revert` is the part that makes the green result mean something. It removes the feature five
+ways — writes become a no-op, the durable read is deleted, durability is claimed instead of probed,
+the endpoint's `await` is dropped, a failed write is swallowed — reruns the gate after each, and
+requires it to go red every time and to come back to **11 of 11** once all five are undone. A gate
+that is red in both states is broken, not strict, so both halves are checked.
+
+**Where this actually stands:** the store code is deployed and switched OFF, which you can confirm
+yourself — `curl .../build` reports `proofStorage: {"durable": false, "kind": "in-memory only", …}`.
+Turning it on is a bucket and a role: no code change, no endpoint change, no re-review. These cases
+deliberately sit in `gates/` rather than `test/`, and they are staying there: the paper is served live
+and states the size of the model-free suite, so moving that number in the repo while the live paper
+keeps the old one would create exactly the staleness this project keeps auditing for — and the only
+thing that could reconcile them is re-cutting the paper to describe a feature that is switched off.
 
 ### Quiver bought from another agent
 

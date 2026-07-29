@@ -95,13 +95,19 @@ const MAX = 200;
 const store = new Map();   // contentHash -> { status, proof?, publicSignals?, error?, at }
 
 // On a memory miss, ask the durable store before answering 404: the proof may have been built by a
-// process that no longer exists, or by a different replica. Stays synchronous on purpose. The disk
-// read only happens when memory has already missed, the record is a few kilobytes, and making it
-// async would turn a lookup change into a change of shape for every caller.
-export function getProof(contentHash) {
+// process that no longer exists, or by a different replica.
+//
+// ASYNC, ALWAYS. It used to be synchronous, and the comment here defended that: a disk read is a few
+// kilobytes and making it async would change the shape of every caller. The S3 backend removes the
+// choice — the SDK is async — and a function that returned a record for one backend and a Promise
+// for the other would be the worst possible outcome, because `res.json()` serialises a Promise as
+// `{}` and /proof/<hash> would answer 200 with an empty body that reads exactly like a cache miss.
+// So it is a Promise on every path, including the memory hit, and a forgotten `await` fails on the
+// first call rather than only on the deploy that has S3 configured.
+export async function getProof(contentHash) {
   const hot = store.get(contentHash);
   if (hot) return hot;
-  const cold = proofStore.read(contentHash);
+  const cold = await proofStore.read(contentHash);
   if (cold) store.set(contentHash, cold);   // hydrate, so the next poll costs nothing
   return cold || null;
 }
@@ -111,8 +117,20 @@ function put(contentHash, rec) {
   const full = { ...rec, at: new Date().toISOString() };
   store.set(contentHash, full);
   // No-op unless durability is configured, and only ever for `ready`. See proofStore.js for why a
-  // `building` or `failed` record must not outlive the process that decided it.
-  proofStore.write(contentHash, full);
+  // `building` or `failed` record must not outlive the process that decided it. The promise is
+  // returned rather than dropped: with a network store the record is in memory some milliseconds
+  // before it is anywhere else, and something has to be able to wait for that.
+  return proofStore.write(contentHash, full);
+}
+
+/**
+ * Settle everything: the proving queue, then every durable write it started. A long-lived server does
+ * not need this. A process that is about to exit does — the store call is a network round trip now,
+ * and `status: ready` is true in memory before it is true anywhere a second process can see it.
+ */
+export async function flushProofWrites() {
+  await queue.catch(() => {});
+  await proofStore.drain();
 }
 
 /**
@@ -167,10 +185,37 @@ const MAX_QUEUED = 8;
 let queue = Promise.resolve();
 let queued = 0;
 
-/** Build a proof in the background and record it under the response's content hash. */
-export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
-  // getProof, not store.has: a proof already on disk from an earlier process must not be re-proved.
-  if (getProof(contentHash)) return;
+// The window between "this hash is not in memory" and "this hash is marked building" used to be zero
+// instructions wide, because the store lookup in front of it was synchronous. It is now a round trip,
+// and two requests for the same position arriving in the same tick would both sail through it and
+// both enqueue the same proof. Cheap to hold the claim explicitly; the entries live only until `put`
+// writes a `building` record, which the memory check below then sees.
+const claimed = new Set();
+
+/**
+ * Build a proof in the background and record it under the response's content hash.
+ *
+ * Returns a promise, and every caller on the request path deliberately ignores it — the whole point
+ * is that the response does not wait for 703 ms of Plonk. It never rejects.
+ */
+export async function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
+  // The memory check is first and synchronous, so a repeat request costs no round trip at all.
+  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  claimed.add(contentHash);
+  try {
+    await buildOnce(contentHash, echoedInputs, liquidationPrice);
+  } catch (e) {
+    put(contentHash, { status: 'failed', error: String((e && e.message) || e).slice(0, 200) });
+  } finally {
+    claimed.delete(contentHash);
+  }
+}
+
+async function buildOnce(contentHash, echoedInputs, liquidationPrice) {
+  // A proof already in the durable store — built by an earlier process, or by another replica — must
+  // not be re-proved. Hydrated into memory so the poll that follows costs nothing.
+  const cold = await proofStore.read(contentHash);
+  if (cold) { store.set(contentHash, cold); return; }
   const w = witnessFor(echoedInputs, liquidationPrice);
   if (!w) { put(contentHash, { status: 'unavailable', error: 'this position is outside the circuit domain' }); return; }
   // Refuse rather than certify a position that is not the one that was answered. The served price is
@@ -190,7 +235,11 @@ export function buildInBackground(contentHash, echoedInputs, liquidationPrice) {
   queued++;
   queue = queue.then(async () => {
     const { proof, publicSignals } = await prove(w.witness);
-    put(contentHash, {
+    // AWAITED, unlike every other `put` in this function. The others write nothing — only `ready` is
+    // persisted — so awaiting them would be waiting on an already-resolved promise. This one is the
+    // network round trip, and holding the queue slot until it lands is what makes flushProofWrites()
+    // able to promise anything.
+    await put(contentHash, {
       status: 'ready', protocol: PROTOCOL, proof, publicSignals,
       // Signed here rather than at request time because the signals do not exist until the witness
       // is built — and signing anything earlier would be signing a guess at them.

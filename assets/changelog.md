@@ -12,6 +12,47 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 29 July 2026 — the durable proof store can now be shared by every replica, and is still switched off
+
+Phase A claims a finished proof survives a redeploy **and a second replica**, and that `/proof/<hash>`
+answers identically from any instance. The store that shipped could only ever carry the first half: it
+wrote content-addressed files to a local directory, so a second container answered 404 for a proof the
+first one had just built.
+
+The obvious fix was a Railway volume, and it does not work. Railway's own reference says **"Replicas
+cannot be used with volumes"**, one volume per service, pinned to that service's region. A volume
+would have delivered the redeploy half and silently failed the replica half — the worse of the two,
+because the endpoint would have gone on advertising both.
+
+So the store now has an **S3 backend beside the filesystem one**, chosen by environment: set
+`QUIVER_PROOF_S3_BUCKET` for a store every replica shares, `QUIVER_PROOF_DIR` for one only this
+container sees, neither for memory. The filesystem backend was kept rather than replaced — it is the
+one anybody can exercise from a clone with no credentials, and it is what keeps the durability gate
+runnable unattended.
+
+What a caller can see:
+
+- `/build.proofStorage` keeps its shape, `{durable, kind, stored, note}`, and `kind` now names which
+  backend is live rather than describing storage in general.
+- A `durable: false` always travels with the **reason**. A bucket that does not exist, credentials
+  that were refused and an endpoint that did not answer are three different sentences, not one shrug.
+  A store that breaks after a healthy start stops claiming to be durable rather than quietly reverting
+  to being a Map — which is the failure the whole rewrite is designed against.
+- The `/proof/<hash>` 404 gained a third form: "configured but not working", so a miss caused by a
+  broken store cannot read like a miss caused by a store nobody turned on.
+
+**Nothing is turned on by this.** With neither variable set the service behaves exactly as before and
+`/build` still reports `durable: false`. The endpoints, the service list, the schemas and the engine
+build hash `q1-e1fa99d08887d6cc` are all unchanged.
+
+Under the hood the store became asynchronous on every path, including the memory one, because the S3
+SDK is and a `read()` that returns a record for one backend and a Promise for the other is the worst
+available shape: `res.json()` renders a Promise as `{}`, so one missing `await` would have made
+`/proof/<hash>` answer 200 with an empty body that reads exactly like a cache miss. `npm run gate:a`
+now runs 11 cases against **both** backends — building a proof in a child process, killing it, and
+asking a fourth process for the proof over HTTP — and `npm run gate:a-revert` proves that gate can
+fail five separate ways, one of which is dropping precisely that `await`.
+
 ## 29 July 2026 — the signpost could only name twelve of the twenty-two, and nobody had counted
 
 The mis-route signpost added yesterday works by scoring a request against all twenty-two services on

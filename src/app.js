@@ -12,7 +12,9 @@ import { repairBody, correctedExample } from './util/repair.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
 import { getProof, verificationKey, warmProver } from './util/snark.js';
-import { durable as proofsAreDurable, count as storedProofCount } from './util/proofStore.js';
+// Every one of these is async — see util/proofStore.js for why there is no synchronous read left on
+// either backend. `kind()` is the exception and does no I/O at all.
+import { durable as proofsAreDurable, count as storedProofCount, kind as proofStoreKind, durabilityNote } from './util/proofStore.js';
 import { _internal, engineSourceFiles } from './engine/proof.js';
 
 // The same directory buildId() hashes, resolved the same way, so /build cannot describe a rule over
@@ -153,8 +155,40 @@ app.get('/healthz', (_req, res) => res.json({ ok: true, version: config.version,
 // unless the rule travels with the hash. So it does now: the exact walk, the key format, the join, the
 // digest, and the file count and manifest the current hash was taken over. A verifier that reproduces
 // `files` but not `codeHash` knows the sources moved; one that reproduces neither knows its rule is old.
-app.get('/build', (_req, res) => {
+// Reported rather than claimed, and never allowed to throw: a store that is down must make /build say
+// so, not make /build disappear. The shape is fixed — {durable, kind, stored, note} — and `kind` names
+// which of the three backends is live, so a reader can tell an S3 deploy from a disk deploy from a
+// memory-only one without inferring it from whether proofs happen to survive.
+async function proofStorageReport() {
+  try {
+    if (await proofsAreDurable()) {
+      return {
+        durable: true,
+        kind: proofStoreKind(),
+        stored: await storedProofCount(),
+        note: 'A finished proof survives this process and is readable by any replica sharing the store.',
+      };
+    }
+    // The reason travels with the `false`. A configured-but-unreachable bucket reporting a bare
+    // `durable: false` would be indistinguishable from a deploy that never turned durability on,
+    // which is the exact silent fallback this store was rebuilt to make impossible.
+    const why = await durabilityNote();
+    return {
+      durable: false,
+      kind: proofStoreKind(),
+      stored: 0,
+      note: proofStoreKind() === 'in-memory only'
+        ? 'Proofs are held in memory and cleared by a redeploy. Set QUIVER_PROOF_S3_BUCKET (shared by every replica) or QUIVER_PROOF_DIR (this container only) to make them durable.'
+        : `Durable storage is CONFIGURED BUT NOT WORKING, so proofs are held in memory and cleared by a redeploy: ${why}`,
+    };
+  } catch (e) {
+    return { durable: false, kind: 'unknown', stored: 0, note: `the proof store could not be inspected: ${String((e && e.message) || e).slice(0, 160)}` };
+  }
+}
+
+app.get('/build', async (_req, res) => {
   const files = engineSourceFiles(ENGINE_DIR);
+  const proofStorage = await proofStorageReport();
   res.json({
     codeHash: _internal.buildId(),
     node: process.version,
@@ -173,9 +207,7 @@ app.get('/build', (_req, res) => {
     },
     // Reported rather than claimed. A reader who wants to know whether a proof they fetched will
     // still be there after a redeploy can read it here instead of taking a docs sentence for it.
-    proofStorage: proofsAreDurable()
-      ? { durable: true, kind: 'content-addressed files', stored: storedProofCount(), note: 'A finished proof survives this process and is readable by any replica sharing the store.' }
-      : { durable: false, kind: 'in-memory only', stored: 0, note: 'Proofs are held in memory and cleared by a redeploy. Set QUIVER_PROOF_DIR to a shared path to make them durable.' },
+    proofStorage,
     reproduce: 'Rebuild from source → identical codeHash. Then re-run the open engine on proof.inputs (on this Node version) → identical result & contentHash. Correctness is re-derived, not trusted.',
   });
 });
@@ -238,21 +270,30 @@ app.get('/proof/vk', (_req, res) => {
   });
 });
 
-app.get('/proof/:contentHash', (req, res) => {
+// `async` because the store is. A missing `await` on getProof would serialise a Promise as `{}` and
+// answer 200 with an empty body — which is why gate A asserts on this route's JSON rather than on the
+// store's return value.
+app.get('/proof/:contentHash', async (req, res) => {
   const h = String(req.params.contentHash || '').toLowerCase();
   if (!/^[0-9a-f]{64}$/.test(h)) {
     return res.status(400).json({ error: 'bad_content_hash', note: 'Pass the 64-character proof.contentHash from a perp-gate response.' });
   }
-  const rec = getProof(h);
+  const rec = await getProof(h);
   if (!rec) {
-    // The note has to say which of the two worlds this deploy is in, because "a redeploy clears them"
-    // stops being true the moment durable storage is configured, and a stale reassurance in a 404 is
-    // exactly the kind of claim this service exists to not make.
+    // The note has to say which of the THREE worlds this deploy is in, because "a redeploy clears
+    // them" stops being true the moment durable storage is configured, and a stale reassurance in a
+    // 404 is exactly the kind of claim this service exists to not make. The third world — configured
+    // and broken — is the one that matters most: without it a store that cannot reach its bucket
+    // answers exactly like a store nobody turned on, and nothing in the response says otherwise.
+    const durable = await proofsAreDurable();
+    const why = durable ? null : await durabilityNote();
     return res.status(404).json({
       error: 'no_proof_for_that_hash',
-      note: proofsAreDurable()
+      note: durable
         ? 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Finished proofs are stored by content hash and survive a redeploy, so this hash was never proved here; ask again and it will be built.'
-        : 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.',
+        : proofStoreKind() === 'in-memory only'
+          ? 'A proof is built only when a perp-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.'
+          : `A proof is built only when a perp-gate call asks for one with {"snark": true}. Durable storage is CONFIGURED BUT NOT WORKING here, so this miss may be the store rather than the hash: ${why}`,
     });
   }
   if (rec.status === 'building') return res.status(202).json({ status: 'building', retryAfterMs: 900, contentHash: h });

@@ -39,7 +39,7 @@ async function proven(input, { timeoutMs = 90_000 } = {}) {
   const h = out.proof.contentHash;
   const deadline = Date.now() + timeoutMs;
   for (;;) {
-    const rec = getProof(h);
+    const rec = await getProof(h);
     if (rec && rec.status !== 'building') return { out, rec };
     if (Date.now() > deadline) throw new Error(`proof for ${h} never left "building"`);
     await new Promise((r) => setTimeout(r, 250));
@@ -167,7 +167,7 @@ test('the free MCP path strips the proof flag and builds the proof too', async (
 
   const deadline = Date.now() + 90_000;
   for (;;) {
-    const rec = getProof(asked.proof.contentHash);
+    const rec = await getProof(asked.proof.contentHash);
     if (rec && rec.status === 'ready') break;
     assert.ok(Date.now() < deadline, 'MCP asked for a proof and none was ever built');
     await new Promise((r) => setTimeout(r, 250));
@@ -223,13 +223,13 @@ test('proving does not block the thread that serves requests', async () => {
   const out = await byName['perp-gate'].run({ side: 'short', entryPrice: 1875.25, size: 4.5, leverage: 7, maintMarginRate: 0.012, snark: true });
   const deadline = Date.now() + 90_000;
   for (;;) {
-    const rec = getProof(out.proof.contentHash);
+    const rec = await getProof(out.proof.contentHash);
     if (rec && rec.status !== 'building') break;
     if (Date.now() > deadline) break;
     await new Promise((r) => setTimeout(r, 10));
   }
   clearInterval(tick);
 
-  assert.equal(getProof(out.proof.contentHash).status, 'ready', 'the proof must still get built');
+  assert.equal((await getProof(out.proof.contentHash)).status, 'ready', 'the proof must still get built');
   assert.ok(worst < 200, `event loop stalled ${worst}ms while proving — it was 506ms before the prover moved off-thread`);
 });

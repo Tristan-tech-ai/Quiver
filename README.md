@@ -38,10 +38,26 @@ human in the loop. Every deterministic answer arrives with a proof you can re-de
 
 The submission closed on 28 July 2026 and judging runs after it. OKX confirmed that during judging
 they cannot go back and forth resolving errors: if the service breaks while being scored it simply
-comes back empty. Our own redeploys take up to three minutes before the new container serves. So
-everything below was built **without deploying anything**, and the live endpoint has not been touched
-since the deadline. The machine-readable paper also stays at exactly seven parts, because the
-submitted entry hardcodes seven URLs.
+comes back empty. Our own redeploys were expected to take up to three minutes before the new
+container serves, so the original plan was to build everything without deploying at all.
+
+**That plan changed, and this paragraph used to claim otherwise.** It said the live endpoint had not
+been touched since the deadline. That was true when it was written and false by the time anyone read
+it: **two deploys have shipped**, on 29 July at 00:30 and 09:30 UTC. Both went out because leaving
+them undone was the larger risk — the first carried a mis-route signpost that had been telling callers
+with *correct* requests they had asked the wrong service, and the second carried a fix for inputs like
+`side: "SHORT"` being silently answered as a long, signed and billed.
+
+The three-minute estimate did not survive contact either. **Measured darkness was 11 seconds on the
+first deploy and 0 seconds on the second** — the service answered every poll straight through the
+container swap. Both were run behind a watchdog that establishes a marker only the new build can
+produce, polls until it appears, and records any window where the service stopped answering; `gates/`
+holds it, along with a preflight that refuses to pass unless the codeHash, the service list, the
+endpoint and the advertised schemas are all unmoved.
+
+The machine-readable paper stays at exactly seven parts, because the submitted entry hardcodes seven
+URLs. That has held through every change, and `npm run gate:y` now checks the section-to-part mapping
+rather than the part count, because a section can move between parts while the count stays at seven.
 
 ### A second circuit: the Kelly sizing identity
 

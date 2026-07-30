@@ -33,8 +33,31 @@
 // trust, and it should cost somebody a red gate rather than passing as a diff nobody read.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { SERVICES } from '../src/services.js';
+import { TOOLS } from '../src/mcp.js';
 import { GENUINE, invalidFixtures } from './routing-fixtures.mjs';
+
+const HERE = fileURLToPath(new URL('.', import.meta.url));
+const SERVICE_DIR = join(HERE, '..');
+// DISCOVERED BY WALKING UP, NOT BY COUNTING `..`. This gate file lives in two trees at two different
+// depths — `hackathon/veritape/gates` in the working tree and `Quiver/gates` in the mirror — so a fixed
+// `../..` resolves to "research startup" in one and to a directory above it in the other, and check 8
+// would have gone red in the mirror for a reason that is not a defect. The ancestor that holds BOTH
+// copies of the report is the root, and if no ancestor does, check 8 says so rather than skipping.
+const REPORT_REL = [join('hackathon', 'WIRE_CLASSIFY_TWO.md'), join('Quiver', 'docs', 'wire-classify-two.md')];
+function findReportRoot() {
+  let dir = SERVICE_DIR;
+  for (let up = 0; up < 6; up++) {
+    if (REPORT_REL.every((r) => existsSync(join(dir, r)))) return dir;
+    const parent = join(dir, '..');
+    if (parent === dir) break;
+    dir = parent;
+  }
+  return null;
+}
 
 const CTX = { host: 'http://gate' };
 const UNDEF_PROP = /Cannot read propert(?:y|ies) of (?:undefined|null)/;
@@ -240,4 +263,68 @@ test('gateG/7 a callerMistake refusal carries neither proof nor observation, by 
   assert.equal(r.observation, undefined);
   assert.ok(Array.isArray(r.errors) && r.errors.length, 'a refusal with no sentence in it teaches nothing');
   assert.ok(r.howToFix, 'a refusal must carry the body that would have worked');
+});
+
+// ── CHECK 8. this gate's own report does not quote a proof-emitting set that has rotted ────────────
+// ADDED BY THE SECOND PASS, BECAUSE THE REPORT WAS ALREADY WRONG WHEN IT WAS RE-READ. §3 of
+// `wire-classify-two.md` stated the pinned proof-emitting set as four services / eight entries. It was
+// four when it was written and it was six by the end of the same day: two sibling sessions wired
+// `event-vol` (ncdf.circom) and `lp-risk` (lpbracket.circom) afterwards. The sentence was prose, so
+// nothing went red — `tools/docs-consistency.mjs` is green over 252 documents and scopes its figure
+// rules to filenames matching `VERIFY_*.md` / `verify-*.md`, which this report is not. A number that
+// only a reader can falsify is the same disease as a verifier that cannot fail, one document further
+// out, and it is the disease that put a different gas figure in each of four reports.
+//
+// WHAT IS COMPARED, AND WHY IT IS NOT A SECOND OPINION. The doc's claim is specifically "the pinned set
+// in gates/preflight.mjs is …", so the truth it is checked against is preflight's OWN array literal,
+// parsed out of preflight's source. This check deliberately does NOT re-run the `EMITS_ZK` regex to
+// form its own set: a second derivation of the same quantity is how a mathematically-equal,
+// numerically-different answer gets shipped, and preflight already owns that derivation and asserts it
+// against the handlers. So this is a doc-vs-pin check, and preflight is still the pin-vs-code check.
+const NUMWORD = { four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13, fourteen: 14 };
+
+/** The set preflight pins, read out of preflight's own literal rather than re-derived from the handlers. */
+function pinnedSet() {
+  const src = readFileSync(join(SERVICE_DIR, 'gates', 'preflight.mjs'), 'utf8');
+  const m = src.match(/the proof-emitting set is the one that has been checked'[\s\S]{0,200}?JSON\.stringify\(\[([^\]]+)\]\.sort\(\)\)/);
+  assert.ok(m, 'could not find preflight\'s pinned proof-emitting array literal — this check would be comparing the doc against nothing');
+  const entries = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
+  assert.ok(entries.length > 0, 'preflight\'s pinned literal parsed to an empty list');
+  const services = [...new Set(entries.map((e) => e.split(':')[1].replace(/_/g, '-')))].sort();
+  return { entries, services };
+}
+
+test('gateG/8 the report quotes the proof-emitting set preflight actually pins, on both copies', () => {
+  const { entries, services } = pinnedSet();
+  // Both handler arrays, counted here only to check the doc's own arithmetic — not to re-derive the set.
+  const totalHandlers = SERVICES.length + TOOLS.length;
+
+  const root = findReportRoot();
+  assert.ok(root, `no ancestor of ${SERVICE_DIR} holds both copies of the report (${REPORT_REL.join(', ')}) — `
+    + 'this check must name where it looked rather than pass over a report it never opened');
+  const copies = REPORT_REL.map((r) => join(root, r));
+  const present = copies.filter((p) => existsSync(p));
+  assert.deepEqual(present, copies, `a copy of the report is missing, so this check would silently examine fewer than it claims:\n  ${copies.filter((p) => !existsSync(p)).join('\n  ')}`);
+  const texts = present.map((p) => readFileSync(p, 'utf8'));
+  assert.equal(texts[0], texts[1], 'the two copies of the report have diverged, so one of them is quoting a set the other does not');
+
+  for (const [n, text] of texts.entries()) {
+    const claim = (text.match(/pinned proof-emitting set in `gates\/preflight\.mjs` is\s+([\s\S]{0,400}?)build no proof\./) || [])[1];
+    assert.ok(claim, `${present[n]}: could not locate the pinned-set sentence — the sentence this check exists to police must stay findable`);
+    const named = [...new Set([...claim.matchAll(/`([a-z][a-z-]+)`/g)].map((x) => x[1]))].sort();
+    assert.deepEqual(named, services,
+      `${present[n]}: the report names [${named.join(', ')}] as the proof-emitting set; preflight pins [${services.join(', ')}]`);
+
+    const entryWord = (claim.match(/(\w+) entries of/) || [])[1];
+    const claimedEntries = NUMWORD[entryWord] ?? Number(entryWord);
+    assert.ok(Number.isInteger(claimedEntries), `${present[n]}: could not read the entry count from "${entryWord}"`);
+    assert.equal(claimedEntries, entries.length, `${present[n]}: the report claims ${claimedEntries} pinned entries; preflight pins ${entries.length}`);
+
+    const claimedTotal = Number((claim.match(/of (\d+) handlers/) || [])[1]);
+    assert.equal(claimedTotal, totalHandlers, `${present[n]}: the report claims ${claimedTotal} handlers; the two arrays carry ${totalHandlers} (${SERVICES.length} HTTP + ${TOOLS.length} MCP)`);
+
+    const claimedRest = Number((claim.match(/other (\d+)/) || [])[1]);
+    assert.equal(claimedRest, totalHandlers - entries.length,
+      `${present[n]}: the report says ${claimedRest} handlers build no proof; ${totalHandlers} - ${entries.length} = ${totalHandlers - entries.length}`);
+  }
 });

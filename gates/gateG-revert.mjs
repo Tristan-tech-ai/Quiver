@@ -32,10 +32,16 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
+const SR = join(ROOT, '..', '..');   // "research startup"
 const F = {
   services: join(ROOT, 'src', 'services.js'),
   gate: join(ROOT, 'gates', 'gateG-envelope-classification.mjs'),
   fixtures: join(ROOT, 'gates', 'routing-fixtures.mjs'),
+  // The REPORT, both copies. Check 8 asserts they are byte-identical as well as correct, so the
+  // DOCFIGURE revert edits BOTH — reverting one would go red on the divergence assertion instead of on
+  // the claim, and would demonstrate a different property from the one it is here to demonstrate.
+  docHack: join(SR, 'hackathon', 'WIRE_CLASSIFY_TWO.md'),
+  docQuiver: join(SR, 'Quiver', 'docs', 'wire-classify-two.md'),
 };
 
 // ── runners ──────────────────────────────────────────────────────────────────────────────────────
@@ -109,19 +115,38 @@ const REVERTS = [
     expect: /accepted by the validator of the service it names/i,
     expectRaw: /require spot>0, atmIv\/atmIvPct, and daysToEvent\/T/,
   },
+  {
+    // NOT A HYPOTHETICAL. This is the sentence as it actually stood when the report was re-read on
+    // 30 July, and it was already wrong: `event-vol` and `lp-risk` were wired by sibling sessions after
+    // it was written. Putting it back is putting back a defect that shipped, not inventing one.
+    name: 'DOCFIGURE — the report\'s pinned proof-emitting set back to the four services it shipped claiming',
+    file: ['docHack', 'docQuiver'],
+    find: '`perp-gate`, `size-gate`, `treasury-risk`, `exec-verify`, `event-vol` and `lp-risk` on both surfaces —\n'
+      + 'twelve entries of 31 handlers (22 HTTP + 9 MCP), and the other 19 build no proof.',
+    replace: '`perp-gate`, `size-gate`, `treasury-risk`, `exec-verify` on both surfaces —\n'
+      + 'eight entries of 31 handlers (22 HTTP + 9 MCP), and the other 23 build no proof.',
+    occurrences: 1,
+    expect: /quotes the proof-emitting set preflight actually pins/i,
+    expectRaw: /the report names \[exec-verify, perp-gate, size-gate, treasury-risk\] as the proof-emitting set/,
+  },
 ];
 
 console.log('GATE G REVERT — proving the envelope-classification gate can fail\n');
 
 const originals = Object.fromEntries(Object.entries(F).map(([k, p]) => [k, readFileSync(p, 'utf8')]));
+// A revert may name one file or several. `occurrences` is asserted in EVERY file it names, so a
+// multi-file revert that half-applies — the exact way a mirrored doc drifts — refuses to run.
+const filesOf = (r) => (Array.isArray(r.file) ? r.file : [r.file]);
 for (const r of REVERTS) {
-  const n = originals[r.file].split(r.find).length - 1;
-  if (n !== r.occurrences) {
-    console.error(`The code this revert removes is not in ${F[r.file]} the expected number of times:\n  ${r.name}`);
-    console.error(`  literal: ${r.find.slice(0, 100)}`);
-    console.error(`  found ${n} occurrence(s), expected ${r.occurrences}`);
-    console.error('Refusing to run: a revert that does not apply would report a meaningless result.');
-    process.exit(2);
+  for (const key of filesOf(r)) {
+    const n = originals[key].split(r.find).length - 1;
+    if (n !== r.occurrences) {
+      console.error(`The code this revert removes is not in ${F[key]} the expected number of times:\n  ${r.name}`);
+      console.error(`  literal: ${r.find.slice(0, 100)}`);
+      console.error(`  found ${n} occurrence(s), expected ${r.occurrences}`);
+      console.error('Refusing to run: a revert that does not apply would report a meaningless result.');
+      process.exit(2);
+    }
   }
 }
 
@@ -139,7 +164,7 @@ const restore = () => { for (const [k, p] of Object.entries(F)) writeFileSync(p,
 const results = [];
 try {
   for (const r of REVERTS) {
-    writeFileSync(F[r.file], originals[r.file].split(r.find).join(r.replace));
+    for (const key of filesOf(r)) writeFileSync(F[key], originals[key].split(r.find).join(r.replace));
     const out = runGate();
     console.log(`\n  revert: ${r.name}`);
     console.log(`    gate G against reverted code : ${out.pass} pass, ${out.fail} fail`);

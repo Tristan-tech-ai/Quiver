@@ -634,16 +634,41 @@ test('§13 the published-repository row is git at HEAD, not a directory listing'
   // And the third quantity, so that "committed" is never read as "reproducible". Committed, compiled and
   // has-a-proving-key are three states and this section published one number for all three.
   //
-  // ASKED AT EVERY DEPTH. The flat form of this check answered 0 and the answer is 1: `ncdfonesided.r1cs`
-  // is at `zk/build/adv/ncdfadv/`, and every one it names must be named on the page, so the count cannot
-  // drift without the reader being told which circuit moved it.
-  const compiled = onDisk.map((f) => f.replace(/\.circom$/, '')).filter((c) => artifact(`${c}.r1cs`));
-  // Anchored to the start of a table cell but not to its end, because the row carries the reason the
-  // figure moved and a cell-terminating `|` would forbid explaining it.
-  assert.ok(s.includes(`| **${compiled.length} of ${onDisk.length}**`),
-    `${compiled.length} of the ${onDisk.length} adversary sources have a compiled .r1cs somewhere under zk/build (${compiled.join(', ') || 'none'}); §13 must publish that separately from the committed count`);
-  for (const c of compiled) {
-    assert.ok(s.includes(c), `${c} is compiled (at ${artifact(`${c}.r1cs`)}) and §13's compiled row does not name it`);
+  // THE FIGURE PUBLISHED IS THE ONE A CLONE GETS, and that is a correction of a correction. This row first
+  // stated the WORKING-TREE count, which is tree-dependent: 1 here, 0 in a clone, so the rule went red in a
+  // clone for the same reason §4 does. Since §13's question is whether a reader can rebuild the refutations
+  // FROM THE REPOSITORY, the committed count is both the honest figure and the tree-independent one. It is
+  // asked of git, at every depth under `zk/build`.
+  const advNames = onDisk.map((f) => f.replace(/\.circom$/, ''));
+  const lsBuild = spawnSync('git', ['-C', GIT.cwd, 'ls-tree', '-r', '--name-only', 'HEAD', 'zk/build'], { encoding: 'utf8' });
+  assert.equal(lsBuild.status, 0, 'git could not list zk/build at HEAD, so the compiled count below would be a guess');
+  const committedR1cs = new Set(lsBuild.stdout.split('\n').map((s) => s.trim())
+    .filter((p) => p.endsWith('.r1cs')).map((p) => p.split('/').pop().replace(/\.r1cs$/, '')));
+  const compiled = advNames.filter((c) => committedR1cs.has(c));
+
+  // ASKED AT EVERY DEPTH, SEPARATELY, for what exists only on this machine. The flat form of this answered
+  // "no adversary artifacts" about a build tree holding `adv/ncdfadv/ncdfonesided.r1cs`, three directories
+  // below where every other circuit's lands. Whatever it finds must be NAMED on the page, so an artifact
+  // that exists in one working tree and nowhere else cannot go unmentioned — which is this section's whole
+  // subject. A clone finds none and is required to say nothing extra, so this holds in both trees.
+  const localOnly = advNames.filter((c) => artifact(`${c}.r1cs`) && !committedR1cs.has(c));
+  // ANCHORED TO ITS OWN ROW, and this was got wrong first. The check was `s.includes('| **N of M**')`,
+  // which passed in a fresh clone — where the true compiled count is 0 — because the ZKEY row of the same
+  // table also reads `| **0 of 38**`. A figure check that any cell in the table can satisfy is a check that
+  // passes on the wrong cell, which is this gate's own disease. So the row is located by its label and the
+  // figure is read out of THAT row.
+  const compiledRow = SECTIONS.get(13).body.split('\n').filter((L) => /^\|\s*of those, with a compiled/.test(L));
+  assert.equal(compiledRow.length, 1,
+    `§13 has ${compiledRow.length} rows for the compiled count; exactly one is expected or the figure below is read out of the wrong cell`);
+  assert.ok(compiledRow[0].includes(`**${compiled.length} of ${onDisk.length}**`),
+    `${compiled.length} of the ${onDisk.length} adversary sources have a compiled .r1cs committed at HEAD (${compiled.join(', ') || 'none'}); §13's compiled row says "${compiledRow[0].trim()}"`);
+  for (const c of [...compiled, ...localOnly]) {
+    assert.ok(compiledRow[0].includes(c),
+      `${c} has a compiled .r1cs at ${artifact(`${c}.r1cs`)}${committedR1cs.has(c) ? '' : ' and it is NOT committed'}, and §13's compiled row does not name it`);
+  }
+  if (localOnly.length) {
+    assert.match(compiledRow[0], /uncommitted|not committed|this machine only|one working tree/,
+      `${localOnly.join(', ')} exists as a built artifact in this working tree and in no clone; §13's compiled row names it without saying it is uncommitted, which is the exact exposure this section is about`);
   }
 });
 

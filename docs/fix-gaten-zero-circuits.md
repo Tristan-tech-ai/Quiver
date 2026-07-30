@@ -122,17 +122,16 @@ all three, and there is no single value of that number that is honest. The table
 | --- | --- |
 | sources rescued into `zk/circuits/adv/` | **38 files** |
 | of those, **committed** to the published repository | **38 of 38** — `git ls-tree -r --name-only HEAD zk/circuits` returns **60** paths, **38** under `adv/`, same names as on disk |
-| of those, with a compiled `.r1cs` anywhere under `zk/build` | **1 of 38** — `ncdfonesided`, at `zk/build/adv/ncdfadv/ncdfonesided.r1cs` |
+| of those, with a compiled `.r1cs` **committed** anywhere under `zk/build` | **0 of 38** — one exists, `ncdfonesided` at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`, **uncommitted** |
 | Plonk zkeys for any of them | **0 of 38** |
 
-The distinction is the honest answer to the section's own question. **The sources are in the repository; one
-of the 38 has been compiled and none has a proving key**, so no reader can re-derive the four refutations
-from what is published — which is the defect §13 is about, and is *not* the same sentence as "the sources are
-lost". The single compiled `.r1cs` is itself uncommitted.
+The distinction is the honest answer to the section's own question. **The sources are in the repository;
+nothing built from them is.** No reader can re-derive the four refutations from what is published — which is
+the defect §13 is about, and is *not* the same sentence as "the sources are lost".
 
-### That "1" was a "0" in the first version of this fix, and the cause was mine
+### The compiled row got this wrong twice more, both of them mine
 
-The compiled row was first published as **0 of 38**, and the rule behind it was:
+**First it said `0 of 38`, and the rule behind it was flat:**
 
 ```js
 … .filter((c) => existsSync(join(BUILD, `${c}.r1cs`)))     // flat. wrong.
@@ -141,16 +140,29 @@ The compiled row was first published as **0 of 38**, and the rule behind it was:
 `find zk/build -name '*.r1cs'` returns **22** paths, and one of them is
 `zk/build/adv/ncdfadv/ncdfonesided.r1cs` — three directories below where every other circuit's artifact
 lands. A flat `existsSync` cannot see it, so a search that did not recurse produced an absence and the
-absence was published as a fact. **This is the same error as the row it was fixing**, one level down: a
-measurement taken with the wrong instrument and reported as a property of the world. It was caught by
-searching properly before the batch closed, not by the gate.
+absence was published as a fact. **The same error as the row it was fixing**, one level down: a measurement
+taken with the wrong instrument and reported as a property of the world.
 
-Two rules were repaired, not one. `zk/build` is now indexed **recursively, once**, and asked by basename;
-the pre-existing zkey check in the original §13 test had the identical flat hole and now asks at every depth
-for `_plonk.zkey`, `.zkey` and `_final.zkey`. Its answer is unchanged — `0 of 38`, now measured rather than
-assumed. The compiled rule additionally requires the page to **name** every circuit it counts, so the figure
-cannot drift without the reader being told which file moved it, and revert mutation 11 puts the `0` back and
-requires the gate to name `ncdfonesided` rather than merely disagree with the count.
+**Then it said `1 of 38`, and that figure passed in this tree and was red in a clone** — because the
+working-tree count is 1 and the clone's is 0. A figure that changes with which checkout you ask is not a
+figure a reviewer can use, and §13's question is specifically whether the refutations can be rebuilt *from
+the repository*. So the published figure is now the **committed** count, asked of
+`git ls-tree -r HEAD zk/build` at every depth: **0 of 38**, identical in both trees, with the one
+uncommitted artifact **named in the row rather than counted in it**.
+
+**And the `1 of 38` version passed for the wrong reason before that was noticed.** The assertion was
+`s.includes('| **N of M**')` over the whole section, and in a clone — where the true count is 0 — it matched
+the **zkey** row of the same table, which also reads `| **0 of 38** |`. A figure check that any cell in the
+table can satisfy is a check that passes on the wrong cell: this gate's own disease, committed by the rule
+written to cure it. The row is now located by its label and the figure read out of that row only, with an
+assertion that exactly one such row exists.
+
+Three rules were repaired in total. `zk/build` is indexed **recursively, once**, and asked by basename; the
+pre-existing zkey check in the original §13 test had the identical flat hole and now asks at every depth for
+`_plonk.zkey`, `.zkey` and `_final.zkey` — its answer is unchanged at `0 of 38`, now measured rather than
+assumed. And whatever exists locally but is uncommitted must be **named** on the page *and* flagged as
+uncommitted; a clone finds none and is required to say nothing extra, which is why the rule is green in both
+trees without either claim being weakened.
 
 Both prior versions of the row are quoted on the page rather than deleted, with the `ea69ea3` diagnosis.
 
@@ -224,7 +236,7 @@ GATE N REVERT — 2026-07-30T07:55:29.338Z
            gate N went RED (expected red) and named it
   [PASS] an uncommitted artifact in the mirror makes gate N red rather than green
            gate N went RED (expected red) and named it
-  [PASS] putting the compiled count back to zero makes gate N red and names the circuit
+  [PASS] a compiled row that drops the uncommitted artifact makes gate N red and names it
            gate N went RED (expected red) and named it
 
   [PASS] every copy of the register is byte-identical to how it started
@@ -328,6 +340,15 @@ local mirror) into a scratch directory, `node_modules` junctioned in, and `gate:
 **All four new rules pass in the clone**, and §10 went from red to green there. The clone's own git answers
 `60` paths and `38` under `adv/`, and its `zk/circuits/adv` holds the same 38 files — so the git-based rule
 measures the clone rather than the working tree, which is the case it exists for.
+
+**Passing in a clone was checked for the right reason, not accepted.** A rule that passes there because it
+finds nothing to check is the disease in a new place, so the figure was falsified inside the clone — the
+compiled row edited to `1 of 38` — and the rule went red naming the clone's own measurement:
+
+```
+AssertionError: 0 of the 38 adversary sources have a compiled .r1cs committed at HEAD (none);
+§13's compiled row says "… | **1 of 38** — …"
+```
 
 **The four that still fail in a clone are the §8 defect, and they are the same four before and after:**
 

@@ -288,12 +288,15 @@ step('an uncommitted artifact in the mirror makes gate N red rather than green',
 // batch because the check behind it was a flat `existsSync` in `zk/build`, and the one compiled adversary
 // circuit is at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`. Putting the 0 back must be red, and the message
 // must NAME the circuit — a count alone would let the same error recur with a different file.
-step('putting the compiled count back to zero makes gate N red and names the circuit', {
+// The committed count is 0 and stating 0 is correct, so the mutation that has to be red is the row
+// FORGETTING THE UNCOMMITTED ARTIFACT. That is the flat search's actual output: a bare 0, with no mention of
+// the one circuit that is built and reachable from nobody else's clone.
+step('a compiled row that drops the uncommitted artifact makes gate N red and names it', {
   line: {
     prefix: '| of those, with a compiled `.r1cs`',
-    replacement: '| of those, with a compiled `.r1cs` in `zk/build` | **0 of 38** |',
+    replacement: '| of those, with a compiled `.r1cs` **committed** anywhere under `zk/build` | **0 of 38** |',
   },
-  expect: ['somewhere under zk/build', 'ncdfonesided'],
+  expect: ['ncdfonesided', 'does not name it'],
 });
 
 // Everything must be back, byte for byte. A revert that leaves the tree edited is worse than no revert.

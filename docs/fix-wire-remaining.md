@@ -317,7 +317,31 @@ Two sessions wiring the same handler from opposite ends is how a circuit got orp
 update records why `execadverse` joined: a proof carrying fifteen public signals cannot be checked
 against any of the three keys already there.
 
-## 6. What was NOT verified
+## 6. The shared working tree, and one thing it did while this ran
+
+Five sessions share the `Quiver` checkout and its **index**. When this session staged its files, the
+index already held another session's staged work — `docs/fix-known-defects.md`,
+`gates/gateN-known-defects.mjs`, `gates/gateN-revert.mjs`, and two `probe-direct-vs-snark-gas` files.
+
+Committing with a literal pathspec (`git commit -- <paths>`, never `git add -A`) is what kept those
+out. They are theirs, they are in their own commit `03adf10`, and none of the 16 files in this
+session's commit is one of them.
+
+Two facts worth recording rather than tidying:
+
+- `package.json` was in this session's pathspec and is **not** in its commit. The other session
+  committed `03adf10` while this one was staging, and that commit carried `package.json` with *both*
+  its `gate:n` aliases and the `gate:ex` aliases this session had already written to the shared file.
+  Both sets survive in the tree; the aliases simply landed in their commit. Verified:
+  `git show HEAD:package.json` contains all four.
+- The commit message had to be **corrected after the fact**, because its first version claimed to
+  carry `package.json` and that stopped being true between writing the message and the commit
+  existing. It was amended — this session's own unpushed tip commit, never anybody else's.
+
+Nothing was soft-reset and no commit this session did not create was touched. `origin/main` is 6
+commits behind local and **nothing was pushed**.
+
+## 7. What was NOT verified
 
 - **Nothing was deployed.** Every figure is local. `/proof/vk/execadverse` and the 15-signal retrieval
   shape are asserted against the in-process app, not against `quiver-production-c3a8`. Preflight

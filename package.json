@@ -81,7 +81,9 @@
     "gate:g": "node --test gates/gateG-envelope-classification.mjs",
     "gate:g-revert": "node gates/gateG-revert.mjs",
     "gate:if": "node --test gates/gateIF-inflight-eviction.mjs",
-    "gate:if-revert": "node gates/gateIF-revert.mjs"
+    "gate:if-revert": "node gates/gateIF-revert.mjs",
+    "gate:mr": "node --test gates/gateMR-memoised-refusal.mjs",
+    "gate:mr-revert": "node gates/gateMR-revert.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",

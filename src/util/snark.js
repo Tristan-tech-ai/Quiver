@@ -223,10 +223,10 @@ export async function getProof(contentHash) {
 
 // EVICTION MUST NOT TAKE THE RECORD A BUILD IS STILL WRITING TO, and a plain FIFO eviction did.
 //
-// `store.has(contentHash)` is one half of the guard that stops the six builders below proving the same
-// content hash twice — `claimed` is the other half, and it is released as soon as the build is ENQUEUED,
-// not when it settles. So between enqueue and `ready`, a `building` record in this map is the ONLY thing
-// that marks the hash as in flight. Insertion-order eviction deletes it like any other entry, and then:
+// `answeredOrInFlight(contentHash)` is one half of the guard that stops the seven builders below proving
+// the same content hash twice — `claimed` is the other half, and it is released as soon as the build is
+// ENQUEUED, not when it settles. So between enqueue and `ready`, a `building` record in this map is the
+// ONLY thing that marks the hash as in flight. Insertion-order eviction deletes it like any other entry:
 //
 //   a second request for the SAME inputs, arriving after MAX other proof requests, passes the guard,
 //   starts a DUPLICATE build, hits MAX_QUEUED, and writes `unavailable: prover busy` OVER a proof that
@@ -369,6 +369,45 @@ let queued = 0;
 const claimed = new Set();
 
 /**
+ * Has this content hash already got an answer, or a build that is going to produce one?
+ *
+ * A REFUSAL IS NOT AN ANSWER, AND MUST NOT STAND IN FOR ONE. This was `store.has(contentHash)`, which
+ * treats every record in the map as settled. Two of the four statuses this file writes are not settled
+ * at all:
+ *
+ *   `unavailable: prover busy — 8 proofs already queued; retry shortly` is a statement about this
+ *   PROCESS at one instant, and its own sentence tells the caller to retry. Measured on the served
+ *   event-vol handler: saturate the queue, ask for a proof of a fresh body, get that refusal — then
+ *   wait for the prover to go completely idle (12.2 s for the eight ahead of it) and re-issue the
+ *   IDENTICAL body. `store.has` was true, so the builder returned before reaching a queue that would
+ *   now have admitted it, and the record did not move: same status, same `at`. "Retry shortly" was
+ *   unretryable until the entry fell out of the 200-entry cache — which for a hash nobody else is
+ *   asking for means 200 further distinct proof requests.
+ *
+ *   `failed` is one exception in one worker — an OOM, a WASM fault, a worker that died mid-proof. The
+ *   next attempt gets a fresh worker (ensureWorker respawns), so it is the same shape of transient.
+ *
+ * proofStore.js already had exactly this policy in writing, for the DURABLE layer, and had had it
+ * longer: it refuses to persist `failed`/`unavailable` because "a refusal is a judgement made by one
+ * build of the code. Persisting it would let a fixed prover keep serving the old refusal after a
+ * deploy. Cheap to redo." The in-memory guard contradicted the store it writes through.
+ *
+ * WHY A POSITIVE LIST rather than `status !== 'unavailable' && status !== 'failed'`. A status added
+ * tomorrow is then retryable by default. The two failure directions are not symmetric: re-deriving a
+ * refusal costs the arithmetic of one witness and nothing else — every refusal in this file is written
+ * BEFORE the queue is touched, so a re-attempt cannot occupy the prover — while memoising a status
+ * that should have been retried costs a caller a proof they paid for and told them to retry for it.
+ *
+ * `building` still blocks, and that is load-bearing for a different defect: `claimed` is released when
+ * the build is ENQUEUED, not when it settles, so from enqueue to `ready` this record is the only thing
+ * marking the hash as in flight (see `evictOne`, and gates/gateIF-inflight-eviction.mjs).
+ */
+function answeredOrInFlight(contentHash) {
+  const rec = store.get(contentHash);
+  return !!rec && (rec.status === 'ready' || rec.status === 'building');
+}
+
+/**
  * Build a proof in the background and record it under the response's content hash.
  *
  * Returns a promise, and every caller on the request path deliberately ignores it — the whole point
@@ -384,7 +423,7 @@ const claimed = new Set();
  */
 export async function buildInBackground(contentHash, echoedInputs, liquidationPrice, provenance) {
   // The memory check is first and synchronous, so a repeat request costs no round trip at all.
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildOnce(contentHash, echoedInputs, liquidationPrice, provenance);
@@ -639,7 +678,7 @@ export function kellyWitnessFor(echoedInputs, servedFullKelly) {
  * rejects.
  */
 export async function buildKellyInBackground(contentHash, echoedInputs, servedFullKelly) {
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildKellyOnce(contentHash, echoedInputs, servedFullKelly);
@@ -868,7 +907,7 @@ export function concentrationWitnessFor(echoedInputs, result) {
  * The twin of `buildInBackground` and `buildKellyInBackground`, separate for the same reason.
  */
 export async function buildConcentrationInBackground(contentHash, echoedInputs, result) {
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildConcentrationOnce(contentHash, echoedInputs, result);
@@ -1187,7 +1226,7 @@ export function execWitnessFor(echoedInputs) {
  * It never rejects.
  */
 export async function buildExecInBackground(contentHash, echoedInputs, result) {
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildExecOnce(contentHash, echoedInputs, result);
@@ -1334,7 +1373,7 @@ async function buildExecOnce(contentHash, echoedInputs, result) {
  * The fifth twin of `buildInBackground`, separate for the reason the other four are.
  */
 export async function buildNcdfInBackground(contentHash, echoedInputs, result) {
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildNcdfOnce(contentHash, echoedInputs, result);
@@ -1436,7 +1475,7 @@ async function buildNcdfOnce(contentHash, echoedInputs, result) {
  * hash. Never rejects; every caller on the request path ignores the promise.
  */
 export async function buildLpBracketInBackground(contentHash, echoedInputs, result) {
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildLpBracketOnce(contentHash, echoedInputs, result);
@@ -1597,7 +1636,7 @@ async function buildLpBracketOnce(contentHash, echoedInputs, result) {
  * The seventh twin of `buildInBackground`, separate for the reason the other six are.
  */
 export async function buildOptionsRiskNcdfInBackground(contentHash, echoedInputs, result) {
-  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  if (answeredOrInFlight(contentHash) || claimed.has(contentHash)) return;
   claimed.add(contentHash);
   try {
     await buildOptionsRiskNcdfOnce(contentHash, echoedInputs, result);

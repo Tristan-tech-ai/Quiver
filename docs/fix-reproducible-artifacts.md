@@ -105,8 +105,9 @@ step needs a download, write the fetch with a checksum assertion.**
 | every other `.ptau` | **script** | see §5. 270 MiB more, and not byte-reproducible when generated |
 | `build/pot12_final.ptau` | **neither** | it is `hez_final_12.ptau` with a different name and the same sha256. Committing a byte-identical duplicate would be 4.58 MiB spent on nothing |
 
-**Total committed: 5,354,993 bytes across 90 files** — 536,898 bytes (524.3 KiB) of text in 88 files,
-plus the 4,801,688-byte ceremony file and 12 lines of `.gitattributes`.
+**Total committed: 5,377,786 bytes (5.13 MiB) across 90 files**, read back out of `git ls-tree` rather
+than off the working tree — 576,098 bytes (562.6 KiB) of text in 89 files, plus the 4,801,688-byte
+ceremony file, plus 12 lines of `.gitattributes`.
 
 | where | bytes | files |
 |---|---|---|
@@ -114,10 +115,11 @@ plus the 4,801,688-byte ceremony file and 12 lines of `.gitattributes`.
 | `zk/scripts/adversary/` | 286,480 | 49 |
 | `gates/gateZ-adversary-repro.mjs` | 2,138 | 1 |
 | `gates/gateZ-revert.mjs` | 2,288 | 1 |
+| `docs/fix-reproducible-artifacts.md` (this file) | 35,251 | 1 |
 | `zk/build/hez_final_12.ptau` | **4,801,688** | 1 |
 
-Against 726.8 MiB of derived binaries left out: the repository grows by **0.70%** of what the
-refutations produced, and **0.070%** if the ceremony file is excluded. No *source* file committed is
+Against 726.8 MiB of derived binaries left out: the repository grows by **0.706%** of what the
+refutations produced, and **0.076%** if the ceremony file is excluded. No *source* file committed is
 over 25 KiB; the largest is `circuits/adv/ctl.circom` at 21,376 bytes, a generated constant table that
 `repro.mjs` regenerates and diffs.
 

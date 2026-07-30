@@ -1,0 +1,202 @@
+{
+  "at": "2026-07-30T07:28:24.664Z",
+  "passed": true,
+  "question": "Is gateAT's 3-point derived bound reproducible enough to publish as a point figure?",
+  "answer": "No. Over 12 independent runs the headroom figure spans 18.43%-31.32% (12.89 points). The finding itself is unaffected: the worst-case margin stayed positive and the gate stayed green in every run. What fails is the PUBLICATION of a point estimate, which is why the report now quotes a one-sided bound measured on the ten-point instrument (probe-attest-pi-marginal.json) instead.",
+  "whyItMoves": "The figure is 3*SE(slope)*490 divided by a difference of two large gas numbers. SE(slope) is estimated from an OLS through 3 points with 2 fitted parameters, leaving 1 residual degree of freedom, so SE(slope) is itself badly determined and is then amplified 1470-fold.",
+  "runs": 12,
+  "perRun": [
+    {
+      "run": 1,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1121.6,
+      "seOfMarginal": 19.62,
+      "pairingAtCeiling": 827906,
+      "marginCentral": 119731,
+      "marginWorstCase": 90817,
+      "fractionOfCentralMarginPct": 24.15,
+      "worstLinearityResidualSE": 0.87,
+      "survives": true
+    },
+    {
+      "run": 2,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1063.2,
+      "seOfMarginal": 18.03,
+      "pairingAtCeiling": 800648,
+      "marginCentral": 92473,
+      "marginWorstCase": 65960,
+      "fractionOfCentralMarginPct": 28.67,
+      "worstLinearityResidualSE": 1.6,
+      "survives": true
+    },
+    {
+      "run": 3,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1114.4,
+      "seOfMarginal": 23.15,
+      "pairingAtCeiling": 824531,
+      "marginCentral": 116356,
+      "marginWorstCase": 82304,
+      "fractionOfCentralMarginPct": 29.27,
+      "worstLinearityResidualSE": 0.92,
+      "survives": true
+    },
+    {
+      "run": 4,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1075.4,
+      "seOfMarginal": 19.56,
+      "pairingAtCeiling": 806450,
+      "marginCentral": 98275,
+      "marginWorstCase": 69569,
+      "fractionOfCentralMarginPct": 29.21,
+      "worstLinearityResidualSE": 0.99,
+      "survives": true
+    },
+    {
+      "run": 5,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1101.4,
+      "seOfMarginal": 18.1,
+      "pairingAtCeiling": 818817,
+      "marginCentral": 110642,
+      "marginWorstCase": 83937,
+      "fractionOfCentralMarginPct": 24.14,
+      "worstLinearityResidualSE": 1.69,
+      "survives": true
+    },
+    {
+      "run": 6,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1107.8,
+      "seOfMarginal": 14.08,
+      "pairingAtCeiling": 821342,
+      "marginCentral": 113167,
+      "marginWorstCase": 92311,
+      "fractionOfCentralMarginPct": 18.43,
+      "worstLinearityResidualSE": 0.72,
+      "survives": true
+    },
+    {
+      "run": 7,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1107.8,
+      "seOfMarginal": 20.91,
+      "pairingAtCeiling": 821617,
+      "marginCentral": 113442,
+      "marginWorstCase": 82471,
+      "fractionOfCentralMarginPct": 27.3,
+      "worstLinearityResidualSE": 0.38,
+      "survives": true
+    },
+    {
+      "run": 8,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1090.3,
+      "seOfMarginal": 17.41,
+      "pairingAtCeiling": 813252,
+      "marginCentral": 105077,
+      "marginWorstCase": 79204,
+      "fractionOfCentralMarginPct": 24.62,
+      "worstLinearityResidualSE": 0.71,
+      "survives": true
+    },
+    {
+      "run": 9,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1048.8,
+      "seOfMarginal": 18.48,
+      "pairingAtCeiling": 793967,
+      "marginCentral": 85792,
+      "marginWorstCase": 58921,
+      "fractionOfCentralMarginPct": 31.32,
+      "worstLinearityResidualSE": 2.42,
+      "survives": true
+    },
+    {
+      "run": 10,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1130.2,
+      "seOfMarginal": 20.64,
+      "pairingAtCeiling": 832111,
+      "marginCentral": 123936,
+      "marginWorstCase": 93634,
+      "fractionOfCentralMarginPct": 24.45,
+      "worstLinearityResidualSE": 1.59,
+      "survives": true
+    },
+    {
+      "run": 11,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1089.9,
+      "seOfMarginal": 21.19,
+      "pairingAtCeiling": 813306,
+      "marginCentral": 105131,
+      "marginWorstCase": 73910,
+      "fractionOfCentralMarginPct": 29.7,
+      "worstLinearityResidualSE": 1.73,
+      "survives": true
+    },
+    {
+      "run": 12,
+      "gateExit": 0,
+      "gateGreen": true,
+      "marginalGasPerSignal": 1110.4,
+      "seOfMarginal": 15.88,
+      "pairingAtCeiling": 822949,
+      "marginCentral": 114774,
+      "marginWorstCase": 91506,
+      "fractionOfCentralMarginPct": 20.27,
+      "worstLinearityResidualSE": 1.62,
+      "survives": true
+    }
+  ],
+  "dispersion": {
+    "fractionOfCentralMarginPct": {
+      "min": 18.43,
+      "max": 31.32,
+      "mean": 25.96,
+      "spread": 12.89
+    },
+    "marginCentral": {
+      "min": 85792,
+      "max": 123936,
+      "mean": 108233,
+      "spread": 38144
+    },
+    "marginWorstCase": {
+      "min": 58921,
+      "max": 93634,
+      "mean": 80378.67,
+      "spread": 34713
+    },
+    "marginalGasPerSignal": {
+      "min": 1048.8,
+      "max": 1130.2,
+      "mean": 1096.77,
+      "spread": 81.4
+    },
+    "worstLinearityResidualSE": {
+      "min": 0.38,
+      "max": 2.42,
+      "mean": 1.27,
+      "spread": 2.04
+    }
+  },
+  "everyRunGreen": true,
+  "worstCaseMarginPositiveEveryRun": true,
+  "runsExceeding2SEResidual": 1,
+  "note": "The gate is run unmodified as a child process; only its artifact is read. The finding is not in question here — the reproducibility of two published figures is."
+}

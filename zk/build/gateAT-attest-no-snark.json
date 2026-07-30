@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-30T04:33:10.278Z",
+  "at": "2026-07-30T07:28:24.421Z",
   "passed": true,
   "finding": "A zk proof adds nothing to risk-attest. The response publishes the complete leaf set, so set-exactness — no item dropped AND no item hidden, the two halves an inclusion proof cannot reach — is decided by recomputing the root in 2N-1 sha256 calls. There is no privacy to buy because every leaf is already public, and no succinctness to buy because the verifier already holds every leaf. At the service's own batch ceiling the direct check is also cheaper on chain than a pairing check that would prove a weaker statement, and the circuit needed at that N is beyond this project's trusted setup.",
   "whatNoCircuitCanFix": "Whether the submitter submitted its COMPLETE set of computations. The root covers what it was handed; a circuit's witness is also what it was handed. That is the input problem, and it is answered by input attestation, not by a circuit.",
@@ -114,86 +114,86 @@
         "circuit": "liquidation",
         "publicSignals": 8,
         "samples": 12,
-        "mean": 288042.3,
-        "median": 288077,
-        "min": 286927,
-        "max": 289349,
-        "spread": 2422,
-        "sd": 690.4,
-        "se": 199.3
+        "mean": 288079,
+        "median": 288371,
+        "min": 286315,
+        "max": 289117,
+        "spread": 2802,
+        "sd": 770.5,
+        "se": 222.4
       },
       {
         "circuit": "concentration",
         "publicSignals": 12,
         "samples": 12,
-        "mean": 292126.5,
-        "median": 292304,
-        "min": 290542,
-        "max": 294114,
-        "spread": 3572,
-        "sd": 945,
-        "se": 272.8
+        "mean": 291710.7,
+        "median": 291998,
+        "min": 290028,
+        "max": 292940,
+        "spread": 2912,
+        "sd": 959.9,
+        "se": 277.1
       },
       {
         "circuit": "portfoliogate",
         "publicSignals": 28,
         "samples": 12,
-        "mean": 309801.5,
-        "median": 309672,
-        "min": 308804,
-        "max": 310798,
-        "spread": 1994,
-        "sd": 543.9,
-        "se": 157
+        "mean": 310017.7,
+        "median": 309770,
+        "min": 309024,
+        "max": 311238,
+        "spread": 2214,
+        "sd": 785.2,
+        "se": 226.7
       }
     ],
     "linearityResiduals": [
       {
         "circuit": "liquidation",
         "publicSignals": 8,
-        "mean": 288042.3,
-        "fitted": 287914.9,
-        "residual": 127.4,
-        "seMultiples": 0.64
+        "mean": 288079,
+        "fitted": 287719,
+        "residual": 360,
+        "seMultiples": 1.62
       },
       {
         "circuit": "concentration",
         "publicSignals": 12,
-        "mean": 292126.5,
-        "fitted": 292285.8,
-        "residual": -159.3,
-        "seMultiples": -0.58
+        "mean": 291710.7,
+        "fitted": 292160.7,
+        "residual": -450,
+        "seMultiples": -1.62
       },
       {
         "circuit": "portfoliogate",
         "publicSignals": 28,
-        "mean": 309801.5,
-        "fitted": 309769.6,
-        "residual": 31.9,
-        "seMultiples": 0.2
+        "mean": 310017.7,
+        "fitted": 309927.7,
+        "residual": 90,
+        "seMultiples": 0.4
       }
     ],
-    "perPublicSignalGas": 1092.7,
-    "plonkBaseGasAtZeroSignals": 279173,
-    "plonkVerifyTotalGasAtCeiling": 814615,
+    "perPublicSignalGas": 1110.4,
+    "plonkBaseGasAtZeroSignals": 278835,
+    "plonkVerifyTotalGasAtCeiling": 822949,
     "publicSignalsRequiredAtCeiling": 490,
     "directIsCheaper": true,
     "directDeterministic": true
   },
   "derivedBound": {
     "what": "the most SNARK-favourable reading the samples admit — the only direction that can overturn the finding",
-    "perPublicSignalGasMin": 1054.7,
-    "perPublicSignalGasCentral": 1092.7,
-    "plonkVerifyTotalGasAtCeilingWorstCase": 795801,
-    "marginGasCentral": 106440,
-    "marginGasWorstCase": 87626,
+    "perPublicSignalGasMin": 1062.8,
+    "perPublicSignalGasCentral": 1110.4,
+    "plonkVerifyTotalGasAtCeilingWorstCase": 799681,
+    "marginGasCentral": 114774,
+    "marginGasWorstCase": 91506,
     "sigmaMultiple": 3,
-    "seOfMarginalGasPerSignal": 12.69,
-    "fractionOfCentralMarginConsumedByWorstCase": 0.1768,
+    "seOfMarginalGasPerSignal": 15.88,
+    "fractionOfCentralMarginConsumedByWorstCase": 0.2027,
     "atN64": {
       "directTotalGas": 190931,
-      "pairingTotalGas": 421229,
-      "ratio": 2.21
+      "pairingTotalGas": 423192,
+      "ratio": 2.22
     },
     "tightestPointIsTheCeiling": true,
     "survives": true

@@ -133,8 +133,16 @@ directional exposure the envelope can misstate — with `vega` and `theta` alrea
 **±1.11e-6 quote units of dollar delta on a 100,000 forward, per contract — 1.11e-7 bps of the
 forward.**
 
-Against what it refuses, in the **same** unit: A-S 7.1.26 misstates dollar delta by up to
-**6.881e-3 quote units** on the same legs — **620,000×** the envelope.
+Against what it refuses, in the **same** unit. A-S 7.1.26 carries up to 7.5e-8 of absolute CDF error by
+construction, so at a 100,000 forward its dollar-delta error is **±7.5e-3** against this circuit's
+±1.110e-6 — **6,760×**. The worst A-S dollar-delta miss actually *measured* over the sweep is
+**6.881e-3**, at that leg's own forward, which is **6,202×** the envelope at 100,000.
+
+> **This paragraph first read "620,000×", and the figure was mine rather than the artifact's.** It is
+> corrected in place rather than quietly, because it is precisely the class of defect this repository
+> keeps finding in its own reports — four earlier reports had gas figures that disagreed with the
+> artifacts they cited. 6.881e-3 / 1.110e-6 is 6.2e+3, not 6.2e+5. Every other number on this page was
+> re-read off `zk/build/gateB7-7-optionsrisk-greeks.json` in the same pass that caught it.
 
 Reported against the **forward** and never the premium, deliberately. gateB7-5 measured the same premium
 denominator saying 19.4% at one seed and 18,526% at another: a deep out-of-the-money premium is 1e-70 and
@@ -236,8 +244,15 @@ ceiling nobody has tested**.
   proof refused; all six greeks reconstruct from the public signals **alone** and display as the figures
   served; the exponential binding performed
 - **§7** the substitution attack on options-risk's own slice of the x-axis
-- **§8** the exported verifier in an EVM: **274,238 gas** to accept, **573** to refuse (one sample — see
-  `probe-plonk-gas-variance`; the measured Plonk spread is 1.22%, so a smaller marginal would be noise)
+- **§8** the exported verifier in an EVM: **274,238 gas** to accept, **573** to refuse — the figures in
+  `zk/build/gateB7-7-optionsrisk-greeks.json`, which is the artifact every number on this page was read
+  off. A **second** run of the same gate returned **273,406**, a spread of **0.303%**, inside the 1.22%
+  `probe-plonk-gas-variance` measured for Plonk on this host. Both runs passed all 44 checks and every
+  *derived* quantity — envelope, sweep, refusal rate — was bit-identical; only gas and wall time moved.
+  So the gas figure is one sample and is labelled as one, and a marginal smaller than ~3,500 gas would
+  be noise rather than a result. The artifact was restored to the run this page quotes rather than left
+  disagreeing with it by 832 gas, because four earlier reports on this project had gas figures that
+  disagreed with their own artifacts, and the cause every time was two numbers from two runs.
 - **§9** both surfaces call the same builder
 
 ### The negative-x branch had never been exercised

@@ -27,8 +27,8 @@ produced more defects than it closed, which is the outcome to expect from an hon
 | 2 | 12 of 13 observation services ship `selfChecks: []` while the summary copy promises a proof on every answer | **open** — envelopes honest, copy overreaches |
 | 3 | `portfolio_gate` sealed an undisclosed live venue read inside a `deterministic: true` proof | **fixed** 29 Jul, both surfaces |
 | 4 | 18 of 21 circuits have no private input; on the paid path a proof costs 134× the same predicate in Solidity | **open**, not scheduled — needs a different circuit |
-| 5 | `lp-risk`'s boundedness self-check fails on a live call, and the paid path reports "input rejected by engine" | **open — NOT being fixed.** Needs `src/engine/`; Tristan's decision |
-| 6 | the served note calls the leading-order divergence a diverging approximation; it is that expectation's logarithm | **open**, same freeze as §5 |
+| 5 | `lp-risk`'s boundedness self-check fails on a live call, and the paid path reports "input rejected by engine" | **fixed** 30 Jul **outside `src/engine/`** — hash unmoved, not yet deployed; one residual band 5.2149e-4 wide disclosed |
+| 6 | the served note calls the leading-order divergence a diverging approximation; it is that expectation's logarithm | **open** — and unlike §5 it cannot be fixed outside the hashed tree |
 | 7 | `gateB6` passed "the contract picks the right leg" while ranking by liquidation price, against its own copy of that rule | **fixed** 30 Jul — the claim was deleted, not the ranking changed |
 | 8 | `gate-clone-portability` listed 14 of 21 circuits and missed `liquidation`, which the published mirror does not carry | **gate fixed** 30 Jul; **the 5 missing artifacts are still missing** |
 | 9 | every gas figure in the four Phase B reports disagreed with its artifact, and every disagreement was inside the noise | **fixed** 30 Jul, and the checker now reads gas |
@@ -501,11 +501,15 @@ and it was still being repeated as a reason to act on the conclusion.
 
 ## 5. `lp-risk`'s own boundedness self-check fails on an ordinary live call, and the paid path tells the buyer their input was rejected
 
-**Status: OPEN, and this one is NOT being fixed here.** The check is inside `src/engine/lpRisk.js`, the
-directory the build hash `q1-e1fa99d08887d6cc` is taken over, and that hash must not move while judging
-runs. Every other defect on this page was closed outside the hashed tree or is a document; this one
-cannot be. **It is Tristan's decision, not an agent's**, and it is disclosed here rather than deferred
-quietly.
+**Status: FIXED in this checkout, 30 July 2026 — and fixed OUTSIDE `src/engine/`, so the build hash
+`q1-e1fa99d08887d6cc` did not move.** The sentence below this line, in the entry as it stood that
+morning, said the fix needed the hashed tree and could not be done. That was wrong, and the reason it
+was wrong is worth more than the fix: the entry asked whether the un-rounded value is *published* (it is
+not — `eIlExact` is a local variable) and stopped there, when the question was whether anything
+published lets a reader **recompute** it. §6 below is the answer, sitting on the next page of this same
+register: `E[IL] = exp(-sigma^2*T/8) - 1` exactly, and `sigma`/`horizonPeriods` are echoed in every
+envelope. The verdict is now re-evaluated on that exact fraction in `src/util/lpBoundedness.js`.
+**NOT YET DEPLOYED — the live service still answers the old way while deploys are frozen for judging.**
 
 **What is wrong.** The check ranges over the **rounded display value** rather than the quantity:
 
@@ -548,9 +552,68 @@ delivered. The seller loses the fee; the buyer is told something false about the
 envelope's `allSelfChecksPass: false` invites a reviewer to conclude the arithmetic is broken, which it
 is not.
 
-**The one-line shape of the fix, for whoever owns the next engine change.** Evaluate the check on the
-unrounded fraction rather than on the served percentage. It is one expression, it moves the build hash,
-and it needs the four documents that quote the hash re-published with it.
+**The one-line shape of the fix, as this entry predicted it.** Evaluate the check on the unrounded
+fraction rather than on the served percentage. That half was right. "It moves the build hash" was not:
+it moves the build hash *if you edit the engine*, and nothing forces that.
+
+**What was actually built, 30 July 2026 — `src/util/lpBoundedness.js`, and it is not one expression.**
+The check is re-evaluated after the engine returns and before the envelope is built, on the same three
+echoed inputs the engine used. Four things had to be true and each was measured:
+
+- **The exact fraction is recomputable from the response.** `E[IL](v) = exp(-v/8) - 1` with
+  `v = sigma^2*T`. Verified against a quadrature that does NOT share the engine's `|z| <= 6` window —
+  `|z| <= 12`, N = 6000 — worst disagreement **6.88338e-15** at `v = 1.19809e-4` over 401 log-spaced `v`
+  in [1e-6, 250], printed by `npm run gate:lb`. The same comparison at the engine's own window gives
+  **1.41910e-9** (and **1.41912e-9** at `v = 1.12564` over a wider 20,001-point sweep of [1e-8, 1e4]),
+  six orders larger: that is the truncation floor §6 describes, not an error in the closed form.
+- **The strict inequality has to be asked in L-form.** Recomputing `E[IL]` and testing `> -1`
+  reproduces this very defect one digit lower: at `v = 300`, `exp(-v/8)` is 5.18e-17 and
+  `exp(-v/8) - 1` is exactly `-1` in doubles. So the test is carried out on `L = 1 + E[IL] = exp(-v/8)`
+  and never on `L - 1`. Measured: the engine's check flips at `v = 116.06874041832731`, this one does
+  not flip until `v > 5961.07`, **51× further out**.
+- **It is one-way and fail-closed.** A check whose `pass` is not literally `false` is never touched, so
+  nothing that passes today can start failing. A failing one is overridden only when the exact fraction
+  is inside the interval **and** the recomputation reproduces the 4-dp figure the response published.
+  The second condition is what keeps the check able to fail: fed the -135% headline of §C in
+  `liveAdversarial.test.mjs`, or the -200% amplified figure of `judgeRound2.test.mjs`, or a positive
+  expected divergence, the override is withheld and the check stays red.
+- **The failure that remains is real.** Past `v ~ 5961.07`, `exp(-v/8)` underflows to zero, the
+  engine's own quadrature has itself saturated to exactly `-1` (measured: from `v = 266.25`), and the
+  served `-100%` **is** the boundary rather than a rounding of something inside it. Nothing certifies
+  it. `{volatility: 100, horizonPeriods: 1}` still ships `allSelfChecksPass: false` and is still not
+  billed, and so does a non-finite variance.
+
+**The residual gap, which is not fixed.** For `v` in
+(**116.06874041832731**, **116.06926190819375**) the engine's quadrature rounds to `-100` while the
+closed form rounds to `-99.9999`, so the digits disagree, the override is withheld, and the false
+failure is **retained** — a band **5.2149e-4** wide in total variance, 1.3e-6 wide in sigma at T = 365.
+Its upper end is exactly the `-8*ln(5e-7)` this entry recorded as an unconfirmed prediction; it is now
+the confirmed edge of a disclosed gap. 52 sweep points sit inside it and gate LB asserts that all 52
+still fail, so the disclosure cannot go stale without going red.
+
+**What it costs, stated because it is caller-visible.** `selfChecks` is inside the contentHash preimage,
+so correcting a `pass` moves the hash of exactly the calls that were publishing a false failure —
+**741 of 1142** points on gate LB's sweep, and no others (asserted as an equality, not a containment).
+The two pinned `lp-risk` fixtures and the Appendix C exhibit `8575ce5a…` are byte-identical. And for a
+moved call, re-running `src/engine/lpRisk.js` alone no longer reproduces the response: the corrected
+check says so in its own `reEvaluated.reproduce`, a sentence naming the util module is appended to
+`proof.reproduce`, and the SDK's `reproduce()` applies the same step so it does not answer
+`reproduced: false` on an honest high-volatility response.
+
+**Where it is asserted.** `gates/gateLB-lp-boundedness.mjs` (`npm run gate:lb`) — 12 checks over 1,142
+calls across the flip point, the engine-saturation region and the underflow edge, with the closed form
+restated rather than imported. `npm run gate:lb-revert` puts the rounded-field comparison back, puts the
+subtraction back, drops the fail-closed guard, and unwires the free surface, and requires the gate to go
+red naming the case each time.
+
+**A second instance of the same class, found by sweeping for it and also fixed.** `realizedIL`'s
+boundedness check has the identical shape and the identical defect: at `priceRatio <= 6.2499999975846693e-14`
+(and symmetrically at `>= 1.6e13`) `round(IL*100, 4)` is exactly `-100` and the check fails on a value
+whose exact `L = 2*sqrt(r)/(1+r)` is 2.0e-7. Both flips are where the closed form says they are —
+`2*sqrt(r) = 5e-7` gives `r = 6.25e-14`. It is corrected by the same one-way rule. Unlike the divergence
+half, this conjunct **cannot fail on any reachable input**: `2*sqrt(r)/(1+r) > 0` for every representable
+`r > 0`, so what keeps that check honest is the fail-closed digit guard and not the range test. Said
+plainly rather than left for a reader to discover.
 
 **A prediction this page is not making.** The closed form of the expectation (see §6) puts the flip at
 `−8·ln(5e-7)` = **116.06926190819375**, which is **5.2e-4 away** from the measured 116.06874041832731 —
@@ -562,7 +625,12 @@ here as an unconfirmed one.
 
 ## 6. The engine's served note calls the leading-order expected divergence a diverging approximation. It is that expectation's logarithm.
 
-**Status: OPEN, same freeze as §5, same decision.** A served-text defect, in the engine.
+**Status: OPEN, and — unlike §5 — this one really cannot be closed outside the hashed tree.** §5's
+verdict was a *derived* field, so it could be re-derived after the engine returned. This defect IS the
+served string `expectedDivergence.note`, which sits inside the contentHash preimage of every call that
+carries a volatility, including the pinned `lp-risk#1` fixture. Rewriting it from outside the engine
+would move those hashes to correct a sentence, which is a worse trade than the one §5 made. A
+served-text defect, in the engine, and it stays there until the hash is allowed to move.
 
 **What is wrong.** `expectedDivergence.note` reads, on every call:
 

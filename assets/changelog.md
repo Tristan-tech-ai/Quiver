@@ -12,6 +12,71 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — a high-volatility `lp-risk` call no longer ships a failed self-check over a correct answer
+
+**What a caller sees change.** Ask `lp-risk` about an LP position in a 62%-per-period-volatility asset
+held for a year and the answer is unchanged to the digit — `expectedIlPct: -100` — but the envelope now
+reports `allSelfChecksPass: true` instead of `false`, and the paid path settles instead of replying
+`status: "not_charged", reason: "input rejected by engine"`. **The input was never rejected and the
+number was never wrong.** The engine's boundedness self-check asserts that its reported divergence lies
+in `(-100%, 0]` and was evaluating that on its own 4-decimal display value: once the expectation reaches
+`-0.9999995` the display is exactly `-100`, and `-100 > -100` is false. The full-precision expectation
+there is **-0.9999999758323288**, strictly inside the interval the check demands. Measured: at
+T = 365 periods the first total variance that flips it is **116.06874041832731**, so every
+high-volatility LP question above that line shipped this way. It was §5 of the defect register, where it
+was disclosed as unfixable because the check lives in the directory the build hash is taken over.
+
+**It was fixable without touching that directory, and the miss is the interesting part.** The register
+asked whether the un-rounded value is *published* — it is not, it is a local variable — and stopped. The
+question it should have asked is whether anything published lets a caller **recompute** it. Something
+does, and it was already written down on the next page of the same register: `E[IL] = exp(-sigma^2*T/8) - 1`
+exactly, with `volatility` and `horizonPeriods` echoed in every envelope. So the verdict is now
+re-evaluated on that exact fraction in `src/util/lpBoundedness.js`, after the engine returns.
+**The engine build hash is still `q1-e1fa99d08887d6cc`. Nothing in `src/engine/` was touched.**
+
+**The strict inequality is asked in L-form, and that is not a detail.** Recomputing `E[IL]` and testing
+`> -1` reproduces this very defect one digit lower down: at a total variance of 300, `exp(-v/8)` is
+5.18e-17 and `exp(-v/8) - 1` is exactly `-1` in IEEE-754 doubles. So the test is carried out on
+`L = 1 + E[IL] = exp(-v/8)`, which `Math.exp` returns directly, and never on `L - 1`. The engine's check
+flips at a total variance of 116.07; this one does not until **5961.07**, where `exp(-v/8)` underflows.
+
+**Which content hashes moved, exactly.** `selfChecks` is inside the contentHash preimage, so a corrected
+verdict moves the hash of the call it corrects — **741 of the 1,142 calls** on the new gate's sweep, and
+no others; the gate asserts that as an equality rather than a containment. Both pinned `lp-risk`
+fixtures — `e65cd458…` and `c3997db9…` — and the Appendix C exhibit `8575ce5a…` are byte-identical. For
+a moved call, re-running `src/engine/lpRisk.js` **alone** no longer reproduces the response, so the
+corrected check carries its own `reEvaluated.reproduce` naming the extra file, a sentence naming it is
+appended to `proof.reproduce`, and the SDK's `reproduce()` applies the same step — otherwise it would
+answer `reproduced: false` on an honest response, which is the one failure this SDK exists to prevent.
+
+**The correction is one-way and fail-closed, so it cannot invent a pass.** A check that is not already
+failing is never touched. A failing one is overridden only when the exact fraction is inside the interval
+**and** the recomputation reproduces the published 4-decimal figure. Fed the `-135%` divergence headline
+that a live adversarial session produced, the `-200%` amplified figure the old escape hatch shipped
+green, or a positive expected divergence, the override is withheld and the check stays red.
+
+**What still fails, and it is reachable rather than theoretical.** `{volatility: 100, horizonPeriods: 1}`
+gives a total variance of 10,000; `exp(-1250)` is zero in double precision; the engine's own quadrature
+has itself saturated to exactly `-1` (measured: from a total variance of **266.25**); and the served
+`-100%` **is** the boundary rather than a rounding of something inside it. That call still ships
+`allSelfChecksPass: false` and is still not billed. So does a non-finite variance.
+
+**One residual gap, disclosed rather than smoothed.** For a total variance between
+**116.06874041832731** and **116.06926190819375** the engine's quadrature and the closed form round to
+different 4-decimal figures — the truncation floor of the engine's own `|z| <= 6` window, worst
+**1.41910e-9** — so the guard withholds and the false failure is retained in a band **5.2149e-4** wide.
+Its upper end is exactly `-8*ln(5e-7)`. 52 sweep points sit inside it and the gate asserts all 52 still
+fail, so the disclosure cannot go stale without going red.
+
+The same defect in `realizedIL`'s sibling check — flipping at a price ratio of 6.25e-14, and at 1.6e13
+the other way — was found by sweeping for it and is corrected by the same rule.
+
+New: `npm run gate:lb` (12 checks over 1,142 calls, the closed form restated rather than imported) and
+`npm run gate:lb-revert` (four reverts: the rounded field back, the subtraction back, the fail-closed
+guard dropped, and the free surface unwired — all four red, each naming its case).
+
+---
+
 ## 30 July 2026 — `exec-verify` now serves a proof, and it is the first one whose sold number is a ratio
 
 Four of twenty-two services carry a succinct proof, up from three. `exec-verify` — the fair-fill and

@@ -1,0 +1,9 @@
+{
+  "note": "Stable summary of zk/build/adversary-repro.json, written by repro.mjs and COMMITTED so a clone can check the published figures without a three-minute rebuild. No timestamp and no path, so an unchanged run produces no diff. gates/gateZ2-repro-figures.mjs reads it.",
+  "pass": 62,
+  "fail": 0,
+  "skipped": 2,
+  "withoutLocalPtau": 55,
+  "bytePins": 9,
+  "section4Open": true
+}

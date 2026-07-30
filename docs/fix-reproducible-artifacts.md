@@ -94,9 +94,9 @@ step needs a download, write the fetch with a checksum assertion.**
 | artifact class | decision | reason |
 |---|---|---|
 | 37 `.circom` | **commit** — 245,992 B | text, and the only irreducible input. Six of them are generator output and are checked against a regeneration |
-| 42 probe/gate `.mjs` | **commit** — 264,688 B | text. These *are* the refutations |
+| 47 probe/gate `.mjs` | **commit** — 313,525 B | text. These *are* the refutations. Two of them, `figures.mjs` and `gateZ2-repro-figures.mjs`, check this document rather than a circuit |
 | 5 `probe*.json` from the original run | **commit** — 5,701 B | the original verdicts, for comparison against a re-run |
-| `MANIFEST.json`, `README.md` | **commit** — 16,091 B | the pins and the map |
+| `MANIFEST.json`, `README.md` | **commit** — 16,196 B | the pins and the map |
 | `.r1cs`, `.sym`, `.wasm` | **script** | deterministic circom output. 23.7 MiB regenerated in ~2 s per circuit |
 | Plonk `.zkey` on `hez_final_12` | **script**, sha256 pinned | deterministic; 18.9 MiB across the four, ~0.6 s each. Pinning the digest is a stronger check than committing the bytes |
 | Groth16 `.zkey` | **script**, not pinned | phase-2 contribution mixes entropy. And a single-contributor phase 2 is worthless as trust, so committing one would be committing a misleading artifact |
@@ -105,23 +105,49 @@ step needs a download, write the fetch with a checksum assertion.**
 | every other `.ptau` | **script** | see §5. 270 MiB more, and not byte-reproducible when generated |
 | `build/pot12_final.ptau` | **neither** | it is `hez_final_12.ptau` with a different name and the same sha256. Committing a byte-identical duplicate would be 4.58 MiB spent on nothing |
 
-**Total committed: 5,377,786 bytes (5.13 MiB) across 90 files**, read back out of `git ls-tree` rather
-than off the working tree — 576,098 bytes (562.6 KiB) of text in 89 files, plus the 4,801,688-byte
-ceremony file, plus 12 lines of `.gitattributes`.
+**Total committed: 5,383,102 bytes (5.13 MiB) across 92 files**, read out of `git ls-tree` at HEAD —
+581,414 bytes (567.8 KiB) of text in 91 files, plus the 4,801,688-byte ceremony file, plus 12 lines of
+`.gitattributes`. Every figure in this section is asserted by `npm run gate:z2`, which recomputes it
+from `git ls-tree` and goes red on a disagreement; the five ways it can go red are in `gate:z2-revert`.
 
+**This file is not one of the files counted, and that is a decision rather than an oversight.** The
+first version of this table counted itself: it published its own size as 35,251 bytes when the file was
+35,396, and the missing 145 bytes were the length of the edit that published the number. The same 145
+propagated into the text subtotal and the grand total, so three of the six figures here were wrong by
+exactly the act of writing them down. §3.1 states why the write-up is excluded rather than corrected,
+and why the two other honest resolutions are worse. Its size, if you want it:
+`git ls-tree -l HEAD -- docs/fix-reproducible-artifacts.md`.
+
+<!--figures:size-table-->
 | where | bytes | files |
 |---|---|---|
-| `zk/circuits/adv/` | 245,992 | 37 |
-| `zk/scripts/adversary/` | 286,480 | 49 |
-| `gates/gateZ-adversary-repro.mjs` | 2,138 | 1 |
-| `gates/gateZ-revert.mjs` | 2,288 | 1 |
-| `docs/fix-reproducible-artifacts.md` (this file) | 35,251 | 1 |
+| `zk/circuits/adv/` — the `.circom` pinned in `MANIFEST.json` | 245,992 | 37 |
+| `zk/scripts/adversary/` | 319,864 | 50 |
+| `gates/gateZ*.mjs` — the two gates and their two reverts | 15,558 | 4 |
 | `zk/build/hez_final_12.ptau` | **4,801,688** | 1 |
+| **total** | **5,383,102** | **92** |
 
-Against 726.8 MiB of derived binaries left out: the repository grows by **0.706%** of what the
-refutations produced, and **0.076%** if the ceremony file is excluded. No *source* file committed is
-over 25 KiB; the largest is `circuits/adv/ctl.circom` at 21,376 bytes, a generated constant table that
-`repro.mjs` regenerates and diffs.
+Two growth statements, each naming its own denominator, because the first version of this paragraph
+did not and was read as the other one.
+
+<!--figures:growth-repo-->Against the repository as it stood at `620c041^` (199,061,444 bytes in 654
+files), this work grows it by **2.70%**, or **0.29%** with the ceremony file excluded.
+
+<!--figures:growth-derived-->Against the 762,139,277 bytes (726.8 MiB) of derived binaries §2
+enumerates and this repository deliberately does not carry, what is committed is **0.706%** of it, or
+**0.076%** with the ceremony file excluded.
+
+The published figure used to be "the repository grows by 0.706%". That is the second ratio wearing the
+first one's sentence: 0.706% is committed bytes over *discarded artifacts*, and against the repository
+the same numerator is near four times larger. Both are worth knowing and neither substitutes for the
+other, so both are now stated with their denominators attached and both are asserted.
+
+No *source* file committed is over 25 KiB; the largest of the pinned circuits is
+`circuits/adv/ctl.circom` at 21,385 bytes, a generated constant table that `repro.mjs` regenerates and
+diffs. (This was published as 21,376. That file has been 21,385 bytes in every commit it appears in;
+21,376 is not a size it has ever had in this repository. `circuits/adv/ncdfonesided.circom` is larger
+at 21,759 bytes, and is *not* part of this set — it belongs to the options-risk work and no assertion
+here covers it, which is why the row above says "pinned in `MANIFEST.json`" rather than the directory.)
 
 `.gitattributes` gained `*.ptau *.zkey *.r1cs *.wasm *.sym *.wtns binary`. Measurement says the
 existing `text=auto` sniffing was already working — every committed `.zkey` and `.r1cs` comes out of a
@@ -138,6 +164,57 @@ Two things deliberately *not* committed and *not* scripted:
   unmeasured. They still are: measuring them needs a witness for a circuit with 246 private inputs and
   no encoder was ever written. `lp/expsetup.mjs` reproduces the three figures that *were* measured and
   says on its own last line that the other two are still unmeasured.
+
+### 3.1 A document that grows when it records its own size
+
+The table above measures a set of files. The first version of it put this file in that set, and so the
+number it published was a fixed point: measure, write the measurement down, and the writing changes
+what you measured. It came out 145 bytes low in three places, which is the length of the edit.
+
+It is worth being exact about how solvable that is, because "impossible" would be the easy answer and
+it is false. Replacing one six-digit number with another six-digit number is byte-neutral, so the
+fixed point was reachable in a single step: writing 35,396 where 35,251 stood would have left the file
+at 35,396 and the table correct. **The reason to reject that is not that it cannot be done — it is
+that it has to be done again on every subsequent edit to this document, forever, and no gate can help.**
+A gate would have to know the file's size *after* the edit that publishes it. That is a number no
+checker can obtain, so the figure would be back to living in prose with nothing able to contradict it,
+which is the condition that produced all five of the defects in this section.
+
+Three resolutions were available. The one taken is the first, and the reasons the other two are worse
+are specific rather than aesthetic.
+
+**Taken — measure the set with the write-up excluded, and name the exclusion.** The measured set is
+then a total function of the tree: `git ls-tree` at any commit answers it, editing this document cannot
+move it, and `gate:z2` can therefore recompute it and go red. The exclusion costs one figure, and that
+figure is recoverable with one command, printed above. The self-inclusion cannot creep back either: the
+checker matches every row of the table to a group it knows, and a row it does not recognise is a hard
+failure rather than an unchecked row — so re-adding a `docs/fix-reproducible-artifacts.md` row turns
+the gate red instead of turning it blind.
+
+**Rejected — measure the whole set, including this file, at a named commit.** Stable, and the fixed
+point genuinely dissolves: a past commit is immutable, so `5ca5137`'s copy of this file is 35,396 bytes
+and will be forever. Two things are wrong with it. First, it answers a question nobody asked — what the
+tree weighed at a commit the reader does not have — and it decays silently while remaining
+arithmetically true. Between `5ca5137` and the HEAD this was written against, `zk/circuits/adv/` gained
+a circuit (+21,759 bytes) that belongs to different work, and `zk/scripts/adversary/` gained the module
+that performs this very check; a figure pinned to `5ca5137` would still verify and would describe none
+of it. Second, and worse, it cannot be landed in one commit: stating the figure *as of the commit that
+states it* requires knowing the commit before it exists, so it needs either an amend — which this
+project forbids for commits you did not create, having once orphaned a circuit that way — or two
+commits, the first of which publishes a number that is wrong by construction.
+
+**Rejected — publish the figure as prose, "as of commit X".** The same decay as above, minus the only
+thing that makes a published number trustworthy here. A figure qualified in prose is a figure no gate
+can check, because the gate would have to be re-pointed at a new commit by hand each time, and a check
+that a human must re-aim is a check that goes stale between the two people who care about it. This is
+the shape the original 61 had: correct-looking, unqualified, and unfalsifiable from inside the tree.
+
+One asymmetry is worth naming, because it looks like the second option smuggled back in. The
+*repository-growth denominator* IS a named commit — `620c041^`, the commit before this work began.
+That is not the same choice: growth is a difference between two states, so one of its terms is
+necessarily a past event, and a past event is exactly what a commit hash is for. The quantity being
+divided is measured at HEAD; only the thing it is compared against is fixed, and it is fixed because it
+is history.
 
 ---
 
@@ -355,32 +432,49 @@ it was running the reproduction as a reader rather than as its author.
 ## 6. The gate, and proof that it can fail
 
 ```
-npm run gate:z              # 55 assertions in a clean directory, ~3 min
-npm run gate:z-revert       # four ways to break it
+npm run gate:z              # rebuild and re-assert everything, ~3 min
+npm run gate:z-revert       # five ways to break it
+npm run gate:z2             # the figures published above, against git ls-tree — seconds
+npm run gate:z2-revert      # five ways to break that
 ```
 
 `zk/scripts/adversary/repro.mjs` asserts three different kinds of claim and keeps them separate:
-source integrity (sha256 of 79 committed sources), byte reproducibility (8 pinned r1cs/zkey digests),
+source integrity (sha256 of 80 committed sources), byte reproducibility (8 pinned r1cs/zkey digests),
 and figures (constraint counts, domains, public-signal counts, and the Groth16 power arithmetic).
 
-Run against an empty `ADV_WORK`: **55 assertions, 55 pass, 0 fail** — 1 toolchain, 2 source, 1 generator,
-2 ceremony, 25 portfolio, 16 Plonk, 8 byte-identity. With a locally generated 2^13 also present, section 4
-opens and it is **61 assertions, 61 pass, 0 fail** with 9 byte-identity pins. Both numbers were measured in
-a **fresh clone** as well as in the working tree. `zk/build/adversary-repro.json` records every row.
+<!--figures:assertions-->Run against an empty `ADV_WORK`: **55 assertions, 55 pass, 0 fail** — 1
+toolchain, 2 source, 1 generator, 2 ceremony, 25 portfolio, 16 Plonk, 8 byte-identity. With a locally
+generated 2^13 also present, section 4 opens and adds seven more, for **62 assertions, 62 pass, 0 fail**
+with 9 byte-identity pins. Both numbers were measured in a **fresh clone** as well as in the working
+tree. `zk/build/adversary-repro.json` records every row, and
+`zk/build/adversary-repro-counts.json` — committed, timestamp-free, so an unchanged run leaves no diff
+— records the totals.
+
+**This paragraph said 61 for a day, and nothing could contradict it.** The artifact held 62 passing
+rows the whole time. The arithmetic that produced 61 is worth naming because it is not a typo: section 4
+contributes seven passing rows, and the seventh, `price40b .r1cs sha256 matches the pin`, was counted
+under "9 byte-identity pins" — where it is correct, being the ninth — and then not counted again in the
+total. One row, classified twice and tallied once. Section 5 of `repro.mjs` now compares the published
+figure against the counts of the run in progress, so `gate:z` itself goes red on a disagreement; the
+`row-count` revert below proves it. Those comparisons are deliberately *not* among the 62 — an
+assertion about how many rows there are must not be one of the rows, for the same reason §3.1 gives
+about a document that records its own size.
 
 It does **not** assert gas. Plonk verify gas has a measured 1.22–1.26% spread plus a 7,500-gas EIP-2929
 cold/warm gap, so an equality assertion on gas is a gate that goes red on noise. The probes print gas;
 this document states the spread beside every gas figure.
 
-Four independent reverts, each breaking one kind of assertion:
+Five independent reverts, each breaking one kind of assertion:
 
 ```
-  source-hash   exit   1 ·  1 red rows · the gate FAILED as required
-  plonk-bytes   exit   1 ·  1 red rows · the gate FAILED as required
-  counts        exit   1 ·  1 red rows · the gate FAILED as required
-  ptau-power    exit   1 ·  8 red rows · the gate FAILED as required
+  (unmodified)  exit   0 ·  0 red rows · green, so the reverts below mean something
+  source-hash   exit   1 ·  5 red rows · the gate FAILED as required
+  plonk-bytes   exit   1 ·  7 red rows · the gate FAILED as required
+  counts        exit   1 ·  5 red rows · the gate FAILED as required
+  ptau-power    exit   1 · 12 red rows · the gate FAILED as required
+  row-count     exit   1 ·  4 red rows · the gate FAILED as required
 
-GATE Z REVERT: PASSED — all four assertions are load-bearing
+GATE Z REVERT: PASSED — all 5 assertions are load-bearing
 ```
 
 `ptau-power` is the interesting one: it reads snarkjs's Groth16 power test with `Math.ceil` instead of
@@ -388,6 +482,45 @@ the floor snarkjs actually uses (`main.cjs:4427`). That is not a synthetic mutat
 error that put "2^14, ~18 MB" into a report where 2^13 was what the circuit needed, one clean power out.
 Eight rows go red, including `portfoliogate4` reading power 13 and therefore *not* fitting the file it
 demonstrably fits.
+
+### 6.1 The second gate: the numbers in this document
+
+`gate:z` checks circuits. Nothing checked *this document* until 30 July, and the five defects §3 and §6
+now record — a row count, three propagated 145-byte errors, a stale table row its own total
+contradicted, a size the file never had, and a percentage against an unstated denominator — all shipped
+while every gate in the tree was green.
+
+`gates/gateZ2-repro-figures.mjs` closes that. It is separate from `gate:z` and it is deliberately cheap:
+`gate:z` needs `circom`, a 4.58 MiB ceremony file, two `node_modules` trees and three minutes, which are
+the right requirements for rebuilding Groth16 and Plonk artifacts and the wrong ones for asking whether
+a number in a markdown table matches `git ls-tree`. It asserts, for **both** published copies of this
+document — the mirror's `docs/fix-reproducible-artifacts.md` and the submission's
+`FIX_REPRODUCIBLE_ARTIFACTS.md`, because the stale copy historically survives in the second:
+
+- the two assertion counts and the byte-identity pin count, against `adversary-repro-counts.json`;
+- every row of the §3 size table, against `git ls-tree` at HEAD, and that the total is the sum of the
+  rows shown — so a row cannot be added without being checked, and this file cannot be added back;
+- both growth percentages, each against its own named denominator;
+- that no measured file is dirty relative to HEAD, because a figure read from a commit describes that
+  commit and not a draft;
+- that every measured file also exists in the dev tree, byte-identical to its blob. This is the
+  discipline that has failed twice here — a module written into one tree, its importer committed, and
+  the module never copied, once leaving a HEAD that could not start — and it is checked by comparing
+  bytes rather than by grepping for the import, which is what produced eight false positives the last
+  time it was attempted.
+
+Five reverts, one per shipped defect rather than one per line of code:
+
+```
+  (unmodified)        exit   0 ·  0 red rows · green, so the reverts below mean something
+  row-count           exit   1 ·  4 red rows · the gate FAILED as required
+  self-include        exit   1 · 10 red rows · the gate FAILED as required
+  stale-row           exit   1 · 12 red rows · the gate FAILED as required
+  derived-denominator exit   1 ·  2 red rows · the gate FAILED as required
+  mirror-drop         exit   1 ·  1 red rows · the gate FAILED as required
+
+GATE Z2 REVERT: PASSED — all 5 assertions are load-bearing
+```
 
 ---
 
@@ -478,7 +611,12 @@ existed. The sequence, in order:
 | + the ceremony file | **55 of 55 assertions pass**, all 8 byte-identity pins among them |
 | …but `portfolio/probe1` | **crashes** — the service tree's `node_modules` is missing, and probes 1–3 build witnesses through the service's own encoder, which reaches `ethers` |
 | + the service dependencies | `probe1` runs, and the gate goes **red on one row**: the manifest catching my own edit to `repro.mjs` made after the last manifest write |
-| fresh clone of `1761b7d`, all three supplied, a local 2^13 in the work directory | **61 of 61 pass**, **9 byte-identity pins**, `gate:z-revert` **red in all four modes** |
+| fresh clone of `1761b7d`, all three supplied, a local 2^13 in the work directory | **62 of 62 pass**, **9 byte-identity pins**, `gate:z-revert` red in all four modes it then had |
+
+That last row read "61 of 61" until 30 July. It was the same miscount §6 records, written down a second
+time: `repro.mjs` is byte-identical from `1761b7d` through the commit that published the figure, so the
+clone produced 62 passing rows on the day too. A wrong number copied into a second place is the reason
+`gate:z` now derives it instead of quoting it.
 
 Two of those five rows are defects this exercise created for itself and then found: the uncommitted
 ceremony file (now committed, §3/§5) and a gate that went green while three of the probes it claims to

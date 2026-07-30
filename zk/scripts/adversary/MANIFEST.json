@@ -77,6 +77,7 @@
     "scripts/adversary/exec/same-statement.mjs": "06e38583f7ede6f997bcbdde10d774aadcb5f92a9d1fe7c56713d44807cd196b",
     "scripts/adversary/exec/witness-window.mjs": "2ebe300e69a4f0f94a2ba35d1b0a89af90034e79d936a63622b623a998237eea",
     "scripts/adversary/facts.mjs": "e7b3d84fcf2033abc36635b4fb396a9453269bb68e3a1570b3f598114f77ce44",
+    "scripts/adversary/figures.mjs": "0f2926b2b38b85b280b60c2fe210b73a16ca9024e84a5fa9918651fdb05e22c5",
     "scripts/adversary/gas-regress.mjs": "ad43d08c96af8170d19114463015ade427aae657bc740d0eeb2bf0229037b490",
     "scripts/adversary/indep-facts.mjs": "b86f29b2bef07fcd523c92decb4795248cb73058c7ff25507d9e2c3882c8baaf",
     "scripts/adversary/lp/b100.mjs": "a691bf8764b333397fc6216c6863760a5c065864df7fc29eb61d0c57d74a6c96",
@@ -111,6 +112,6 @@
     "scripts/adversary/portfolio/probe5-plonk-parity.mjs": "db8a5b9132a1bc366e56e6df9218bb99cc2b98d4fb0b29aa69ddf9f16ee5ee5c",
     "scripts/adversary/ptau.mjs": "546a1a53ebb82b6e6142f9f75a2163d4b2c9d4a64432cadc0a33793e9fa64298",
     "scripts/adversary/r1cs-probe.mjs": "d2a65858778e7f7b2c571c27c1dc883346e86ff6bfcb4a87cd61150de22a0710",
-    "scripts/adversary/repro.mjs": "60b4c97aa765fc2340eb964d31f54c4a6c14aa2bdb75dcfbe82742aa9f19f1c1"
+    "scripts/adversary/repro.mjs": "bb337c9dd845cdf92752886b90e075237ce29fdb2876b55488064e1274810536"
   }
 }

@@ -42,6 +42,7 @@ const REVERT_MODES = {
   'plonk-bytes': 'hash the wrong zkey, as a stale artifact on disk would',
   'counts': 'assert the constraint count the INVESTIGATORS believed instead of the measured one',
   'ptau-power': 'read the Groth16 power test with Math.ceil, the off-by-one that cost one clean power',
+  'row-count': 'report one fewer passing row than this run produced — the 61-against-62 defect',
 };
 if (REVERT && !REVERT_MODES[REVERT]) {
   console.error(`unknown ADV_REPRO_REVERT=${REVERT}. modes:`);
@@ -320,5 +321,81 @@ writeFileSync(outFile, JSON.stringify({
   rows,
 }, null, 2) + '\n', 'utf8');
 console.log(`\n  artifact: ${path.relative(P.ZK, outFile)}`);
+
+// =================================================================================================
+// 5. DOES THE DOCUMENT THAT REPORTS THIS GATE AGREE WITH THIS GATE?
+// =================================================================================================
+// It did not. On 30 July 2026 `docs/fix-reproducible-artifacts.md` published "61 assertions, 61 pass"
+// while this file's own artifact held 62 passing rows, and every gate in the tree was green. Six rows
+// of section 4 were counted and the seventh — `price40b .r1cs sha256 matches the pin` — was tallied
+// under "9 byte-identity pins" and nowhere else.
+//
+// Two properties of this check are deliberate.
+//
+// It reads the counts from the run that just happened, NOT from the artifact file, so it cannot be
+// satisfied by a stale artifact agreeing with a stale document.
+//
+// Its own rows are NOT pushed into `rows`. An assertion about the number of rows must not be one of
+// the rows it counts — that is the same fixed point as a document recording its own size, and the
+// whole subject of the size table below it. `rows` therefore stays exactly "the refutation
+// assertions", which is what the published figure is a figure of.
+const counts = {
+  pass: rows.filter((r) => r.ok === true).length,
+  fail: rows.filter((r) => r.ok === false).length,
+  skipped: rows.filter((r) => r.ok === null).length,
+  // Sections 13 and 17 exist only when a ceremony file bigger than the committed 2^12 is present, so
+  // the narrower figure — the one a reader with a bare checkout reproduces — is the rest.
+  withoutLocalPtau: rows.filter((r) => r.ok !== null && r.section !== '13' && r.section !== '17').length,
+  bytePins: rows.filter((r) => r.ok === true && /sha256 matches the pin/.test(r.label)).length,
+  section4Open: rows.some((r) => r.section === '13' && r.ok !== null),
+};
+
+head('5. the published figures against these counts');
+const reproFails = fails;      // captured BEFORE section 5, so the summary-write guard below is about
+                               // the reproduction and not about whether the document agrees with it
+let figFails = 0;
+try {
+  const { checkFigures } = await import('./figures.mjs');
+  const res = checkFigures({ counts, revert: REVERT === 'row-count' ? 'row-count' : '', only: 'counts' });
+  for (const r of res.rows) {
+    console.log(`  ${r.label.padEnd(64)}${r.ok === null ? 'skipped' : r.ok ? 'ok' : '*** FAIL ***'}`);
+    console.log(`      ${r.value}`);
+  }
+  figFails = res.fails;
+} catch (e) {
+  console.log(`  *** FAIL *** ${e.message}`);
+  figFails = 1;
+}
+fails += figFails;
+
+// The committed summary. It carries no timestamp and no path, so it is byte-stable across runs and a
+// re-run that changes nothing produces no diff — which is what makes committing it honest.
+//
+// A PARTIAL run does not overwrite it. Without a local 2^13 there are no section-4 rows, so a summary
+// written from such a run would turn gate Z2's with-2^13 assertion into a skip. Replacing a complete
+// record with an incomplete one, silently, is how a verifier stops being able to fail.
+//
+// Nor does a run whose own assertions failed. The summary is the record the published figures are
+// checked against; letting a red run replace it would let a broken build move the baseline it is
+// measured by. Section 5's own result is deliberately NOT part of that guard — you have to be able to
+// regenerate the summary in order to fix a document that disagrees with it.
+const sumFile = path.join(P.BUILD, 'adversary-repro-counts.json');
+if (REVERT) {
+  console.log(`\n  summary NOT written: this was a revert run (${REVERT})`);
+} else if (reproFails > 0) {
+  console.log(`\n  summary NOT written: ${reproFails} of the reproduction's own assertions failed`);
+} else if (!counts.section4Open && existsSync(sumFile)) {
+  console.log(`\n  summary NOT overwritten: section 4 did not open, and ${path.basename(sumFile)} records a`
+    + ' complete run. Run `ptau.mjs make 13` first if you mean to regenerate it.');
+} else {
+  writeFileSync(sumFile, JSON.stringify({
+    note: 'Stable summary of zk/build/adversary-repro.json, written by repro.mjs and COMMITTED so a '
+      + 'clone can check the published figures without a three-minute rebuild. No timestamp and no '
+      + 'path, so an unchanged run produces no diff. gates/gateZ2-repro-figures.mjs reads it.',
+    ...counts,
+  }, null, 2) + '\n', 'utf8');
+  console.log(`\n  summary:  ${path.relative(P.ZK, sumFile)}`);
+}
+
 console.log(`  ${fails === 0 ? 'ADVERSARY REPRO: PASSED' : `ADVERSARY REPRO: FAILED (${fails})`}`);
 process.exit(fails === 0 ? 0 : 1);

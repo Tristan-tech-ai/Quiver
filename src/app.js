@@ -266,7 +266,7 @@ app.get('/proof/vk', (_req, res) => {
   res.set('cache-control', 'public, max-age=86400');
   res.json({
     protocol: 'plonk',
-    note: 'Verify with: snarkjs plonk verify <this> <publicSignals> <proof>. Plonk rather than Groth16 deliberately — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so a proof under it is forgeable by us. This key derives from the public Hermez powers-of-tau.',
+    note: 'Verify with the `verificationKey` FIELD of this document, not this document itself: the key is served wrapped beside this note, so handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <this URL> -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify vk.json <publicSignals> <proof>. Plonk rather than Groth16 deliberately — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so a proof under it is forgeable by us. This key derives from the public Hermez powers-of-tau.',
     verificationKey: vk,
   });
 });
@@ -296,7 +296,7 @@ app.get('/proof/vk/:circuit', (req, res) => {
   res.json({
     protocol: 'plonk',
     circuit: name,
-    note: 'Verify with: snarkjs plonk verify <this> <publicSignals> <proof>. Plonk rather than Groth16 deliberately — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so a proof under it is forgeable by us. This key derives from the public Hermez powers-of-tau.',
+    note: 'Verify with the `verificationKey` FIELD of this document, not this document itself: the key is served wrapped beside this note, so handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <this URL> -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify vk.json <publicSignals> <proof>. Plonk rather than Groth16 deliberately — the Groth16 circuit-specific ceremony had a single participant and it was our machine, so a proof under it is forgeable by us. This key derives from the public Hermez powers-of-tau.',
     verificationKey: vk,
   });
 });

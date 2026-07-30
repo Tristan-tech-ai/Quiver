@@ -12,6 +12,48 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — every deterministic service now serves a proof, and the instruction for checking one did not work
+
+**Seven of seven deterministic services emit a proof on the live container, up from three.** `exec-verify`,
+`event-vol`, `lp-risk` and `options-risk` were wired in the repository and had never been deployed. Measured
+from outside against the free MCP surface before and after: three carried a `snark` block, now seven do.
+`q1-e1fa99d08887d6cc` is unmoved, the service list is still 22 with 9 MCP tools, and the container answered
+every poll through the swap, so the darkness was **0 seconds**.
+
+**Then the deploy was tested as a buyer, and the instruction we publish for verifying a proof turned out not
+to work.** Every proof carries `verify: "snarkjs plonk verify <circuit>_vk.json publicSignals proof — the
+verification key is published at /proof/vk/<circuit>"`, and the key endpoint's own note said `Verify with:
+snarkjs plonk verify <this> <publicSignals> <proof>`. Both imply the endpoint returns a key. It returns the
+key **wrapped**, as `{protocol, circuit, note, verificationKey}`.
+
+So a reviewer who does exactly what the page says saves the response to a file, runs the command, and gets
+`TypeError: Cannot read properties of undefined (reading 'toUpperCase')` from inside snarkjs. The proof is
+fine. The instruction is not. Both were run to be sure: the wrapper crashes, and the same proof with the
+`verificationKey` field extracted returns `PLONK VERIFIER STARTED / OK!`.
+
+**The wording now names the field and gives a command that runs.** Seven `verify` strings and two endpoint
+notes were rewritten. The command deliberately uses `node` rather than `jq`: `jq` is not installed on this
+machine and is not guaranteed on a reviewer's, while anyone who can run `snarkjs` already has Node, and
+publishing a command that needs a tool the reader may not have is a milder version of the same defect. The
+new text was then followed verbatim against the live service, with nothing from this repository: `curl` the
+endpoint, run the published one-liner, run the published verify command, `OK!`.
+
+**None of this moves a hash.** The `snark` block is named in `proof.excludedFromContentHash`, and it was
+measured rather than assumed: the same call with and without `snark: true` returns contentHash
+`ea18edac…` both times. The strings live in `src/app.js` and `src/util/snark.js`, both outside `src/engine/`.
+
+**Preflight gained three checks and is now 34.** They assert the shape the endpoint actually serves and that
+every instruction about to ship names the field to extract, counted as 2 of 2 notes and 7 of 7 verify
+strings. The check reads what is about to ship rather than what is live, because a check that asserted the
+live wording would block the only deploy able to satisfy it, which is a gate that cannot pass rather than
+one that cannot fail.
+
+**One thing went wrong on the way and is worth recording.** The first rewrite inserted a `node -e
+"require('fs')…"` one-liner into a single-quoted JavaScript string, so the inner apostrophes closed the
+literal and `src/util/snark.js` stopped parsing. Nothing shipped: the module was restored from the mirror,
+the rewrite was redone with the apostrophes escaped, and it now import-checks both files before writing
+anything back.
+
 ## 30 July 2026 — the flagship circuit is now rebuildable from a clone, and four published counts were stale within a day
 
 **Nothing a caller sees changes.** `q1-e1fa99d08887d6cc` is unmoved and no contentHash moves. This is about

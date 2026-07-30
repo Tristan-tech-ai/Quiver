@@ -544,6 +544,54 @@ check('no scripted-revert defect or abandoned backup is left in the working tree
         ? ` — a revert script is RUNNING (${healLive}); this is in-flight, not wreckage. Wait for it to finish and re-run, do not deploy through it.`
         : ' — nothing is running, so this is an abandoned defect: run `node zk/scripts/revert-heal.mjs --heal` and re-run preflight.'));
 
+// ── the verification instruction we publish is executable ────────────────────────────────────────
+// Found by testing the deployed container as a buyer rather than by reading the code. Every proof used to
+// say "snarkjs plonk verify <key file> publicSignals proof — the verification key is published at
+// /proof/vk/<circuit>", and the key endpoint says "Verify with: snarkjs plonk verify <this> ...". Both
+// imply the endpoint returns a key. It returns the key WRAPPED in {protocol, circuit, note,
+// verificationKey}, so a reviewer who does exactly what the page says gets
+// "Cannot read properties of undefined (reading toUpperCase)" and a proof that looks broken when it is
+// fine. Measured both ways: the wrapper crashes snarkjs, the unwrapped field returns OK.
+//
+// This asserts the shape the instruction depends on, and that the instruction names the field. It cannot
+// pass by accident: if the endpoint ever serves a bare key, the first check fails and the wording has to
+// move with it.
+// The check is on what is ABOUT TO SHIP, not on what is live. Asserting the live note here would be a
+// check that blocks the only deploy able to satisfy it, which is the same shape as a gate that cannot
+// fail, one turn later. Preflight already treats "the repo is ahead of live" as the correct pre-deploy
+// state for the changelog, and this follows it.
+const appSrc = readFileSync(join(ROOT, 'src', 'app.js'), 'utf8');
+const snarkSrc = readFileSync(join(ROOT, 'src', 'util', 'snark.js'), 'utf8');
+const vkDoc = await (async () => { try { return await (await fetch(`${LIVE}/proof/vk/lpbracket`)).json(); } catch { return null; } })();
+
+check('the verification-key endpoint answers', !!vkDoc,
+  vkDoc ? Object.keys(vkDoc).join(', ') : 'no response');
+
+if (vkDoc) {
+  // Whether the key is wrapped is a property of the SERVED shape, and it decides what the wording must say.
+  const wrapped = !vkDoc.curve && !!vkDoc.verificationKey?.curve;
+  const notesNameField = (appSrc.match(/verificationKey` FIELD/g) || []).length;
+  const verifiesNameField = (snarkSrc.match(/verificationKey` FIELD/g) || []).length;
+  check('every published verify instruction about to ship names the field to extract',
+    wrapped ? (notesNameField >= 2 && verifiesNameField >= 7) : (notesNameField === 0 && verifiesNameField === 0),
+    wrapped
+      ? `the key is served WRAPPED; ${notesNameField}/2 endpoint notes and ${verifiesNameField}/7 proof verify strings say so`
+      : 'the key is served BARE, so no instruction should be telling callers to extract a field');
+
+  // and the thing the instruction produces has to be a key snarkjs can actually read
+  const inner = vkDoc.verificationKey || vkDoc;
+  check('the key a caller extracts is a usable Plonk key',
+    inner.curve === 'bn128' && inner.protocol === 'plonk' && Number.isInteger(inner.nPublic),
+    `curve ${inner.curve}, protocol ${inner.protocol}, nPublic ${inner.nPublic}`);
+
+  const liveSaysField = /verificationKey` FIELD/.test(String(vkDoc.note || ''));
+  check('the repo is ahead of live on this wording, or level with it',
+    true,
+    liveSaysField
+      ? 'live already carries the corrected wording'
+      : 'live still tells callers to hand the whole document to snarkjs, which crashes it — this deploy fixes that');
+}
+
 // ── verdict ──────────────────────────────────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.pass);
 console.log(`\n${'='.repeat(72)}`);

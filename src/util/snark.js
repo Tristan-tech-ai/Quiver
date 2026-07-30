@@ -515,7 +515,7 @@ async function buildOnce(contentHash, echoedInputs, liquidationPrice, provenance
       // grid divergence itself is below 1e-9 (see util/grid.js). Published so a verifier can see
       // exactly which number the proof is about.
       gapToServedPrice: w.gapToServed,
-      verify: 'snarkjs plonk verify vk_plonk.json publicSignals proof — the verification key is published at /proof/vk',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'vk_plonk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify vk_plonk.json publicSignals proof',
       // Spread, not assigned, so a record whose inputs were all supplied by the caller is byte-for-byte
       // what it was before this field existed. Every published proof keeps reproducing on that basis.
       ...(provenance ? { provenance } : {}),
@@ -773,7 +773,7 @@ async function buildKellyOnce(contentHash, echoedInputs, servedFullKelly) {
       // a price, and a reader parsing a field called "price" off a Kelly proof would be being lied to
       // by the schema.
       gapToServedFraction: w.gapToServed,
-      verify: 'snarkjs plonk verify kelly_vk.json publicSignals proof — the verification key is published at /proof/vk/kelly',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk/kelly, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk/kelly -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'kelly_vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify kelly_vk.json publicSignals proof',
     });
   })
     .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
@@ -995,7 +995,7 @@ async function buildConcentrationOnce(contentHash, echoedInputs, result) {
         groups: String(w.encoded.groups), paddedLanes: String(w.encoded.padded),
       },
       gapToServedIndex: w.gapToServed,
-      verify: 'snarkjs plonk verify concentration_vk.json publicSignals proof — the verification key is published at /proof/vk/concentration',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk/concentration, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk/concentration -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'concentration_vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify concentration_vk.json publicSignals proof',
     });
   })
     .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
@@ -1336,7 +1336,7 @@ async function buildExecOnce(contentHash, echoedInputs, result) {
       // "gapToServed": one is a ratio in basis points and the other is a quantity of output tokens.
       gapToServedBps: Math.abs(w.certifiedBps - Number(result.adverseExecutionBps)),
       gapToServedShortfallOut: Math.abs(w.certifiedShortfall - Number(result.adverseValueOut)),
-      verify: 'snarkjs plonk verify execadverse_vk.json publicSignals proof — the verification key is published at /proof/vk/execadverse',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk/execadverse, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk/execadverse -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'execadverse_vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify execadverse_vk.json publicSignals proof',
     });
   })
     .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
@@ -1422,7 +1422,7 @@ async function buildNcdfOnce(contentHash, echoedInputs, result) {
       envelopeUsd: w.envelopeUsd,
       twoPointCollapseUlp: w.collapseUlp,
       reconstruct: 'straddleImpliedAbsMoveUsd = 2*spot*(2*nHat/2^40 - 1), with nHat the fifth public signal. The point x = xMag/2^40 is the fourth; check it against your own sigma and horizon by squaring: 4*x^2 = sigma^2*T.',
-      verify: 'snarkjs plonk verify ncdf_vk.json publicSignals proof — the verification key is published at /proof/vk/ncdf',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk/ncdf, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk/ncdf -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'ncdf_vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify ncdf_vk.json publicSignals proof',
     });
   })
     .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
@@ -1597,7 +1597,7 @@ async function buildLpBracketOnce(contentHash, echoedInputs, result) {
       },
       straddleMarginGridSteps: { lo: w.straddleMarginLo, hi: w.straddleMarginHi },
       reconstruct: 'The public signals are [midResidual, widthSlack, sigResidual, sigTolerance, feeHat, loHat, hiHat, vStarHat, eLoHat, eHiHat, sigHat, horizonT, widthHat]. breakevenVolatility = sigHat/1e9; the total variance it is the root of is vStarHat/1e9; check the root by squaring: sigHat^2 * horizonT - vStarHat * 1e9 is the third signal and is bounded by the fourth.',
-      verify: 'snarkjs plonk verify lpbracket_vk.json publicSignals proof — the verification key is published at /proof/vk/lpbracket',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk/lpbracket, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk/lpbracket -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'lpbracket_vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify lpbracket_vk.json publicSignals proof',
     });
   })
     .catch((e2) => put(contentHash, { status: 'failed', error: String(e2 && e2.message || e2).slice(0, 200) }))
@@ -1683,7 +1683,7 @@ async function buildOptionsRiskNcdfOnce(contentHash, echoedInputs, result) {
       worstFractionOfEncodingBound: w.worstFractionOfEncodingBound,
       pointProven: w.point,
       reconstruct: 'With n = nHat/2^40 and p = pHat/2^40 the fifth and sixth public signals, and x = ±xMag/2^40 the third and fourth: delta = q·n (q·(n−1) for a put), gamma = q·p/(F·σ·√T), vega = q·F·p·√T/100, vanna = −q·p·d2/σ·0.01, volga = vega·d1·d2/σ·0.01, theta = −q·F·p·σ/(2·√T)/365, with d1 = x and d2 = x − σ·√T. Bind x to your own leg with ONE exponential: x is this leg\'s d1 iff K·exp(σ·√T·x − ½σ²T) = F.',
-      verify: 'snarkjs plonk verify ncdf_vk.json publicSignals proof — the verification key is published at /proof/vk/ncdf',
+      verify: 'The key is the `verificationKey` FIELD of /proof/vk/ncdf, not that document: the endpoint serves the key wrapped beside a note, and handing the whole response to snarkjs fails with "Cannot read properties of undefined (reading toUpperCase)". Extract it with the runtime snarkjs already needs — curl -s <host>/proof/vk/ncdf -o vkdoc.json && node -e "require(\'fs\').writeFileSync(\'ncdf_vk.json\',JSON.stringify(require(\'./vkdoc.json\').verificationKey))" && snarkjs plonk verify ncdf_vk.json publicSignals proof',
     });
   })
     .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))

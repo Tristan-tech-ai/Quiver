@@ -12,6 +12,29 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 31 July 2026 — all 22 services bought with real money on the rail that had been unpayable
+
+**Verification, not a change.** Immediately after the fix below shipped, every one of the 22 services was
+bought on the X Layer rail with real funds: fetch the 402, sign `accepts[0]` from a real wallet, replay with
+the `PAYMENT-SIGNATURE` header. No free MCP calls, so a pass here is a settled purchase rather than a free
+call wearing a paid label.
+
+The first one settled on chain in under five seconds, buyer `…1f9b` down 0.010000 USD₮0 and `payTo` up the
+same, and the answer's contentHash was byte-identical to the free MCP call for the same inputs.
+
+**Billing is exactly as advertised, and the reconciliation is worth writing down because it caught a
+mistake of ours rather than of the service.** Total spend across the sweep was **0.280000 USD₮0**. That
+looked like 28 charges for 22 calls until the prices were read rather than assumed: they are not flat.
+Fourteen services are 0.01, three are 0.02, three are 0.05 and two are 0.005. The fifteen calls that
+genuinely answered sum to exactly **0.280000** at their published prices.
+
+Which leaves the two cases that matter to anyone paying:
+
+- **A rejected request is not billed.** Six services returned 400 on our bodies. Measured in isolation on
+  `tape-pulse`: balance before 22.812323, after 22.812323, charged **0.000000**.
+- **A 200 carrying a refusal is not billed either.** `options-risk` answered 200 with `ok: false` and its
+  0.02 does not appear in the total, which is what makes the arithmetic come out exactly.
+
 ## 31 July 2026 — the X Layer rail could not be paid, because we told payers the wrong signing domain
 
 **This is the most serious thing found in this round, and it was on the primary rail.** X Layer is the chain

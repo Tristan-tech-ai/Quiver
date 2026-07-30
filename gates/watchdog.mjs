@@ -86,7 +86,11 @@ async function getMarkerPresent() {
   if (!getMarker) return null;
   try {
     const r = await fetch(`${LIVE}${getMarker.path}`);
-    if (!r.ok) return null;                 // unreachable is darkness, not a false marker
+    // ANY status carries a body worth reading, and the first version of this returned null unless r.ok.
+    // That made the most useful target unwatchable: a paid route answers 402, 402 is not `ok`, and the 402
+    // challenge is exactly where the payment fields live. It would have polled forever in silence, which is
+    // the same failure the hardcoded /build.proofStorage marker had. Darkness is a fetch that THROWS; a
+    // status code is an answer.
     return (await r.text()).includes(getMarker.needle);
   } catch { return null; }
 }

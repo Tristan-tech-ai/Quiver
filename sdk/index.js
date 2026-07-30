@@ -14,18 +14,24 @@ import { perpGate } from '../src/engine/perpGate.js';
 import { sizeGate } from '../src/engine/sizeGate.js';
 import { execVerify } from '../src/engine/execVerify.js';
 import { optionsRisk } from '../src/engine/optionsRisk.js';
-import { lpRisk } from '../src/engine/lpRisk.js';
 import { treasuryRisk } from '../src/engine/treasuryRisk.js';
 import { riskAttest, verifyInclusion } from '../src/engine/riskAttest.js';
 import { portfolioGate } from '../src/engine/portfolioGate.js';
 import { eventVol } from '../src/engine/eventVol.js';
 import { proofEnvelope, _internal } from '../src/engine/proof.js';
 import { enrichPerpInputs, enrichPortfolioLegs } from '../src/adapters/hyperliquid.js';
+// lp-risk is the one service whose served result is NOT `engine(inputs)` alone: its boundedness
+// self-check ranges over its own 4-dp display value and so reports a failure on a correct answer once
+// that value rounds to exactly -100. The verdict is re-evaluated on the exact fraction outside
+// src/engine (the build hash must not move), and `reproduce()` below has to apply the same step or it
+// would answer `reproduced: false` on an honest high-volatility response — the precise failure this
+// SDK exists to make impossible. See src/util/lpBoundedness.js.
+import { lpRiskChecked, lpRiskEnvelope } from '../src/util/lpBoundedness.js';
 
 // engine dispatch by service name — reproduce() re-runs the exact engine on proof.inputs.
 const ENGINES = {
   'perp-gate': perpGate, 'portfolio-gate': portfolioGate, 'size-gate': sizeGate, 'exec-verify': execVerify,
-  'options-risk': optionsRisk, 'lp-risk': lpRisk, 'treasury-risk': treasuryRisk, 'risk-attest': riskAttest, 'event-vol': eventVol,
+  'options-risk': optionsRisk, 'lp-risk': lpRiskChecked, 'treasury-risk': treasuryRisk, 'risk-attest': riskAttest, 'event-vol': eventVol,
 };
 
 export function createRiskBrain({ mode = 'local', baseUrl = 'https://quiver-production-c3a8.up.railway.app', version = 'sdk', fetchImpl } = {}) {
@@ -43,7 +49,7 @@ export function createRiskBrain({ mode = 'local', baseUrl = 'https://quiver-prod
     sizeGate(a) { return proofEnvelope('size-gate', a, sizeGate(a), V); },
     execVerify(a) { return proofEnvelope('exec-verify', a, execVerify(a), V); },
     optionsRisk(a) { return proofEnvelope('options-risk', a, optionsRisk(a), V); },
-    lpRisk(a) { return proofEnvelope('lp-risk', a, lpRisk(a), V); },
+    lpRisk(a) { return lpRiskEnvelope(a, V); },
     treasuryRisk(a) { return proofEnvelope('treasury-risk', a, treasuryRisk(a), V); },
     eventVol(a) { return proofEnvelope('event-vol', a, eventVol(a), V); },
     attest(a) { return proofEnvelope('risk-attest', a, riskAttest(a), V); },

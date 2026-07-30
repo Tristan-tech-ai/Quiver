@@ -117,12 +117,21 @@ console.log(`source repository: ${SOURCE}\nsource HEAD:       ${SOURCE_HEAD}\n`)
 console.log('BASELINE — a clean clone of that repository, nothing broken:');
 const clean = scratchClone(SOURCE);
 let base;
-try { base = await section4(clean.repo); } finally { /* kept until the end so the printout can be read */ }
+try { base = await section4(clean.repo); } finally { rmSync(clean.dir, { recursive: true, force: true }); }
 console.log(base.split('\n').map((l) => `  ${l}`).join('\n'));
-const baselineGreen = !base.includes('*** FAIL ***') && base.includes('[PASS] no file committed at HEAD imports');
-console.log(`\n  baseline is green: ${baselineGreen}\n`);
-rmSync(clean.dir, { recursive: true, force: true });
+const preExisting = base.split('\n').filter((l) => l.includes('*** FAIL ***')).map((l) => l.trim());
+console.log(`\n  baseline is green: ${preExisting.length === 0}\n`);
 
+// FALSIFIABILITY IS MEASURED DIFFERENTIALLY, not against a green baseline, and the difference matters.
+//
+// The first version of this harness required the baseline to be clean and reported FAILED when it was
+// not. That conflates two different statements — "the check responds to the mutation" and "the
+// repository is currently whole" — and it makes the harness useless exactly when it is most needed: on a
+// tree five sessions share, where somebody else's open defect would report that MY check cannot fail.
+// Worse, it lets a mutation pass on a failure it did not cause: with `npm run gate:mr` already published
+// and undefined, the third mutation below would have "gone red" whether or not deleting the gate:lb
+// aliases did anything at all. So a mutation counts only if it produces a named failure the baseline did
+// NOT have, and the baseline's own failures are reported separately as the repository's, not the check's.
 let allWentRed = true;
 for (const m of MUTATIONS) {
   console.log(`${'-'.repeat(100)}\nMUTATION: ${m.name}`);
@@ -134,16 +143,22 @@ for (const m of MUTATIONS) {
   } finally {
     rmSync(scratch.dir, { recursive: true, force: true });
   }
-  // Both halves matter: the right check has to go red AND it has to NAME the thing that broke, because a
-  // red gate that does not say what is wrong sends a reader to read the gate instead of the repository.
+  // Three things have to hold: the right check goes red, it NAMES the thing that broke — a red gate that
+  // does not say what is wrong sends a reader to read the gate instead of the repository — and at least
+  // one of those two statements is NEW, so the redness is attributable to this mutation.
   const red = m.expect.every((rx) => rx.test(out));
-  if (!red) allWentRed = false;
-  console.log(out.split('\n').filter((l) => /FAIL|imports|missing|not at HEAD|npm run|differ/.test(l)).slice(0, 6).map((l) => `  ${l}`).join('\n') || '  (no failure line at all)');
-  console.log(`\n  => went red and named it: ${red ? 'YES' : 'NO — THE CHECK CANNOT FAIL'}`);
+  const attributable = m.expect.some((rx) => !rx.test(base));
+  if (!(red && attributable)) allWentRed = false;
+  const introduced = out.split('\n').filter((l) => !base.includes(l.trim()) && /FAIL|imports |not at HEAD|npm run|differ/.test(l));
+  console.log((introduced.length ? introduced : ['(nothing the baseline did not already say)']).slice(0, 6).map((l) => `  ${l.trimEnd()}`).join('\n'));
+  console.log(`\n  => went red, named it, and the baseline did not already say so: ${red && attributable ? 'YES' : 'NO — THE CHECK CANNOT FAIL'}`);
 }
 
 console.log(`\n${'='.repeat(100)}`);
-console.log(`REVERT PROOF: ${baselineGreen && allWentRed
-  ? 'PASSED — section 4 is green against a clean clone and red, by name, for every commit above'
-  : 'FAILED — see above'}`);
-process.exit(baselineGreen && allWentRed ? 0 : 1);
+console.log(`FALSIFIABILITY: ${allWentRed
+  ? 'PASSED — every commit above makes section 4 red, by name, and the baseline did not already say it'
+  : 'FAILED — a mutation left the check green, or was indistinguishable from a defect the baseline already had'}`);
+console.log(preExisting.length
+  ? `BASELINE: ${preExisting.length} pre-existing failure(s) IN THE REPOSITORY, not introduced by this harness:\n  ${preExisting.join('\n  ')}`
+  : 'BASELINE: clean — section 4 is green against an untouched clone of this repository');
+process.exit(allWentRed && preExisting.length === 0 ? 0 : 1);

@@ -28,6 +28,25 @@
 //                             to every document. It is here to show the two checkers are complementary
 //                             rather than redundant — and that neither alone is enough.
 //
+//   7. THE PUBLISHED COUNT     §13's "of those, committed to the published repository" row is put back to
+//      PUT BACK TO ZERO        the `**0** — git ls-files zk/circuits returns 22 paths and none is under
+//                             adv/` it carried while 37 were committed. This is the row nineteen green
+//                             tests could not see, because every source gate N read was the WORKING tree
+//                             and committedness is not visible from there. `docs-consistency` MUST stay
+//                             silent: it has no idea what git tracks either.
+//   8. THE PROSE LEFT BEHIND   the row is left correct and the paragraph below it is reverted to "not
+//                             under version control at all". A count-only rule passes this — the count IS
+//                             right — and the page still contradicts itself on one screen, which is how §1
+//                             broke. Reverting only one side of a two-sided edit is the actual defect.
+//   9. THE INDEX ROW           §10's index row goes back to "open for 3 of 4" while three of the four are
+//                             wired. Thirteen index rows were checked by nothing at all until this pair.
+//  10. AN UNCOMMITTED ARTIFACT a `liquidation.r1cs` is written into `Quiver/zk/build` and NOT committed.
+//                             §8's original test reads that directory with `readdirSync` and would now
+//                             report the clone as complete; the added test asks HEAD and goes red. This is
+//                             the 29 July failure exactly — a file present to a directory listing and
+//                             present in no clone — and it is a file mutation rather than a text one, so
+//                             it is removed in the same `finally` and its absence is asserted at the end.
+//
 // Both copies of the register are mutated together, because gate N also checks that they are
 // byte-identical: mutating one would produce a red for the wrong reason, which is a demonstration of
 // nothing. Everything is restored from the bytes read at the start, in a `finally`, and the script
@@ -38,7 +57,7 @@
 // somewhere else is not this script's business. What is asserted is what the mutation adds.
 //
 // Run: npm run gate:n-revert
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -86,15 +105,46 @@ function mutate(find, replace) {
     writeFileSync(COPIES[i], s.replace(find, replace), 'utf8');
   }
 }
+/** As `mutate`, but addressed by the START of a line and replacing the whole line.
+ *
+ *  WHY THIS EXISTS. The rows worth reverting are the ones carrying MEASURED figures, and quoting a
+ *  measured figure inside this script would mean editing this file every time a circuit is added — and
+ *  then `mutate` would throw "the register has moved" on a page that had not moved at all. The line is
+ *  addressed by its stable left-hand cell and replaced entire, so the numbers stay out of here. */
+function mutateLine(prefix, replacement) {
+  for (let i = 0; i < COPIES.length; i++) {
+    const s = ORIGINAL[i].toString('utf8');
+    const lines = s.split('\n');
+    const hits = lines.map((L, n) => (L.startsWith(prefix) ? n : -1)).filter((n) => n >= 0);
+    if (hits.length !== 1) throw new Error(`revert: ${short(COPIES[i])} has ${hits.length} lines starting ${JSON.stringify(prefix.slice(0, 50))} — expected exactly one; the register has moved and this script is testing nothing`);
+    lines[hits[0]] = replacement;
+    writeFileSync(COPIES[i], lines.join('\n'), 'utf8');
+  }
+}
+
+// A file mutation rather than a text one: an artifact present to a directory listing and present in no
+// clone. Left over from a crashed run it would make the next baseline red for the wrong reason, so it is
+// cleared at startup as well as in the `finally`.
+const GHOST = join(ROOT, '..', '..', 'Quiver', 'zk', 'build', 'liquidation.r1cs');
+const GHOST_MARK = 'gateN-revert ghost artifact — not a circuit, safe to delete\n';
+function clearGhost() {
+  if (existsSync(GHOST) && readFileSync(GHOST, 'utf8') === GHOST_MARK) unlinkSync(GHOST);
+}
+clearGhost();
+if (existsSync(GHOST)) { console.error(`gate N revert: ${short(GHOST)} already exists and is not this script's — refusing to touch it`); process.exit(1); }
+
 function restore() {
   for (let i = 0; i < COPIES.length; i++) writeFileSync(COPIES[i], ORIGINAL[i]);
+  clearGhost();
 }
 
 const results = [];
-function step(name, { find, replace, expect, docsShould, gateShould = 'red' }) {
+function step(name, { find, replace, line, ghost, expect, docsShould, gateShould = 'red' }) {
   let red = false, out = '', docs = [];
   try {
-    mutate(find, replace);
+    if (line) mutateLine(line.prefix, line.replacement);
+    else if (ghost) writeFileSync(GHOST, GHOST_MARK, 'utf8');
+    else mutate(find, replace);
     ({ red, out } = gateN());
     if (docsShould !== undefined) docs = docsFindingsAboutRegister();
   } finally {
@@ -145,11 +195,17 @@ step('a deleted section makes gate N red, and docs-consistency does not notice',
   docsShould: 'silent',
 });
 
-// 2. the stale-disclosure direction.
-step('marking a live defect FIXED makes gate N red', {
-  find: '**Status: OPEN, and this one is NOT being fixed here.**',
-  replace: '**Status: FIXED, 30 July 2026.**',
-  expect: ['§5 is marked fixed and the self-check still fails'],
+// 2. the stale-disclosure direction. §5 was CLOSED on 30 July — outside `src/engine/`, which the entry
+// itself had said was impossible — so the reachable staleness reversed with it: the page can no longer
+// claim a fixed defect is live by being out of date, it can only claim a live defect is fixed by being
+// out of date. This step therefore reverts the status line to what it said that morning and requires
+// gate N to notice that the system now disagrees with it. Same property, opposite sign; the literal is
+// updated rather than the step deleted, because deleting it would remove the only check on the
+// direction the register itself calls "the worse of the two".
+step('a status line left OPEN over a defect that is now fixed makes gate N red', {
+  find: '**Status: FIXED in this checkout, 30 July 2026 — and fixed OUTSIDE `src/engine/`, so the build hash',
+  replace: '**Status: OPEN, and this one is NOT being fixed here.** The build hash',
+  expect: ['the envelope now reports allSelfChecksPass true at sigma 0.62 over 365 periods'],
 });
 
 // 3. a count quietly edited away from the artifacts.
@@ -183,10 +239,54 @@ step('misdirecting a gas citation is caught by docs-consistency, which gate N le
   gateShould: 'green',
 });
 
+// 7. THE ROW THIS GATE COULD NOT SEE. Put back verbatim: this is the cell as it stood while 37 of the 38
+// adversary sources were committed, and nineteen green rows had nothing to say about it. Gate N must now
+// name it, and `docs-consistency` must not — it does not ask git anything either, so the pair is the same
+// argument as mutations 1 and 5, one corpus wider.
+step('putting the published-circuit count back to zero makes gate N red, and docs-consistency does not notice', {
+  line: {
+    prefix: '| of those, **committed** to the published repository |',
+    replacement: '| of those, present in the published repository | **0** — `git ls-files zk/circuits` returns 22 paths and none is under `adv/` |',
+  },
+  expect: ["§13's row does not state those two figures", 'HEAD tracks'],
+  docsShould: 'silent',
+});
+
+// 8. THE HALF A COUNT CANNOT SEE. The row is left correct and the paragraph beneath it is reverted, which
+// is what actually happened: the cell was fixed and the prose two paragraphs down still said the sources
+// were in no repository at all. A rule that only compares numbers passes this.
+step('reverting the prose under a corrected row makes gate N red', {
+  find: 'So the sources survived the session that produced them **and are now under version control**.',
+  replace: 'So the sources survived the session that produced them and are still not in a repository. They sit in a working tree that is **not under version control at all**.',
+  expect: ['the row was corrected on one side only'],
+});
+
+// 9. THIRTEEN ROWS NOTHING READ. §10's index row goes back to the count it carried while three of its four
+// circuits were wired. The section's own table was right; the index was the copy no rule reached.
+step("putting §10's index row back to its stale count makes gate N red", {
+  line: {
+    prefix: '| 10 | of the four circuits built, proved, gated and swept this round',
+    replacement: '| 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 3 of 4** — `execadverse` wired 30 Jul |',
+  },
+  expect: ['its index row says'],
+});
+
+// 10. AND THE SWEEP'S OTHER HALF, which no edit to the page can demonstrate. An artifact appears in the
+// mirror and is never committed. §8's original test reads that directory and reports the clone complete;
+// the added test asks HEAD. Both go red here — the original for the wrong reason, which is the point: it
+// says "the mirror now carries every compiled circuit" about a tree no reviewer will ever receive.
+step('an uncommitted artifact in the mirror makes gate N red rather than green', {
+  ghost: true,
+  expect: ['in no clone'],
+});
+
 // Everything must be back, byte for byte. A revert that leaves the tree edited is worse than no revert.
 const restoredClean = COPIES.every((p, i) => readFileSync(p).equals(ORIGINAL[i]));
 console.log(`\n  [${restoredClean ? 'PASS' : '*** FAIL ***'}] every copy of the register is byte-identical to how it started`);
 results.push({ name: 'the register is restored', pass: restoredClean });
+const ghostGone = !existsSync(GHOST);
+console.log(`  [${ghostGone ? 'PASS' : '*** FAIL ***'}] the ghost artifact is gone from ${short(GHOST)}`);
+results.push({ name: 'the ghost artifact is removed', pass: ghostGone });
 
 // Mutation 6 deliberately does not require gate N to be red, so its row is scored on the docs half only.
 const failed = results.filter((r) => !r.pass);

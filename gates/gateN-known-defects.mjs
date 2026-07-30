@@ -4,8 +4,11 @@
 // morning of 30 July it held three entries while a four-service investigation and four adversarial
 // passes had produced ten more, four of them confirmed and one of them shipping in a live envelope.
 // Nothing could have caught that: no checker in this repository reads the register against the system
-// it describes. `docs-consistency.mjs` reads 229 documents and asks whether each sentence agrees with
-// the engine's build hash, the service count and the paper's shape — it has no idea what a defect is,
+// it describes. `docs-consistency.mjs` reads every `.md` and `.html` in the tree — 257 of them on 30 July,
+// a figure this comment deliberately does not pin because it moves whenever a document is added, and it
+// moved twice on 30 July alone (229 → 255 → 257, the last by the write-up of this very change) — and it
+// asks whether each sentence agrees with the engine's
+// build hash, the service count and the paper's shape — it has no idea what a defect is,
 // so a defect that is simply ABSENT from this page is invisible to it. That is the hole this gate
 // fills, and `gateN-revert.mjs` demonstrates the hole rather than asserting it.
 //
@@ -40,6 +43,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, existsSync, statSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -133,6 +137,48 @@ function r1csHeader(file) {
 }
 const CIRCUITS = Object.fromEntries(readdirSync(BUILD).filter((f) => f.endsWith('.r1cs'))
   .map((f) => [f.replace(/\.r1cs$/, ''), r1csHeader(join(BUILD, f))]));
+
+// ── THE PUBLISHED REPOSITORY, ASKED OF GIT RATHER THAN OF A DIRECTORY LISTING ────────────────────
+// This is the corpus hole that let §13 publish a wrong number nineteen green rows could not see. Every
+// source above is a filesystem read: `readdirSync`, `statSync`, `existsSync`, and the two trees they
+// resolve to are the WORKING trees. Committedness has no representation in any of them. So a row that
+// says "present in the published repository" was checked against nothing — not because the rule was
+// wrong, but because the quantity it publishes was not observable from anywhere this file could reach.
+// §13's row was consequently wrong twice: `0` when 37 were committed, then `37 of 38` written by the
+// commit that added the 38th file, measured before it was staged.
+//
+// Both errors understated what is published, and that direction is the one a working-tree reader is
+// structurally blind to: the tree always holds at least what HEAD holds, so a disk count can never
+// notice that HEAD has caught up.
+//
+// SO: git is asked, HEAD is the authority, and the answer is guarded against vacuity. A `git` that
+// errors, or a repository that reports zero tracked circuits, throws — because a query returning an
+// empty list would make every assertion below pass, which is the disease this file is organised
+// against. `ls-tree HEAD` and not `ls-files`: the index is not what a reviewer clones, and a circuit
+// surviving only in an index is a thing that has already happened here once.
+const GIT = (() => {
+  const candidates = [join(ROOT, '..', '..', 'Quiver'), ROOT, join(ZK, '..'), join(ROOT, '..')];
+  for (const cwd of candidates) {
+    if (!existsSync(cwd)) continue;
+    const top = spawnSync('git', ['-C', cwd, 'rev-parse', '--show-toplevel'], { encoding: 'utf8' });
+    if (top.status !== 0) continue;
+    const ls = spawnSync('git', ['-C', cwd, 'ls-tree', '-r', '--name-only', 'HEAD', 'zk/circuits'], { encoding: 'utf8' });
+    if (ls.status !== 0) continue;
+    const paths = ls.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+    if (!paths.length) continue;                      // a repo that tracks no circuits is not the one
+    return { cwd, top: top.stdout.trim(), paths };
+  }
+  throw new Error('gate N: no git repository reachable from this checkout tracks zk/circuits at HEAD, from any layout — §13 publishes a count of what is committed and this gate refuses to report a comparison it did not make');
+})();
+/** Paths under `zk/circuits` at HEAD, and the `adv/` subset. Non-vacuous by construction of GIT. */
+const COMMITTED = {
+  all: GIT.paths,
+  adv: GIT.paths.filter((p) => p.startsWith('zk/circuits/adv/')),
+};
+assert.ok(COMMITTED.adv.length > 0,
+  `git reports ${COMMITTED.all.length} tracked circuits and none under adv/ — if that is true the rescue was reverted, but it is far more likely this parse is wrong, and a zero here would make §13 pass on nothing`);
+/** Names tracked at HEAD under a directory, basename only. */
+const committedNames = (prefix) => COMMITTED.all.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -512,4 +558,114 @@ test('§13 the adversary artifacts are still absent, and their sources still unp
     const withKeys = readdirSync(adv).map((f) => f.replace(/\.circom$/, '')).filter((c) => existsSync(join(BUILD, `${c}_plonk.zkey`)));
     assert.deepEqual(withKeys, [], `these adversary circuits now have zkeys: ${withKeys.join(', ')} — §13 must be updated`);
   }
+});
+
+test('§13 the published-repository row is git at HEAD, not a directory listing', () => {
+  // THE ROW NINETEEN GREEN TESTS COULD NOT SEE. It publishes a count of what is COMMITTED, and every
+  // other source in this file is the working tree. Asked of git, both figures, and the row must state
+  // them. It has been wrong in this cell twice; the point of this test is that a third time is red.
+  const s = SECTIONS.get(13).body;
+  const total = COMMITTED.all.length;
+  const adv = COMMITTED.adv.length;
+
+  assert.ok(s.includes(`returns **${total}** paths, **${adv}** of them under \`adv/\``),
+    `HEAD tracks ${total} paths under zk/circuits and ${adv} of them are under adv/; §13's row does not state those two figures`);
+
+  // The ratio the row leads with, and it is a ratio of two things measured differently on purpose: the
+  // numerator is git, the denominator is disk. That is the comparison the row is actually making —
+  // "of the sources rescued onto disk, how many reached the repository" — so both sides are measured.
+  const advDir = join(ZK, 'circuits', 'adv');
+  assert.ok(existsSync(advDir), `${advDir} is gone — §13's first row counts files in it`);
+  const onDisk = readdirSync(advDir);
+  assert.ok(s.includes(`**${adv} of ${onDisk.length}**`),
+    `${adv} of the ${onDisk.length} files in zk/circuits/adv are committed at HEAD; §13's row does not say "${adv} of ${onDisk.length}"`);
+
+  // AND BY NAME, not only by count, because two counts can agree while the sets differ — a file
+  // committed and a different file added on disk in the same round nets to zero and hides both.
+  const committedAdv = committedNames('zk/circuits/adv/').sort();
+  const missing = onDisk.filter((f) => !committedAdv.includes(f)).sort();
+  const ghosts = committedAdv.filter((f) => !onDisk.includes(f)).sort();
+  assert.deepEqual(ghosts, [], `these are committed under adv/ and absent from the working tree: ${ghosts.join(', ')} — §13 describes the opposite direction and must be rewritten`);
+  for (const f of missing) {
+    assert.ok(s.includes(f), `${f} is in zk/circuits/adv on disk and NOT committed at HEAD, which is exactly this section's subject, and §13 does not name it`);
+  }
+
+  // THE SYMMETRIC HALF, which is the one that actually rotted: the row was corrected and the prose two
+  // paragraphs below it was not, so the page said "38 of 38 committed" and "not under version control at
+  // all" on the same screen. A one-sided edit to a disclosure is how §1 came to contradict itself, and a
+  // count-only rule cannot see it — the count was right and the page was still wrong.
+  if (adv > 0) {
+    for (const stale of [
+      'and are still not in a repository',
+      'not under version control at all',
+      '`zk/circuits/adv/` is not in it',
+    ]) {
+      assert.ok(!s.includes(stale),
+        `${adv} of the adversary sources ARE committed at HEAD and §13 still says "${stale}" — the row was corrected on one side only`);
+    }
+  }
+
+  // And the third quantity, so that "committed" is never read as "reproducible". Committed, compiled and
+  // has-a-proving-key are three states and this section published one number for all three.
+  const compiled = onDisk.map((f) => f.replace(/\.circom$/, '')).filter((c) => existsSync(join(BUILD, `${c}.r1cs`)));
+  assert.ok(s.includes(`| **${compiled.length} of ${onDisk.length}** |`),
+    `${compiled.length} of the ${onDisk.length} adversary sources have a compiled .r1cs in zk/build; §13 must publish that separately from the committed count`);
+});
+
+test('§8 the artifacts the clone is missing are missing from HEAD, not merely from a directory listing', () => {
+  // THE SAME SHAPE, ONE SECTION EARLIER, and it is the reason this is a sweep and not a spot-fix. The
+  // §8 test above reads `Quiver/zk/build` with `readdirSync` and calls the answer what "the clone needs".
+  // A clone gets HEAD. A file written into the mirror and never committed is present to `readdirSync`
+  // and absent from every clone — which is precisely the failure that shipped a `services.js` importing
+  // a module that was never copied, one directory over, on 29 July. The disk answer and the HEAD answer
+  // agree today; nothing was making them.
+  const mirror = join(ROOT, '..', '..', 'Quiver', 'zk', 'build');
+  if (!existsSync(mirror)) return;                       // a fresh clone has no sibling to compare
+  const ls = spawnSync('git', ['-C', GIT.cwd, 'ls-tree', '-r', '--name-only', 'HEAD', 'zk/build'], { encoding: 'utf8' });
+  assert.equal(ls.status, 0, 'git could not list zk/build at HEAD, so this test would report a clone comparison it did not make');
+  const headR1cs = ls.stdout.split('\n').map((s) => s.trim()).filter((p) => p.endsWith('.r1cs'))
+    .map((p) => p.split('/').pop().replace(/\.r1cs$/, ''));
+  assert.ok(headR1cs.length > 0, 'HEAD tracks no .r1cs under zk/build — a zero here would make the comparison below pass on nothing');
+
+  const onDisk = readdirSync(mirror).filter((f) => f.endsWith('.r1cs')).map((f) => f.replace(/\.r1cs$/, ''));
+  const absentFromClone = Object.keys(CIRCUITS).filter((c) => !headR1cs.includes(c)).sort();
+  const absentFromDisk = Object.keys(CIRCUITS).filter((c) => !onDisk.includes(c)).sort();
+
+  // The two answers must agree, and when they do not it is the mirror holding an uncommitted artifact —
+  // the direction that makes the sibling test above report a clone as working when it cannot.
+  assert.deepEqual(absentFromClone, absentFromDisk,
+    `the mirror's directory listing and its HEAD disagree about which circuits it carries: absent from HEAD [${absentFromClone}], absent from disk [${absentFromDisk}]. The extra files are present to readdirSync and in no clone, so §8's verdict is written against a tree no reviewer gets.`);
+  assert.deepEqual(absentFromClone, ['liquidation'],
+    `a clone of HEAD is missing [${absentFromClone}] — §8 says it is missing liquidation and only liquidation`);
+  assert.ok(isOpen(8), '§8 must be open while the flagship circuit is absent from a clone of HEAD');
+});
+
+test('★ the index table does not report a live defect as fixed', () => {
+  // THIRTEEN ROWS THAT NOTHING READ. Every status on this page exists twice — once in the index table at
+  // the top and once in the section's own `**Status:**` line — and until this test only the second copy
+  // was ever checked. That is how the §10 row sat at "open for 3 of 4" while three of the four were
+  // wired. The rule is deliberately one-directional: it fires when the index calls a section fixed and
+  // the section itself says open with no FIXED half. §2's status line carries neither word and §8's
+  // carries both, and inventing a two-sided rule those two must satisfy would mean rewriting prose to
+  // suit a checker — so the dangerous direction is held and the other is reported rather than asserted.
+  const rows = new Map([...REG.matchAll(/^\| (\d+) \| (.+?) \| (.+?) \|\s*$/gm)].map((m) => [Number(m[1]), m[3].trim()]));
+  assert.ok(rows.size >= SECTIONS.size, `the index lists ${rows.size} rows for ${SECTIONS.size} sections`);
+  for (const n of SECTIONS.keys()) {
+    const row = rows.get(n);
+    assert.ok(row, `§${n} has no row in the index table, so its status is published once and checked once`);
+    if (!isOpen(n)) continue;
+    if (/FIXED/.test(status(n).toUpperCase())) continue;   // §8: fixed gate, open consequence
+    assert.match(row, /open/i, `§${n}'s own status line says OPEN and the index row says "${row}" — the index is the first thing a reader sees`);
+  }
+});
+
+test('★ §10\'s index row states the number of circuits actually left unwired', () => {
+  // The concrete staleness the rule above cannot catch, because "open for 3 of 4" does say open. The
+  // count is read from the prover, so wiring the last one goes red here too.
+  const rows = new Map([...REG.matchAll(/^\| (\d+) \| (.+?) \| (.+?) \|\s*$/gm)].map((m) => [Number(m[1]), m[3].trim()]));
+  const table = [...SECTIONS.get(10).body.matchAll(/^\| `([a-z0-9]+)`[^|]*\| ([^|]+)\| ([^|]+)\|/gm)].map((m) => m[1]);
+  assert.ok(table.length >= 4, `§10's table parsed ${table.length} circuits; the four built this round are expected`);
+  const unwired = table.filter((c) => !WIRED.includes(c));
+  assert.ok(rows.get(10).includes(`${unwired.length} of ${table.length}`),
+    `${unwired.length} of §10's ${table.length} circuits are unwired (${unwired.join(', ') || 'none'}); its index row says "${rows.get(10)}"`);
 });

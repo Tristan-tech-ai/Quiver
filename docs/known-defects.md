@@ -32,16 +32,20 @@ produced more defects than it closed, which is the outcome to expect from an hon
 | 7 | `gateB6` passed "the contract picks the right leg" while ranking by liquidation price, against its own copy of that rule | **fixed** 30 Jul — the claim was deleted, not the ranking changed |
 | 8 | `gate-clone-portability` listed 14 of 21 circuits and missed `liquidation`, which the published mirror does not carry | **gate fixed** 30 Jul; **the 5 missing artifacts are still missing** |
 | 9 | every gas figure in the four Phase B reports disagreed with its artifact, and every disagreement was inside the noise | **fixed** 30 Jul, and the checker now reads gas |
-| 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 3 of 4** — `execadverse` wired 30 Jul |
+| 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 1 of 4** — `execadverse`, `lpbracket`, `ncdf` wired 30 Jul; `portfolioleg` left |
 | 11 | two shipped circuit headers claim more than the circuits prove | **open**, unpatched |
 | 12 | three constants inside the trust root contradict the code beneath them | **open**, unpatched |
-| 13 | the four refutations that redirected this round are not reproducible from this repository | **open**, partly repaired |
+| 13 | the four refutations that redirected this round are not reproducible from this repository | **open** — sources now committed (38 of 38), **0 of 38 compiled**, ceremony question unanswered |
 
 `gates/gateN-known-defects.mjs` (`npm run gate:n`) re-measures the symptom behind every open section above
 and fails if this page and the measurement disagree — in either direction, so closing a defect without
 updating this page is as red as inventing one. `npm run gate:n-revert` puts each disclosure back the way it
 was and shows the gate go red while `docs-consistency` stays green over the same edit — which is why an
-omission from this page was invisible to a checker that reads 229 documents.
+omission from this page was invisible to a checker that reads every document in the tree. **What that
+checker cannot read is git**, and neither could this gate until 30 July: §13 published a count of what is
+*committed* while every source either checker consulted was a working tree, so the row was wrong twice and
+nineteen green rows had nothing to say about it. `gate:n` now asks `git ls-tree HEAD` for that row and for
+§8's, and the revert puts the wrong count back.
 
 > **How to read this page, because it is half history.** Both §1 fixes and the §3 fix are **live** —
 > deployed, verified against the endpoint at 10:38 UTC on 29 July 2026, and none of them moved the
@@ -423,8 +427,8 @@ than reporting a row that passed green on nothing:
 | with any private input | 3 | `portfoliogate` 3, `portfoliogate4` 4, `lpexpectation` 246 |
 
 **Every circuit on the paid path is in the first group.** `src/util/proverWorker.mjs` carries a closed set
-of circuit names — `liquidation`, `kelly`, `concentration` and, since 30 July, `execadverse` — and each of
-the four measures `nPrvIn = 0`. `preflight.mjs` prints the proof-emitting handler set as
+of circuit names — `liquidation`, `kelly`, `concentration` and, since 30 July, `execadverse`, `lpbracket`
+and `ncdf` — and each of the **six** measures `nPrvIn = 0`. `preflight.mjs` prints the proof-emitting handler set as
 `http:exec-verify, http:perp-gate, http:size-gate, http:treasury-risk` and the four matching MCP tools,
 with 23 of 31 handlers building no proof at all. The count of services a caller can obtain a proof from
 moved from three to four while this page was being written, and the private-input count did not move at
@@ -439,6 +443,14 @@ costs 163,608 exponentials and 82,016 square roots (measured) against a certific
 inequalities. A contract cannot re-execute that in eleven lines of Solidity, because eleven lines of
 Solidity cannot run a 401-point quadrature two hundred times. The 134× gas complaint below is a claim
 about identities a contract could check directly; it is not a claim about this one.
+
+**And it had already not moved for a sixth.** `ncdf` is wired too — to `options-risk` and `event-vol` — and
+measures `nWires` 2,036, `nPubOut` 3, `nPubIn` 4, `nPrvIn` **0**, `nConstraints` 2,051: seven public signals
+and nothing hidden. **Six of six on the paid path, and the private-input count has not moved once across six
+wirings.** That is the shape of the complaint, and it is why this entry is not scheduled: no amount of
+further wiring trends this set toward privacy. This paragraph is late — `ncdf` was wired before this page
+was last edited and the closed-set sentence above still said four, which `gate:n` went red over rather than
+anyone noticing.
 
 **The paper is honest about the count and does not draw the consequence.** It says, and this page is
 quoting it approvingly rather than retracting it:
@@ -862,10 +874,17 @@ the same defect one layer up.
 
 ## 10. Three of the four circuits built this round are still unreachable from a served answer
 
-**Status: OPEN, and shrinking — read the table below rather than this line for the count.** `execadverse`
-was wired on 30 July, hours after this entry was written, and `lpbracket` the same day; the count in the
-heading above is what it was when the entry was opened and is left there deliberately, because a heading
-that keeps getting quietly re-numbered is how a register stops being a record. The entry is kept and
+**Status: OPEN for one of the four — read the table below rather than this line for the count.**
+`execadverse` was wired on 30 July, hours after this entry was written, and `lpbracket` and `ncdf` the same
+day; the count in the heading above is what it was when the entry was opened and is left there
+deliberately, because a heading that keeps getting quietly re-numbered is how a register stops being a
+record. **`portfolioleg` is the only one left.** The `ncdf` row below said "no" from `be0d4c9`, the commit
+that wired it, through **both** later edits of this page — `ea69ea3` and `3c73436` — each of which corrected
+other rows of this same table and left that one. The §10 test predates the wiring, so `gate:n` was red on
+this row for every commit in between; no count of them is given here because it grows with every sibling
+commit and would be stale before it was read. **The gate was working and nobody was running it**, which is
+the one failure this page has no rule against: a red gate nobody runs costs exactly what a green gate that
+cannot fail costs. The entry is kept and
 corrected rather than replaced — the interesting part is that the gap
 existed at all and closed in one afternoon once someone owned it.
 
@@ -879,7 +898,7 @@ that set decides what a response can carry:
 | `execadverse` (exec-verify) | yes | **yes, since 30 July** — `snark: true`, both surfaces, `/proof/vk/execadverse` |
 | `portfolioleg` (portfolio-gate) | yes | no |
 | `lpbracket` (lp-risk) | yes | **yes, since 30 July** — `snark: true`, both surfaces, `/proof/vk/lpbracket` |
-| `ncdf` (options-risk) | yes | no |
+| `ncdf` (options-risk) | yes | **yes, since 30 July** — `snark: true`, both surfaces, `/proof/vk/ncdf`; also serves `event-vol` |
 
 **What this entry said before `execadverse` landed**, kept because the sentence was true when it was
 written and is the reason the entry exists:
@@ -993,16 +1012,47 @@ this checkout:
 | | |
 | --- | --- |
 | adversary circuit sources rescued out of temp into `zk/circuits/adv/` | **38 files**, including `lpclosed2`, `xacommit`, `xamin`, `pg4`–`pg7`, `price40`, and `ncdfonesided` |
-| of those, present in the published repository | **37 of 38** — `git ls-files zk/circuits` returns 59 paths and 37 are under `adv/`. This row said **0** and was stale: the rescue was committed. The 38th is `ncdfonesided.circom`, added 30 July and committed with the change that made it necessary — it is `ncdf.circom` as it stood before the range check on its shifted CDF residual was restored, kept so `gateB7-5` §0 and `revert-ncdf-twosided.mjs` can show a claimed at-the-money call delta of 1.0 SATISFYING a constraint system rather than describe it. A defect demonstrated against a file that only exists in one working tree is the exposure this section is about, so this one is not left there. |
-| Plonk zkeys for any of them | **0** |
+| of those, **committed** to the published repository | **38 of 38** — `git ls-tree -r --name-only HEAD zk/circuits` returns **60** paths, **38** of them under `adv/`, and those 38 names are the same 38 that are on disk. |
+| of those, with a compiled `.r1cs` in `zk/build` | **0 of 38** |
+| Plonk zkeys for any of them | **0 of 38** |
 | powers-of-tau files on disk | **2**, both power 12, 4,801,688 bytes each |
 | the locally generated 2^13 and 2^17 ceremonies those builds used | **absent** |
 
-So the sources survived the session that produced them and are still not in a repository. They sit in a
-working tree that is **not under version control at all** — the git checkout is the published mirror, and
-`zk/circuits/adv/` is not in it — which is the same exposure that left an entire circuit surviving only in
-an index last night, one directory over. Every gas figure, prove time and constraint count attributed to
-those builds rests on a single run by the party that benefits from it, against artifacts that are gone.
+**Three different quantities, because one number was wrong in every reading.** *Committed*, *compiled* and
+*has a proving key* are three different states and this row published one figure for all of them. The
+sources are in the repository. Not one of them has been compiled in this checkout, so not one of the
+refutations can be re-derived from what is committed — which is the defect, and it is not the same
+sentence as "the sources are lost".
+
+**What this row said, twice, and why the second version was worse than the first.** It is kept because a
+register that deletes its corrections is not a register:
+
+> First: `| of those, present in the published repository | **0** — git ls-files zk/circuits returns 22
+> paths and none is under adv/ |`
+>
+> Then: `| of those, present in the published repository | **37 of 38** — git ls-files zk/circuits returns
+> 59 paths and 37 are under adv/ |`
+
+The **0** was true when written and went stale when commit `620c041` committed the rescue. The **37 of 38**
+is the interesting one: the commit that wrote it, `ea69ea3`, **added the 38th file in the same commit**. The
+number was measured before the file was staged and was therefore false the moment it landed — and the cell
+said so itself two sentences later, that `ncdfonesided.circom` was "added 30 July and committed with the
+change that made it necessary". A cell that contradicts its own count in its own second sentence is not a
+transcription slip; it is a measurement taken against the working tree and published as a fact about the
+repository. Both versions were wrong in the same direction, understating what is published, which is the
+harmless direction for a reader and the dangerous one for a checker: it is the direction a gate that reads
+the working tree can never see.
+
+`ncdfonesided.circom` is `ncdf.circom` as it stood before the range check on its shifted CDF residual was
+restored, kept so `gateB7-5` §0 and `revert-ncdf-twosided.mjs` can show a claimed at-the-money call delta of
+1.0 SATISFYING a constraint system rather than describe it. A defect demonstrated against a file that only
+exists in one working tree is the exposure this section is about, so that one is not left there.
+
+So the sources survived the session that produced them **and are now under version control**. What is not
+in the repository is every artifact they were measured with: no `.r1cs`, no zkey, and no ceremony file
+above power 12. Every gas figure, prove time and constraint count attributed to those builds still rests on
+a single run by the party that benefits from it, against artifacts that are gone — and a reader who clones
+this repository gets the sources and cannot rebuild them without deciding the ceremony question below.
 
 **And nobody has attacked the new claims.** Four investigations were adversaried; the four adversaries
 were not. Two of their own results are known to be shaky and were left that way: a breakeven probe that

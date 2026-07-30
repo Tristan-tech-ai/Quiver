@@ -109,8 +109,8 @@
     "scripts/adversary/portfolio/probe3-batch-and-plonk13.mjs": "3eb9ee20687b1b2ef9dd04b3f68aa70b1822798eec51ebea74de9b93dbff2d62",
     "scripts/adversary/portfolio/probe4-minimal.mjs": "06a770a6e21fc47630615b05e9d698fe63cd574cb20ca4acec40a30456c6531c",
     "scripts/adversary/portfolio/probe5-plonk-parity.mjs": "db8a5b9132a1bc366e56e6df9218bb99cc2b98d4fb0b29aa69ddf9f16ee5ee5c",
-    "scripts/adversary/ptau.mjs": "4dda54a4c3abf553472b2a52ff03c434daef318ee68846f1c2eb27b0c6f1dfc7",
+    "scripts/adversary/ptau.mjs": "546a1a53ebb82b6e6142f9f75a2163d4b2c9d4a64432cadc0a33793e9fa64298",
     "scripts/adversary/r1cs-probe.mjs": "d2a65858778e7f7b2c571c27c1dc883346e86ff6bfcb4a87cd61150de22a0710",
-    "scripts/adversary/repro.mjs": "ac464f2a29d4c28e4e9e8af8eab94b1e6c4d90e5cfe521c048a8fb7294aa4d84"
+    "scripts/adversary/repro.mjs": "baad62e988be0f0133162d6ad689a21edfd3211e5ca42c4b6628577b149aab75"
   }
 }

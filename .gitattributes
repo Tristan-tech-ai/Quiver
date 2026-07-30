@@ -34,3 +34,17 @@
 *.pdf  binary
 *.woff binary
 *.woff2 binary
+
+# The zk artifacts. These were relying on `text=auto` sniffing, and measurement says the sniffing is
+# working — every committed .zkey and .r1cs comes out of a fresh clone byte-identical, even with
+# core.autocrlf=true. But sniffing is a guess, and one of these files now has a sha256 asserted by
+# zk/scripts/adversary/repro.mjs: build/hez_final_12.ptau, the ceremony file three of the four
+# adversarial refutations rest on. A normalized ceremony file would break that digest and read as
+# "the refutations do not reproduce", which is the worst possible false alarm for this exercise.
+# So it is declared, for exactly the reason .sql and .csv are declared above. Explicit is the lesson.
+*.ptau binary
+*.zkey binary
+*.r1cs binary
+*.wasm binary
+*.sym  binary
+*.wtns binary

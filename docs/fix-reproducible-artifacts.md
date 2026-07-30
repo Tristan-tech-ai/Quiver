@@ -30,7 +30,15 @@ Two things follow that are worth reading before the numbers.
 compute.** The thing that made these refutations unreproducible was not a missing 9 MB file. It was
 three hardcoded absolute paths per script — the zk tree, the service tree, and the author's own
 scratchpad. Resolving those three constants is the entire repair for the portfolio, exec and lp rows.
-**513 KiB of text replaced 727 MiB of derived binaries**, and nothing was downloaded.
+**524 KiB of text replaced 727 MiB of derived binaries**, and nothing was downloaded.
+
+**A fourth thing was missing and only a clone found it: the ceremony file itself was not in the
+repository.** Every sentence in this project of the form "the ptau already on disk" was true of a
+working tree and false of a clone — `git ls-files | grep ptau` returned **no ceremony file at all**.
+Three of the four refutations rest entirely on that file. It is committed now, at a stated cost of
+**4,801,688 bytes (4.58 MiB)**, its sha256 is pinned, and `repro.mjs` refuses loudly if it is absent.
+This is recorded as a defect this exercise created for itself and then found, because the first draft of
+this document asserted the file was already committed. §5 has the detail.
 
 **One class of artifact is genuinely not byte-reproducible, and it is not the one you would guess.** It
 is not the zkeys: `plonk setup` has no randomness, so a Plonk zkey built on a committed ptau comes back
@@ -93,9 +101,12 @@ step needs a download, write the fetch with a checksum assertion.**
 | Plonk `.zkey` on `hez_final_12` | **script**, sha256 pinned | deterministic; 18.9 MiB across the four, ~0.6 s each. Pinning the digest is a stronger check than committing the bytes |
 | Groth16 `.zkey` | **script**, not pinned | phase-2 contribution mixes entropy. And a single-contributor phase 2 is worthless as trust, so committing one would be committing a misleading artifact |
 | exported `Verifier.sol` | **script** | derived from the zkey; deployed byte counts are asserted instead |
-| `.ptau` | **script** | see §5. 270 MiB, and not byte-reproducible when generated |
+| `hez_final_12.ptau` | **commit — 4,801,688 B (4.58 MiB)**, sha256 pinned | the one exception, and the cost is stated. Three of the four refutations rest on it and it was **not in the repository at all**. `ptau.mjs fetch 12` is also enabled now, so a reader can obtain it with a digest assertion instead |
+| every other `.ptau` | **script** | see §5. 270 MiB more, and not byte-reproducible when generated |
+| `build/pot12_final.ptau` | **neither** | it is `hez_final_12.ptau` with a different name and the same sha256. Committing a byte-identical duplicate would be 4.58 MiB spent on nothing |
 
-**Total committed: 536,898 bytes (524.3 KiB) across 88 files, all text, zero binaries.**
+**Total committed: 5,354,993 bytes across 90 files** — 536,898 bytes (524.3 KiB) of text in 88 files,
+plus the 4,801,688-byte ceremony file and 12 lines of `.gitattributes`.
 
 | where | bytes | files |
 |---|---|---|
@@ -103,10 +114,19 @@ step needs a download, write the fetch with a checksum assertion.**
 | `zk/scripts/adversary/` | 286,480 | 49 |
 | `gates/gateZ-adversary-repro.mjs` | 2,138 | 1 |
 | `gates/gateZ-revert.mjs` | 2,288 | 1 |
+| `zk/build/hez_final_12.ptau` | **4,801,688** | 1 |
 
-Against 726.8 MiB of derived binaries left out: the repository grows by **0.070%** of what the
-refutations produced. Nothing committed is over 25 KiB; the largest single file is `circuits/adv/ctl.circom`
-at 21,376 bytes, and it is a generated constant table that `repro.mjs` regenerates and diffs.
+Against 726.8 MiB of derived binaries left out: the repository grows by **0.70%** of what the
+refutations produced, and **0.070%** if the ceremony file is excluded. No *source* file committed is
+over 25 KiB; the largest is `circuits/adv/ctl.circom` at 21,376 bytes, a generated constant table that
+`repro.mjs` regenerates and diffs.
+
+`.gitattributes` gained `*.ptau *.zkey *.r1cs *.wasm *.sym *.wtns binary`. Measurement says the
+existing `text=auto` sniffing was already working — every committed `.zkey` and `.r1cs` comes out of a
+fresh clone byte-identical, with `core.autocrlf=true` set globally on this machine. But sniffing is a
+guess, and one of these files now has an asserted sha256. A normalized ceremony file would break that
+digest and read as "the refutations do not reproduce", which is the worst false alarm available here.
+Marking them changed no already-committed blob.
 
 Two things deliberately *not* committed and *not* scripted:
 
@@ -309,7 +329,24 @@ digest has been measured, and none is invented here.
 
 Power 14 is in the table with a digest of `null` and a note explaining why: `PHASE_C_RESEARCH_FABLE.md`
 records a *truncated* digest beginning `489be9e5`, and a truncated digest is a check that cannot fail on
-the last 24 bytes. Power 12 needs no fetch; it is committed, and `ptau.mjs check` prints and verifies it.
+the last 24 bytes.
+
+**Power 12 is the one row with a real digest, and it is the one this exercise nearly got wrong.**
+`ptau.mjs fetch 12` now asserts
+`dcf4ea473bf14b971ce5f7b7c1d6ce1c41a8ed042cdb75b65ca9178e3a3c7c17`, measured from the file in this
+tree. Two caveats are written into the table beside it, because they are real: the digest is of the
+*local* file, and `zk/FINDINGS.md`'s record that this file is byte-for-byte the public Hermez one was
+**not independently verified here** — doing so needs the download. So if `fetch 12` ever mismatches, the
+honest reading is "the file here is not the public one", not "the bucket changed". Either way it fails
+loudly.
+
+**And the file was not in the repository.** This was found by cloning the mirror and running the gate,
+which is the only way it could have been found: every check that ran in a working tree passed. A bare
+clone has **no `.ptau` at all** — `git ls-files | grep ptau` matched only `ptau.mjs`. Three refutations
+depend on it. It is committed now (4.58 MiB, cost stated in §3), `repro.mjs` refuses loudly if it is
+absent and names the fetch command, and the first draft of this document confidently described it as
+"the ceremony file already committed". That sentence was false when written, and the thing that caught
+it was running the reproduction as a reader rather than as its author.
 
 ---
 
@@ -425,7 +462,19 @@ Five defects found in the rescued material, four unpatched, each recorded:
 
 ---
 
-## 9. The two things the repository does not carry
+## 9. The two things the repository does not carry, and the reader test that found a third
+
+**The clone test.** `git clone` of the mirror at `620c041` into an empty directory, then
+`npm run gate:z`:
+
+- bare clone → **refuses**, naming `zk/circom.exe` and `zk/node_modules`, exit 2
+- with those two supplied → **still fails**, because `zk/build/hez_final_12.ptau` was not committed
+- with all three → **55 of 55 assertions pass, including all 8 byte-identity pins**
+
+The third gap is now closed by the commit (§3, §5), so a clone needs only the two below. The byte-identity
+rows passing *in a clone* is the load-bearing result: `xamin`, `xapriv`, `xacommit` and `lpclosed2`
+rebuild to zkeys whose sha256 matches artifacts produced last night in a temp directory, from nothing but
+committed inputs.
 
 `repro.mjs` refuses before building anything if either is missing, and names it:
 

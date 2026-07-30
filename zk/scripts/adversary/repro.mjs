@@ -95,6 +95,15 @@ if (!process.argv.includes('--write-manifest')) {
     gaps.push(`  zk/node_modules is missing (gitignored, as it should be).\n`
       + `    Run:  npm install --prefix "${P.ZK}"`);
   }
+  // This one was found the hard way: a clone of the mirror has no .ptau at all. Three of the four
+  // refutations rest entirely on this file, and before it was committed the sentence "the ceremony file
+  // already in the repository" was simply false. It is committed now; the check stays, because the
+  // failure it would have caught is the exact failure this whole exercise is about.
+  if (!existsSync(P.PTAU12)) {
+    gaps.push(`  build/hez_final_12.ptau is missing. Three of the four refutations rest on it.\n`
+      + `    It is 4,801,688 bytes (4.58 MiB) and its sha256 is pinned in ptau.mjs.\n`
+      + `    Run:  node zk/scripts/adversary/ptau.mjs fetch 12`);
+  }
   if (gaps.length) {
     console.error('\nCANNOT REPRODUCE — the toolchain is incomplete:\n');
     for (const g of gaps) console.error(`${g}\n`);

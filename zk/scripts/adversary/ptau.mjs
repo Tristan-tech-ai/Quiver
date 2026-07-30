@@ -39,9 +39,13 @@ import P from './paths.mjs';
 const PINNED = {
   12: {
     bytes: 4801688,
-    sha256: null,
-    provenance: 'already in this repo as build/hez_final_12.ptau, so there is nothing to fetch. '
-      + '`ptau.mjs check build/hez_final_12.ptau` prints and verifies it.',
+    sha256: 'dcf4ea473bf14b971ce5f7b7c1d6ce1c41a8ed042cdb75b65ca9178e3a3c7c17',
+    provenance: 'MEASURED in this session from build/hez_final_12.ptau. Two caveats, both real. (1) It '
+      + 'is the digest of the file in THIS tree, and zk/FINDINGS.md records that file as byte-for-byte '
+      + 'the public Hermez file — a record this session did not independently verify, because doing so '
+      + 'needs the download. (2) So if `fetch 12` ever mismatches, the honest reading is "the file here '
+      + 'is not the public one", not "the bucket changed". Either way it fails loudly, which is the '
+      + 'point. Note build/pot12_final.ptau has the SAME digest: it is this file stored twice.',
   },
   14: {
     bytes: 18957464,

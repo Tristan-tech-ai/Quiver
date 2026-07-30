@@ -9,7 +9,10 @@
     "gate:b0": "node scripts/gateB0-kelly.mjs",
     "gate:b1": "node scripts/gateB1-kelly-sweep.mjs",
     "gate:b2": "node scripts/gateB2-kelly-evm.mjs",
-    "gate:clone": "node scripts/gate-clone-portability.mjs"
+    "gate:b6": "node scripts/gateB6-portfolio-routes.mjs",
+    "gate:b6-revert": "node scripts/gateB6-portfolio-routes.mjs --revert-binding",
+    "gate:clone": "node scripts/gate-clone-portability.mjs",
+    "gate:clone-revert": "node scripts/revert-clone-portability-section1.mjs"
   },
   "dependencies": {
     "@ethereumjs/common": "^4.4.0",

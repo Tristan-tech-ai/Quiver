@@ -247,9 +247,24 @@ export const SERVICES = [
       if (!b.address && looksLikeCexSymbol(b.chain)) return { cex: true, symbol: b.chain, ...common };
       const v = vToken(b); if (v.error) return v; return { ...v, ...common };
     },
+    // `ctx?.host`, NOT `ctx.host`, AND THE DIFFERENCE IS THE WHOLE REASON THIS SERVICE WAS UNMEASURED.
+    // This is the only handler of the twenty-two that dereferences its SECOND argument at all —
+    // measured by diffing each handler's own source for a `ctx.` deref, not assumed — and it did so
+    // unguarded. Every real caller supplies one: app.js builds `{host}` from the request at both entry
+    // points, and chart-press is not on the MCP surface (TOOLS carries the nine risk tools). So no
+    // served response moves by one byte here. What DID move was every attempt to measure this service:
+    // a sweep that called `s.run(validatedFixture)` — the natural shape, and the shape twenty-one
+    // handlers tolerate — got `TypeError: Cannot read properties of undefined (reading 'host')` before
+    // a single pixel was drawn, and the throw was read as evidence about chart-press. It was evidence
+    // about the harness. A handler that cannot be invoked by a checker is a handler nothing checks, so
+    // the argument is made optional and `gates/gateG-envelope-classification.mjs` sweeps all
+    // twenty-two with it omitted and requires no such TypeError from any of them.
+    //
+    // The degraded value is the one `ctx = {}` has always produced (chartPress falls back to a relative
+    // `/card/…png`), so this widens an existing path rather than inventing a new one.
     run: async (i, ctx) => observationEnvelope('chart-press', i, await (i.cex
-      ? chartPress(null, null, { symbol: i.symbol, interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, format: i.format, width: i.width, height: i.height, scale: i.scale, timezone: i.timezone, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx.host })
-      : chartPress(i.chain, i.address, { interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, format: i.format, width: i.width, height: i.height, scale: i.scale, timezone: i.timezone, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx.host })), config.version),
+      ? chartPress(null, null, { symbol: i.symbol, interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, format: i.format, width: i.width, height: i.height, scale: i.scale, timezone: i.timezone, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx?.host })
+      : chartPress(i.chain, i.address, { interval: i.interval, lookback: i.lookback, quality: i.quality, chartType: i.chartType, logScale: i.logScale, format: i.format, width: i.width, height: i.height, scale: i.scale, timezone: i.timezone, indicators: i.indicators, drawings: i.drawings, annotations: i.annotations, theme: i.theme, brand: 'quiver', host: ctx?.host })), config.version),
   },
   {
     name: 'poly-fill', path: '/api/poly-fill', price: config.prices.polyFill,

@@ -14,6 +14,20 @@
 //
 // One entry per accepted INPUT FORM, not one per service, because "reachable" has to mean reachable
 // the way a caller would really write the call.
+// WHAT `invalidFixtures()` PROMISES, AND THE TWO THINGS IT DOES NOT. It promises that every body below
+// is accepted by the validator of the service it names. That is the whole property the routing sweeps
+// need, and it is not the property a sweep that RUNS these bodies needs. Both gaps were paid for:
+//
+//   1. `run()` TAKES A SECOND ARGUMENT. chart-press reads `ctx?.host`, and before that `?.` existed a
+//      sweep calling `s.run(s.validate(body))` got a TypeError from chart-press and read it as a fact
+//      about chart-press. Pass the ctx the HTTP surface passes — `{ host }` — or nothing, but know
+//      which you are measuring. gateG sweeps with it OMITTED, on purpose, so this cannot recur.
+//   2. A VALID BODY CAN NAME DEAD UPSTREAM STATE. `poly-fill`'s `will-btc-hit-100k` is a well-formed
+//      market reference and there is no live Polymarket market behind it, so the run returns the
+//      `callerMistake` REFUSAL envelope — neither `proof` nor `observation` — which is correct
+//      behaviour and looked like an unclassifiable service. No fixture naming one named market can be
+//      immune to this: markets resolve. A run-based sweep must therefore treat REFUSAL as a third
+//      outcome by name, and a classification that only knows two answers will keep finding this one.
 import { SERVICES } from '../src/services.js';
 import { suggestService } from '../src/util/routing.js';
 

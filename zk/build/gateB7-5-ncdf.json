@@ -1,0 +1,110 @@
+{
+  "at": "2026-07-29T23:33:30.292Z",
+  "passed": true,
+  "params": {
+    "S": 40,
+    "ulp": 9.094947017729282e-13,
+    "groups": 12,
+    "TOLC": 12,
+    "TOLP": 10,
+    "CDF_TAIL": 2,
+    "PHI_TAIL": 8
+  },
+  "envelopeAbsoluteN": 1.0913936421275139e-11,
+  "envelopeAbsolutePhi": 9.094947017729282e-12,
+  "sweep": {
+    "samples": 6000,
+    "kept": 6000,
+    "onBranch": 5961,
+    "offBranch": 39,
+    "outOfDomain": 0,
+    "badRange": 0,
+    "badTail": 0,
+    "violations": 0,
+    "worstUsedC": 0.18305315521823962,
+    "worstUsedP": 0.2141087251683551
+  },
+  "tail": {
+    "maxC": 7.687298944375103e-13,
+    "maxP": 5.540487995564692e-12,
+    "cUlp": 0.8452274575530596,
+    "pUlp": 6.091830974676722
+  },
+  "wrongCdf": [
+    {
+      "name": "Abramowitz-Stegun 7.1.26",
+      "n": 1194,
+      "worstUlp": 76621.10245823381,
+      "overBound": 1190,
+      "accepted": 3,
+      "tried": 3,
+      "underBound": 4,
+      "perLegRefusalRate": 0.9966499162479062,
+      "bookMiss": [
+        {
+          "legs": 1,
+          "missProb": 0.00335008375209378
+        },
+        {
+          "legs": 2,
+          "missProb": 0.000011223061146042738
+        },
+        {
+          "legs": 4,
+          "missProb": 1.2595710148781415e-10
+        },
+        {
+          "legs": 8,
+          "missProb": 1.586519141521151e-20
+        }
+      ],
+      "worstUlpOverBound": 6385.091871519485
+    },
+    {
+      "name": "logistic 1.702x",
+      "n": 1194,
+      "worstUlp": 10429741647.415619,
+      "overBound": 1194,
+      "accepted": 0,
+      "tried": 0,
+      "underBound": 0,
+      "perLegRefusalRate": 1,
+      "bookMiss": [
+        {
+          "legs": 1,
+          "missProb": 0
+        },
+        {
+          "legs": 2,
+          "missProb": 0
+        },
+        {
+          "legs": 4,
+          "missProb": 0
+        },
+        {
+          "legs": 8,
+          "missProb": 0
+        }
+      ],
+      "worstUlpOverBound": 869145137.284635
+    }
+  ],
+  "relocationAttack": {
+    "legs": 1492,
+    "worstShift": 0.000916157065070422,
+    "worstPdfUlp": 232127.87094449997,
+    "underPdf": 3,
+    "refusalRate": 0.9979892761394102
+  },
+  "plonkConstraints": 3740,
+  "domainSize": 4096,
+  "nPublic": 7,
+  "proveMs": 1678,
+  "evm": {
+    "acceptGas": "273504",
+    "rejectGas": "573",
+    "deployedSize": 7080,
+    "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang"
+  }
+}

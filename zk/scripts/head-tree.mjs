@@ -147,27 +147,64 @@ export function scan(src) {
   let i = 0;
   const n = src.length;
   const blank = (from, to) => { for (let k = from; k < to; k++) out.push(src[k] === '\n' ? '\n' : ' '); };
+
+  // Last significant character emitted, which is how a `/` is told apart from a regex literal.
+  let prev = '';
+  const remember = (ch) => { if (!/\s/.test(ch)) prev = ch; };
+  const push = (ch) => { out.push(ch); remember(ch); };
+
   while (i < n) {
     const c = src[i], d = src[i + 1];
+
     if (c === '/' && d === '/') { const s = i; while (i < n && src[i] !== '\n') i++; blank(s, i); continue; }
     if (c === '/' && d === '*') {
       const s = i; i += 2;
       while (i < n && !(src[i] === '*' && src[i + 1] === '/')) i++;
       i = Math.min(n, i + 2); blank(s, i); continue;
     }
+
+    // A REGEX LITERAL, and skipping it is not fussiness. `const SPEC = /…(['"])…/g` two definitions
+    // below holds one single quote and one double quote; without this branch the scanner opened a
+    // string on them, ran past the end of the statement, and swallowed a comment 130 lines later —
+    // which then reported `./src/engine/proof.js`, quoted inside that comment, as an import of this
+    // file. The scanner turning its own regex into a false positive is the cleanest possible proof that
+    // "it is only a comment" is not a safe assumption.
+    //
+    // The test is the standard one: a `/` after a value (identifier, number, `)`, `]`) is division;
+    // anywhere else it opens a regex. `return /re/` reads as division under this rule and is therefore
+    // scanned as code, which the newline reset below bounds to that one line.
+    if (c === '/' && !/[A-Za-z0-9_$)\]]/.test(prev)) {
+      const s = i; i++;
+      let inClass = false;
+      while (i < n && src[i] !== '\n') {
+        if (src[i] === '\\') { i += 2; continue; }
+        if (src[i] === '[') inClass = true;
+        else if (src[i] === ']') inClass = false;
+        else if (src[i] === '/' && !inClass) { i++; break; }
+        i++;
+      }
+      blank(s, i); prev = '/'; continue;
+    }
+
     if (c === "'" || c === '"' || c === '`') {
       const q = c, start = i;
       out.push(c); i++;
       while (i < n) {
         if (src[i] === '\\') { out.push(src[i], src[i + 1] ?? ''); i += 2; continue; }
         if (src[i] === q) break;
+        // A NEWLINE ENDS A QUOTED STRING, because in JavaScript it does — an unterminated `'` is a
+        // syntax error, not a multi-line string. Enforcing that here is what bounds the damage when the
+        // regex rule above guesses wrong: the misparse cannot outlive the line it started on. Template
+        // literals genuinely span lines and are the one exception.
+        if (q !== '`' && src[i] === '\n') break;
         out.push(src[i]); i++;
       }
-      if (i < n) { out.push(q); i++; }
+      if (i < n && src[i] === q) { out.push(q); i++; }
       spans.push([start, i]);
-      continue;
+      prev = q; continue;
     }
-    out.push(c); i++;
+
+    push(c); i++;
   }
   return { code: out.join(''), spans };
 }

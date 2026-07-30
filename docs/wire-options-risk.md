@@ -22,8 +22,14 @@ mid-flight.
 1. **DONE — the corrected proving key is in place.** `assets/zk/ncdf_plonk.zkey`, `ncdf_vk.json` and
    `ncdf_js/ncdf.wasm` in both trees are now the rebuilt two-sided circuit, byte-identical to
    `zk/build/`. Without this the `proves` string on every event-vol response is false. `npm test`
-   (386, 0 fail), `gateB7-6` (60 checks), `docs-consistency` (248 documents) and `preflight` are all
-   green against the new key.
+   (386, 0 fail), `gateB7-6` (59 checks, 0 failures), `docs-consistency` (250 documents) and
+   `preflight` are all green against the new key.
+
+   > An earlier draft of this page said `gateB7-5` ran 53 checks and `gateB7-6` 60. Both came from
+   > grepping for the word rather than counting the bracketed results, and both were one too high. The
+   > figures throughout are now 52 and 59. It is a small thing and it is exactly the class of number
+   > this repository keeps finding wrong in its own reports, so it is corrected in place rather than
+   > quietly.
 2. **`src/util/ncdfWitness.js:193` — `envelopeUsd` uses `TOLC` = 12 as the envelope on N.** It is
    *conservative*, not wrong: the measured envelope is 8.3095 ulp, so 12 covers it. But 12 covers it by
    accident. The derivation is `TOLC/2 + evaluator + ½·φ_max`, and that file has the `½·φ_max` term and
@@ -122,7 +128,7 @@ alone would have. Measured, not estimated:
 | domain | 4,096 | 4,096 — still fits `hez_final_12`, no new ceremony |
 | public signals | 7 | 7 |
 | prove | 1,654 ms | 1,425 / 1,555 ms (two runs) |
-| EVM accept gas | 273,406 | 272,990 / 273,504 — **inside the measured 1.22% Plonk spread, so unchanged** |
+| EVM accept gas | 273,406 | 273,504 / 272,990 / 273,614 over three runs — a 624-gas spread, 0.23%, **inside the measured 1.22% Plonk spread, so unchanged** |
 | EVM refuse gas | 573 | 573 |
 
 ## 3. What it proves, and how tight
@@ -276,12 +282,12 @@ carry it, and without it a leg with both points above `z = 7.0711` can have its 
 
 | | |
 |---|---|
-| `zk/scripts/gateB7-5-ncdf.mjs` | **PASSED**, 53 checks, exit 0 |
+| `zk/scripts/gateB7-5-ncdf.mjs` | **PASSED**, 52 checks, 0 failures, exit 0 |
 | `zk/scripts/revert-ncdf-twosided.mjs` | **PASSED** — §0's assertion is red against the one-sided circuit, green against the shipped one |
 | `zk/scripts/probe-ncdf-onesided-exposure.mjs` | 3 cases, reproducible |
-| `zk/scripts/gateB7-6-eventvol-straddle.mjs` | **PASSED**, 60 checks, against the rebuilt key |
+| `zk/scripts/gateB7-6-eventvol-straddle.mjs` | **PASSED**, 59 checks, 0 failures, against the rebuilt key |
 | `npm test` | **386 tests, 0 fail, 5 skipped** — unchanged |
-| `node tools/docs-consistency.mjs` | **CONSISTENT — 248 documents** |
+| `node tools/docs-consistency.mjs` | **CONSISTENT — 250 documents** (248 before this page and its mirror) |
 | `node gates/preflight.mjs` | **PASSED — safe to deploy** |
 
 `src/engine/` is byte-identical: the engine codeHash `q1-e1fa99d08887d6cc` has not moved, and no

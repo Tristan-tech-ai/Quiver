@@ -525,6 +525,25 @@ skipped:
 GATE Z2 REVERT: PASSED — all 5 exercised assertions are load-bearing
 ```
 
+And the same harness in a fresh clone of the pushed HEAD, where the fifth mode cannot be exercised at all
+— there is no second tree to drop a file from. It is reported `n/a` rather than green, and the exemption
+is granted only because `gate:z2` itself printed `mirror-check: skipped`:
+
+```
+  (unmodified)        exit   0 ·  0 red rows · green, so the reverts below mean something
+  row-count           exit   1 ·  2 red rows · the gate FAILED as required
+  self-include        exit   1 ·  5 red rows · the gate FAILED as required
+  stale-row           exit   1 ·  6 red rows · the gate FAILED as required
+  derived-denominator exit   1 ·  1 red rows · the gate FAILED as required
+  mirror-drop              n/a · the mirror row is skipped in this checkout — no second tree to drop from
+
+GATE Z2 REVERT: PASSED — all 4 exercised assertions are load-bearing, 1 inapplicable here
+```
+
+Fewer red rows in the clone because only one copy of this document exists there; the working tree holds
+two and both are checked, so every document assertion doubles. 12 assertions in a clone, 24 in the
+working tree.
+
 ---
 
 ## 7. New measurements, and defects found while doing this

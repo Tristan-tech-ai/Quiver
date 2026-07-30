@@ -57,7 +57,15 @@ Nothing published moved. Both pinned `exec-verify` content hashes are unchanged 
 unchanged, and the engine build hash is still `q1-e1fa99d08887d6cc`. The five snapped fields were
 already on the grid in every fixture this repo publishes, so snapping is the identity on them.
 
-New: `npm run gate:ex` (18 checks) and `npm run gate:ex-revert` (seven reverts, all seven red).
+**A published decode instruction that was wrong on half its domain, found and fixed.** A fill BETTER
+than the benchmark is a normal outcome and makes the shortfall and the basis-point figure negative — and
+a negative integer is a field element just under the BN254 prime. Following the published
+`signalLayout`, `Number(publicSignals[14]) / 1e9` returned **2.1888e+67** where the answer served
+**-3207.37**. The proof verified and the arithmetic was right; the instruction for reading it was not.
+`/proof/<hash>` now publishes `signedSignals` and an executable `decodeSignedSignals` rule carrying the
+prime, and the gate requires the naive unsigned read to FAIL so the rule cannot be quietly dropped.
+
+New: `npm run gate:ex` (19 checks) and `npm run gate:ex-revert` (eight reverts, all eight red).
 The verification key is published at `/proof/vk/execadverse`; a proof there carries **fifteen** public
 signals, so the liquidation registry's `uint256[8]` signature will not compile against it.
 

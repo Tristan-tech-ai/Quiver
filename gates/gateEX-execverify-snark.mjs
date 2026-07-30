@@ -557,6 +557,72 @@ test('EX.9d the circuit\'s three windows are asked before proving, and each can 
   }
 });
 
+// ── EX.10 A FAVOURABLE FILL — the half of the domain EX.4 never reached ───────────────────────────
+//
+// THIS TEST EXISTS BECAUSE EX.4 PASSED OVER A REAL DEFECT. EX.4 decodes signal 14 as
+// `Number(publicSignals[14]) / 1e9` and asserts it is the served headline. That worked only because
+// the pinned fixture has a POSITIVE headline. A fill BETTER than the benchmark is a normal, reported
+// outcome — `execVerify` has a whole verdict sentence for it — and it makes both the shortfall and the
+// basis-point figure NEGATIVE, which in a proof means a field element just under the BN254 prime.
+// Measured on the MCP surface with a favourable fill: the proof verified, the guard's own
+// `gapToServedBps` read 0.00226, and signal 14 decoded to 2.1888e+67. The arithmetic was right and the
+// published `signalLayout` was an instruction that produced gibberish on half its domain.
+//
+// So: `/proof/<hash>` now publishes `signedSignals` and a decode rule, and this test requires the rule
+// to work AND requires the naive unsigned read to fail — because a rule nobody can see the need for is
+// a rule that gets dropped.
+const FIELD_P = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
+const decodeSigned = (s) => { const v = BigInt(s); return Number(v > FIELD_P / 2n ? v - FIELD_P : v) / S; };
+
+test('EX.10 a FAVOURABLE fill proves, verifies, and its signed signals decode by the published rule', async () => {
+  const snarkjs = await import('snarkjs');
+  // Realized MORE than the pool implied — positive slippage, a stale quote in the caller's favour.
+  const good = { amountIn: 2500, amountOutRealized: 2470, reserveIn: 1200000, reserveOut: 900000, feeTier: 0.0005 };
+  const env = await mcp.run({ ...good, snark: true });        // the MCP surface, where this was found
+  assert.ok(env.adverseExecutionBps < 0, `this fixture must have a NEGATIVE headline to test the sign; got ${env.adverseExecutionBps}`);
+  assert.ok(env.adverseValueOut < 0, `and a negative shortfall; got ${env.adverseValueOut}`);
+  assert.match(env.verdict, /BETTER than the honest pool price/, 'the engine no longer reports a favourable fill as favourable');
+
+  const rec = await waitFor(env.proof.contentHash);
+  assert.equal(rec.status, 'ready', `proof not ready: ${rec.error || rec.status}`);
+  assert.equal(await snarkjs.plonk.verify(verificationKey('execadverse'), rec.publicSignals, rec.proof), true,
+    'a favourable fill is inside the circuit domain and its proof must verify');
+
+  // THE PUBLISHED RULE WORKS.
+  const bps = decodeSigned(rec.publicSignals[14]);
+  const short = decodeSigned(rec.publicSignals[6]);
+  console.log(`\n  EX.10 favourable fill: served ${env.adverseExecutionBps} bps / ${env.adverseValueOut} tokens`);
+  console.log(`        signed decode of signals 14 and 6: ${bps} bps / ${short} tokens`);
+  console.log(`        NAIVE unsigned decode of signal 14: ${Number(rec.publicSignals[14]) / S}`);
+  assert.ok(Math.abs(bps - env.adverseExecutionBps) <= _internalExec.DISPLAY_HALF_BPS + 1e-6,
+    `the signed decode ${bps} is not the served ${env.adverseExecutionBps}`);
+  assert.ok(Math.abs(short - env.adverseValueOut) <= 1e-7,
+    `the signed decode ${short} is not the served ${env.adverseValueOut}`);
+
+  // AND THE NAIVE READ MUST FAIL, or the rule above is decoration nobody needs.
+  const naive = Number(rec.publicSignals[14]) / S;
+  assert.ok(!(Math.abs(naive - env.adverseExecutionBps) < 1),
+    `the naive unsigned decode already gives the right answer (${naive}), so this fixture does not exercise the sign and EX.10 proves nothing`);
+  assert.ok(naive > 1e60, `the naive decode should wrap to a field-sized number; got ${naive}`);
+
+  // And the retrieval route must actually PUBLISH the rule, on this record, naming every signed field.
+  const { default: app } = await import('../src/app.js');
+  const server = app.listen(0);
+  try {
+    const port = server.address().port;
+    const served = await (await fetch(`http://127.0.0.1:${port}/proof/${env.proof.contentHash}`)).json();
+    assert.deepEqual(served.signedSignals, ['residual', 'feeResidual', 'bpsResidual', 'shortfall', 'bpsHat'],
+      'the retrieval route does not name which signals are signed — a reader following signalLayout gets 2.19e+67');
+    assert.match(served.decodeSignedSignals, /two's-complement/);
+    assert.match(served.decodeSignedSignals, /21888242871839275222246405745257275088548364400416034343698204186575808495617/,
+      'the decode rule does not carry the prime, so it is not executable as written');
+    // Every name in signedSignals must actually BE in signalLayout, or the instruction points at nothing.
+    for (const n of served.signedSignals) {
+      assert.ok(served.signalLayout.includes(n), `signedSignals names ${n}, which is not in signalLayout`);
+    }
+  } finally { server.close(); }
+});
+
 // Real proofs are built in a real forked worker, and snarkjs spins up its own bn128 curve threads on
 // this side to verify them. Both have to be told to stop or the runner never exits — measured: without
 // the second line this file passed every test in 1.6s and then hung for 200 seconds until the harness

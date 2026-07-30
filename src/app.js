@@ -371,6 +371,16 @@ app.get('/proof/:contentHash', async (req, res) => {
       // declaration order, then the eight public inputs. Signal 6 is the shortfall in output tokens
       // scaled by 1e9, and it is the one a dispute is about.
       signalLayout: ['residual', 'feeResidual', 'bpsResidual', 'tolerance', 'feeTolerance', 'bpsTolerance', 'shortfall', 'xHat', 'yHat', 'dxHat', 'fHat', 'inHat', 'outHat', 'realizedHat', 'bpsHat'],
+      // FIVE OF THE FIFTEEN ARE SIGNED, AND WITHOUT THIS THE LAYOUT ABOVE IS A DECODING INSTRUCTION
+      // THAT PRODUCES NONSENSE ON A REAL CASE. A fill BETTER than the benchmark is a normal, reported
+      // outcome — `execVerify` has a verdict sentence for it — and it makes the shortfall and the
+      // basis-point figure NEGATIVE. A negative integer is a field element near the prime, so the
+      // obvious `Number(publicSignals[14]) / 1e9` returns 2.19e+67 rather than -3207.37. Measured on a
+      // favourable fill, which is exactly how this was found: the proof verifies, the guard's own
+      // gapToServedBps reads 0.0023, and the published signal decodes to gibberish for anyone who
+      // followed the layout without being told. The three residuals are signed for the same reason.
+      signedSignals: ['residual', 'feeResidual', 'bpsResidual', 'shortfall', 'bpsHat'],
+      decodeSignedSignals: 'The signals named in signedSignals are two\'s-complement in the BN254 scalar field: read v = BigInt(signal), and if v > p/2 then the value is v - p, where p = 21888242871839275222246405745257275088548364400416034343698204186575808495617. Then divide by 1e9 to get the decimal. The other ten are non-negative and need no adjustment. This is not a quirk of this proof — a fill better than the benchmark is a normal outcome and makes shortfall and bpsHat negative.',
       proves: 'Three nested statements over the scaled integers, each with its own residual and its own tolerance published as signals so a verifier sees the slack actually used rather than being asked to trust it was small. (1) in·S = dx̂·(S − f̂), bounded 2|Rf| <= S. (2) (x̂ + în)(ŷ − ô) = x̂·ŷ, bounded 2|R| <= x̂+în+ŷ−ô, which says ô is the CORRECTLY ROUNDED constant-product fill for this size rather than merely a number near it. (3) b̂·ô = 10000·S·ŝ, bounded 2|Rb| <= ô. The shortfall ŝ = ô − ẑ (signal 6) carries NO tolerance at all — both terms are integers already on the grid, so it is exact to the last unit of 1e-9 output tokens.',
       doesNotProve: 'That the reserves were real, or that the realized fill was. Both are inputs and the circuit has no term for where a number came from — this is the arithmetic being right about a pool state it was handed, and the input problem is untouched. It does not prove the reserves were the right block: state read immediately before your own transaction UNDER-detects a sandwich, because the front-run is already in it. It does not prove the VERDICT either, and does not need to: the verdict is `bps > 5` and b̂ is signal 14, so anyone holding this proof can evaluate that threshold themselves. `unavoidableCostBps` — the fee and your own price impact — is outside it entirely.',
     } : {}),

@@ -201,7 +201,7 @@ Artifacts asserted present: `execadverse_plonk.zkey` (7.8 MB), `execadverse_vk.j
 | refuse a bent proof | **15** proof elements bent one at a time: 6 returned `false`, 9 refused by a throw; all 3 other circuit keys also refuse it |
 | sweep against the REAL engine | `execVerify` imported and called; 54,410 trades, 5 shapes; 0 divergences |
 | the bound can be exceeded | a 1e-5 relative slip in the benchmark → **100.0%** refused; 1e-6 → 100.0%; 1e-7 → 96.4% |
-| scripted revert going red | **7 of 7** reverts turn `gate:ex` red; green again after restore; engine hash unmoved |
+| scripted revert going red | **8 of 8** reverts turn `gate:ex` red; green again after restore; engine hash unmoved |
 
 The measured public-signal layout (read off a real proof, not off the circuit source):
 `[residual, feeResidual, bpsResidual, tolerance, feeTolerance, bpsTolerance, shortfall, xHat, yHat,
@@ -233,7 +233,7 @@ measured figure that could not be pinned.
 
 ---
 
-## 3. Two defects found in existing checks
+## 3. Three defects found while wiring
 
 ### `EMITS_ZK` matched one of the four builders it was written for
 
@@ -247,6 +247,32 @@ So the trigger the comment block describes as "an actual Plonk proof built off-r
 matching three of the four calls that do it, and the pinned set stayed correct by luck. A fifth circuit
 whose handler did not happen to mention `env.proof` would have been invisible to the one guard that
 exists to see it. Widened to `/env\.proof|obs\.snark|build\w*InBackground/`.
+
+### A published decode instruction that returned `2.19e+67` on a real, reachable case
+
+Found by proving a **favourable fill** on the MCP surface after `EX.4` had already gone green on the
+HTTP one. A fill *better* than the benchmark is a normal outcome — `execVerify` has a verdict sentence
+for it — and it makes both the shortfall and the basis-point figure **negative**. A negative integer is
+a field element just under the BN254 prime, so:
+
+| | value |
+|---|---|
+| served `adverseExecutionBps` | **−3207.37** |
+| `Number(publicSignals[14]) / 1e9`, following the published `signalLayout` | **2.1888e+67** |
+| signed decode (`v > p/2 → v − p`) | **−3207.367739427** |
+
+The proof verified. The guard's own `gapToServedBps` read 0.00226. The arithmetic was right and the
+**published instruction was wrong on half its domain** — and `EX.4` passed over it because the pinned
+fixture happens to have a positive headline.
+
+`/proof/<hash>` now publishes `signedSignals: ['residual', 'feeResidual', 'bpsResidual', 'shortfall',
+'bpsHat']` and an executable `decodeSignedSignals` rule carrying the prime. `EX.10` proves a favourable
+fill, decodes it by the rule, and **requires the naive unsigned read to fail** — a rule nobody can see
+the need for is a rule that gets dropped. Revert 8 withdraws the rule and EX.10 goes red.
+
+Worth flagging beyond this service: the `residual` signal on the liquidation, Kelly and concentration
+records is signed too, and those three `signalLayout`s carry no such note. Not touched here — it is
+their sessions' ground — but it is the same defect one circuit over.
 
 ### My own EX.2b could not fail — and the revert script is what found that
 
@@ -303,8 +329,8 @@ Two sessions wiring the same handler from opposite ends is how a circuit got orp
 | | result |
 |---|---|
 | `npm test` | **386 tests, 0 fail** (exactly 386, unchanged) |
-| `npm run gate:ex` | 18 pass, 0 fail |
-| `npm run gate:ex-revert` | **7 of 7 reverts red**, green after restore, engine hash unmoved |
+| `npm run gate:ex` | **19** pass, 0 fail |
+| `npm run gate:ex-revert` | **8 of 8 reverts red**, green after restore, engine hash unmoved |
 | `npm run gate:v` (recipe + Appendix C) | 9 pass, 0 fail |
 | `npm run gate:k` | 8 pass, 0 fail — went red first on its pinned circuit list, updated consciously |
 | `npm run gate:h` · `gate:m` · `gate:c` · `gate:l` · `gate:p2` · `gate:s` | 7 · 17 · 10 · 8 · 7 · 9, all 0 fail |

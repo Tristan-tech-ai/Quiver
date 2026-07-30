@@ -3,11 +3,11 @@
 // "The adverse-execution guard refuses a real divergence" is a claim about a verifier, and a verifier
 // that cannot fail is the disease this repository names. Gate EX was written after the guard it guards,
 // so of course it passes; that says nothing about whether it would catch what it was written for. This
-// script puts a defect back — seven of them, one at a time — requires gate EX to go RED for each, then
+// script puts a defect back — eight of them, one at a time — requires gate EX to go RED for each, then
 // restores every file and requires GREEN again. Red in both states would mean broken rather than
 // strict, so both halves are required.
 //
-// The seven are deliberately not variations on one theme.
+// The eight are deliberately not variations on one theme.
 //
 // FOUR ARE GENUINE WITNESS/ENGINE MISMATCHES — the circuit is handed a trade the engine did not price:
 //
@@ -28,7 +28,7 @@
 //      person is most likely to make, because using the service's own published number feels more
 //      honest than recomputing it, and gate B5-4 measured it at 30 grid steps.
 //
-// THREE ATTACK THE MEASUREMENT RATHER THAN THE ARITHMETIC, which is the harder half:
+// FOUR ATTACK WHAT IS PUBLISHED OR MEASURED RATHER THAN THE ARITHMETIC, which is the harder half:
 //
 //   5. THE CEILING IS REMOVED. `EXEC_REL_CEILING` is widened by a factor of a million. Nothing is
 //      mis-certified; the guard simply stops refusing the dust fills where a basis-point figure cannot
@@ -37,9 +37,19 @@
 //   6. THE BOUND IS WIDENED to the display step. The arithmetic is untouched and the guard stops being
 //      able to tell anything. EX.7's "the bound is tight, not generous" is what notices.
 //   7. THE BOX BECOMES A DERIVATIVE. `execEncodingShift` returns the linearisation instead of the
-//      corner maximum. This is the subtlest of the seven and the one that was actually WRONG in this
+//      corner maximum. This is the subtlest of the eight and the one that was actually WRONG in this
 //      file's first draft: the benchmark is concave in the effective input, so the linear term is not
 //      an upper bound, and the worst honest case sat at 99.08% of a number that did not bound it.
+//      It is also the revert that FOUND A DEFECT IN THE GATE: the check written to catch this could
+//      not fail, because it compared the shipped bound against a narrower yardstick than the one the
+//      shipped code uses. EX.2b now recomputes the corner max independently and demands bit equality.
+//   8. THE SIGNED-SIGNAL RULE IS WITHDRAWN. `signedSignals` is dropped from the retrieval route, so
+//      `signalLayout` is published with no note that five of the fifteen are two's-complement in the
+//      field. Nothing is mis-proven and nothing a positive-headline fixture touches changes — but a
+//      FAVOURABLE fill, which `execVerify` reports with its own verdict sentence, makes the shortfall
+//      and the basis-point figure negative, and a reader following the layout reads 2.19e+67 instead
+//      of -3207.37. Found on the MCP surface by proving a favourable fill, after EX.4 had gone green
+//      over the same decode on a positive one.
 //
 // It also reads the engine build id before and after. Nothing here touches src/engine/, and the
 // published q1-e1fa99d08887d6cc must be the same string on both sides of a script that rewrites files.
@@ -53,6 +63,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const SNARK_JS = join(ROOT, 'src', 'util', 'snark.js');
 const SCALE_CJS = join(ROOT, 'src', 'util', 'scale.cjs');
+const APP_JS = join(ROOT, 'src', 'app.js');
 
 const REVERTS = [
   {
@@ -123,6 +134,15 @@ const REVERTS = [
     to: '  const hin = EXEC_HALF_STEP + Math.abs(inEff) * 8 * HALF_ULP;\n  if (!(hx >= 0 && hy >= 0 && hin >= 0)) return Infinity;\n  return ((y * x) / ((x + inEff) * (x + inEff))) * hin;   // SCRIPTED REVERT: linearised, and therefore not an upper bound',
     expect: /^EX\.2b/,
     expectDesc: 'EX.2b, which requires the shipped bound to be the corner evaluation rather than the derivative',
+  },
+  {
+    id: 8,
+    file: APP_JS,
+    what: 'the signed-signal decode rule is withdrawn — a favourable fill\'s headline reads 2.19e+67 to anyone following signalLayout',
+    from: "      signedSignals: ['residual', 'feeResidual', 'bpsResidual', 'shortfall', 'bpsHat'],",
+    to: '      // SCRIPTED REVERT: the layout is published with no note that five of the fifteen are signed',
+    expect: /^EX\.10/,
+    expectDesc: 'EX.10, which requires the retrieval route to name every signed signal and carry an executable decode rule',
   },
 ];
 

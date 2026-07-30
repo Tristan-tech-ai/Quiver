@@ -589,11 +589,55 @@ file.** Run under `node --test` it restores every file correctly and then fails 
 `could not read the runner summary`, because it parses a runner summary that nested test output does not
 produce. Run it as `node gates/gateLP-revert.mjs`.
 
+### 11.6 LP.11 was the one test in this file a buyer could not run
+
+Running the gate from the **mirror** rather than the working tree exposed a pre-existing line:
+
+```js
+const circ = readFileSync(join(ROOT, '..', '..', 'zk', 'circuits', 'lpbracket.circom'), 'utf8');
+```
+
+`../../zk` resolves only when the gate sits at `hackathon/veritape/`. From a clone of the published
+repository — where the service **is** the repository and `zk/` sits beside `gates/` — it points
+outside the checkout, and LP.11 died on `ENOENT`. So the one test that asserts *this circuit still
+documents what it does not prove* was the one test a buyer could not run, which is a poor place for a
+project whose argument is that its claims are checkable to have a broken path.
+
+Fixed to the candidate-list convention `gateN-known-defects.mjs` and `gateZ-revert.mjs` already use,
+and it **refuses** rather than skipping if no layout matches — a check that silently passes when it
+cannot find its subject is worse than absent. **13/13 now passes in both layouts**, verified in each.
+
+### 11.7 What was left to its owner
+
 `src/util/lpBoundedness.js`, `src/engine/lpRisk.js` and `docs/verify-lp-risk.md` were left alone — a
 concurrent session holds all three, and `verify-lp-risk.md` had uncommitted gas-attribution edits in the
 working tree. `docs/verify-lp-risk.md` still carries §8's superseded conclusion in the row *"what
 actually blocks the quadrature: the ceremony file"*; that row is true of `lpexpectation.circom` and is no
 longer true of the problem, and it is that session's file to correct.
+
+**And the published repository would not start.** Running this gate from the mirror surfaced it:
+`src/services.js` and `src/mcp.js` — both committed, both reached from `src/app.js` and `api/index.js` —
+imported `./util/lpBoundedness.js`, a file that had **never been committed on any branch**. A fresh clone
+of `origin/main` died on `ERR_MODULE_NOT_FOUND` before serving a request. It was introduced by
+`3c73436`, the lpbracket wiring commit itself, and survived two later commits by other sessions.
+
+**The mechanism is worth recording, because an explicit pathspec did not prevent it.** `3c73436` used
+one, and correctly, for its own change — but `src/services.js` in the shared working tree already
+carried *another session's* uncommitted import. Committing the file it legitimately owned dragged in a
+dependency it did not know about and did not add. Five sessions sharing one working tree means a
+pathspec protects you from files you did not touch, not from *other people's edits inside files you
+did*. The check that catches it is not a narrower pathspec: it is resolving every relative import in
+`HEAD` against `HEAD`'s own file list, which takes seconds.
+
+This was **not** repaired here, deliberately, and the concurrent session repaired it itself minutes
+later in `8545b1b` with its own final version of the file. Committing another session's in-flight module
+from a shared tree is the *precise* failure that caused the break; doing it again to fix it would have
+published a snapshot its author had not chosen. A first pass of the import audit also over-reported —
+29 flags of which 2 were real, 11 were `spawnSync(process.execPath, ['-e', "import('./…')"])` strings
+resolved at runtime against a different `cwd`, and 16 came from `src/util/mcp.js`, a stale duplicate in
+`HEAD` that nothing imports and that the working tree no longer has. A scanner that over-reports is as
+useless as one that cannot fail, so the genuine break was confirmed by loading the module, not by the
+regex.
 
 **Everything green on this pass**, measured not restated: `npm test` **386 tests, 0 fail**;
 `tools/docs-consistency.mjs` **252 documents consistent**; `gates/preflight.mjs` **PASSED** with

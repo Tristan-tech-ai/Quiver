@@ -12,7 +12,7 @@
 //   node --test gates/gateLP-bracket-snark.mjs
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SERVICES } from '../src/services.js';
@@ -564,7 +564,18 @@ test('LP.11 what this gate does NOT establish', async () => {
   for (const l of lines) console.log(`  LP.11 NOT PROVEN: ${l}`);
   // The claim above is checkable in one place: the circuit's public input list must still contain the
   // two endpoint values, or the sentence has gone stale.
-  const circ = readFileSync(join(ROOT, '..', '..', 'zk', 'circuits', 'lpbracket.circom'), 'utf8');
+  // RESOLVED ACROSS LAYOUTS, not hardcoded to the working tree. This line read
+  // `join(ROOT, '..', '..', 'zk', ...)`, which resolves only when the gate sits at
+  // hackathon/veritape/; from a clone of the published repository, where the service IS the
+  // repository and `zk/` sits beside `gates/`, it pointed outside the checkout entirely and LP.11
+  // died on ENOENT. The gate that asserts this circuit still documents what it does not prove was
+  // therefore the one test in this file a buyer could not run. Same candidate-list convention as
+  // gateN-known-defects.mjs and gateZ-revert.mjs, and it refuses rather than skipping if no layout
+  // matches — a check that silently passes when it cannot find its subject is worse than absent.
+  const ZK_SRC = [join(ROOT, '..', '..', 'zk'), join(ROOT, '..', 'zk'), join(ROOT, 'zk')]
+    .find((p) => existsSync(join(p, 'circuits', 'lpbracket.circom')));
+  assert.ok(ZK_SRC, 'no zk/circuits/lpbracket.circom in this checkout, from any layout — refusing to report a check it did not make');
+  const circ = readFileSync(join(ZK_SRC, 'circuits', 'lpbracket.circom'), 'utf8');
   assert.match(circ, /component main \{public \[[^\]]*eLoHat[^\]]*eHiHat[^\]]*\]\}/, 'the circuit no longer publishes the two assumed values, so doesNotProve is describing a different circuit');
   assert.match(circ, /A PUBLIC INPUT, NOT PROVEN HERE/, 'the circuit no longer says which signals it does not prove');
 });

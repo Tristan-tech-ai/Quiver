@@ -66,9 +66,34 @@ const callMarker = markerArg && markerArg.startsWith('call:')
   ? { tool: markerArg.split(':')[1], path: markerArg.split(':').slice(2).join(':') }
   : null;
 
+// A THIRD MARKER FORM, added 30 July 2026 because deploy six had no observable change either of the other
+// two could reach. Its whole effect was on the wording served at /proof/vk/<circuit>, which is neither a
+// key in /build nor a path in an MCP answer. Rather than deploy without a marker, or invent a build key
+// purely to be watched, the marker can name any GET path and a substring that must appear in it:
+//
+//   --marker "get:/proof/vk/lpbracket:verificationKey\` FIELD"
+//
+// The substring is checked against the raw body, so it works for JSON and for HTML pages like /changelog.
+const getMarker = markerArg && markerArg.startsWith('get:')
+  ? { path: markerArg.split(':')[1], needle: markerArg.split(':').slice(2).join(':') }
+  : null;
+if (getMarker && !getMarker.needle) {
+  console.log('FATAL: a get: marker needs a substring — --marker "get:/path:text that must appear"');
+  process.exit(2);
+}
+
+async function getMarkerPresent() {
+  if (!getMarker) return null;
+  try {
+    const r = await fetch(`${LIVE}${getMarker.path}`);
+    if (!r.ok) return null;                 // unreachable is darkness, not a false marker
+    return (await r.text()).includes(getMarker.needle);
+  } catch { return null; }
+}
+
 // Reads /build. Returns false for a call-form marker, which is resolved separately against a live answer.
 const NEW_BUILD_MARKER = (build) => {
-  if (!build || callMarker) return false;
+  if (!build || callMarker || getMarker) return false;
   if (!markerArg) return Object.prototype.hasOwnProperty.call(build, 'proofStorage');
   const p = markerArg.startsWith('build.') ? markerArg.slice(6) : markerArg;
   return present(dig(build, p));
@@ -159,6 +184,9 @@ async function probe() {
     if (callMarker) {
       const m = await callMarkerPresent();
       if (m !== null) out.newBuild = m;   // null means unreachable, which is darkness, not absence
+    } else if (getMarker) {
+      const m = await getMarkerPresent();
+      if (m !== null) out.newBuild = m;   // same rule: unreachable is darkness, not a false marker
     }
 
     out.ok = out.checks.build && out.checks.services > 0 && out.checks.paidReturns402 && out.checks.mcpTools > 0;

@@ -12,6 +12,32 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — correcting the verify instruction did not reach the proofs that were already stored
+
+**Fixing the code fixed the future and left the past broken, which is worth stating plainly.** The previous
+entry corrected the sentence every proof publishes for checking itself. Tested against the live service
+immediately afterwards: a **fresh** proof carried the corrected wording, and a proof built before the deploy
+still published the old one. Proof documents are stored, and `/proof/<contentHash>` served `rec.verify`
+verbatim, so each one keeps whatever text was current on the day it was proved. No amount of editing code
+would ever have reached them.
+
+**The instruction is now derived when the proof is served, not when it is built.** One exported function
+replaces seven inline copies, and `/proof/<contentHash>` calls it for the record's own circuit, falling back
+to the stored string only for a circuit this build does not know. So a proof from any past deploy is
+described by today's wording. `verify` is documentation and sits in no hash preimage, which was measured
+rather than assumed, so nothing verifiable moves and no contentHash changes.
+
+**Why it was seven copies in the first place is the actual lesson.** The same sentence was written out once
+per circuit, so it could drift between them and a correction had to be applied seven times. It is one
+function now, and the reason is in a comment above it rather than in a commit message nobody will read.
+
+**The watchdog gained a third marker form, because this deploy had nothing the other two could see.** A
+marker must be something only the new build can produce. The change here was entirely in served wording, so
+there was no key to point at in `/build` and no path in an MCP answer. Rather than deploy unwatched, or
+invent a build key purely to be watched, `--marker "get:/path:substring"` fetches any path and waits for the
+substring. An unreachable path stays undecided rather than counting as absent, because unreachable is
+darkness and the watchdog already tracks that separately.
+
 ## 30 July 2026 — every deterministic service now serves a proof, and the instruction for checking one did not work
 
 **Seven of seven deterministic services emit a proof on the live container, up from three.** `exec-verify`,

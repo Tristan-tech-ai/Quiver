@@ -20,6 +20,7 @@ import { suggestService, REQUIRED_ALTERNATIVES } from '../src/util/routing.js';
 import { GENUINE, UNREACHABLE_BY_SHAPE, invalidFixtures, coverageSummary, noisyOnCorrectCalls } from './routing-fixtures.mjs';
 import { handleRpc, TOOLS } from '../src/mcp.js';
 import { _internal, engineSourceFiles } from '../src/engine/proof.js';
+import { verifyInstruction } from '../src/util/snark.js';
 import { readFileSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -570,13 +571,29 @@ check('the verification-key endpoint answers', !!vkDoc,
 if (vkDoc) {
   // Whether the key is wrapped is a property of the SERVED shape, and it decides what the wording must say.
   const wrapped = !vkDoc.curve && !!vkDoc.verificationKey?.curve;
+  // MEASURED BY CALLING IT, not by counting copies of a string in the source. The first version of this
+  // check required seven occurrences of the phrase in snark.js, which was true while the sentence was
+  // written out once per circuit and went red the moment those seven copies became seven calls to one
+  // function — the very cleanup that made the drift impossible. A check that fails when its subject
+  // improves is measuring the wrong quantity.
+  const circuits = [null, 'kelly', 'concentration', 'execadverse', 'ncdf', 'lpbracket'];
+  const bad = circuits.filter((c) => {
+    const t = String(verifyInstruction(c) || '');
+    return wrapped
+      ? !(/verificationKey` FIELD/.test(t) && t.includes(c ? `/proof/vk/${c}` : '/proof/vk'))
+      : /verificationKey` FIELD/.test(t);
+  });
   const notesNameField = (appSrc.match(/verificationKey` FIELD/g) || []).length;
-  const verifiesNameField = (snarkSrc.match(/verificationKey` FIELD/g) || []).length;
-  check('every published verify instruction about to ship names the field to extract',
-    wrapped ? (notesNameField >= 2 && verifiesNameField >= 7) : (notesNameField === 0 && verifiesNameField === 0),
-    wrapped
-      ? `the key is served WRAPPED; ${notesNameField}/2 endpoint notes and ${verifiesNameField}/7 proof verify strings say so`
-      : 'the key is served BARE, so no instruction should be telling callers to extract a field');
+  check('every verify instruction about to ship names the field, for every circuit',
+    bad.length === 0 && (wrapped ? notesNameField >= 2 : notesNameField === 0),
+    bad.length
+      ? `these circuits produce an instruction that does not name the field: ${bad.map((c) => c || '(default)').join(', ')}`
+      : `${circuits.length}/${circuits.length} circuits, and ${notesNameField}/2 endpoint notes, against a ${wrapped ? 'WRAPPED' : 'BARE'} key`);
+
+  // and the sentence must be built in one place, or a later fix has to be applied once per circuit again
+  const inlineLeft = (snarkSrc.match(/verify: '(?:[^'\\]|\\.)*'/g) || []).length;
+  check('the verify instruction has a single source',
+    inlineLeft === 0, inlineLeft === 0 ? 'built by verifyInstruction() everywhere' : `${inlineLeft} inline copies remain`);
 
   // and the thing the instruction produces has to be a key snarkjs can actually read
   const inner = vkDoc.verificationKey || vkDoc;

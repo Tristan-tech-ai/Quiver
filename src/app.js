@@ -12,7 +12,7 @@ import { repairBody, correctedExample } from './util/repair.js';
 import { sealContentHashRecipe } from './util/recipe.js';
 import { handleRpc } from './mcp.js';
 import { recurrenceSummary } from './recurrence.js';
-import { getProof, verificationKey, warmProver, CIRCUITS } from './util/snark.js';
+import { getProof, verificationKey, warmProver, CIRCUITS, verifyInstruction } from './util/snark.js';
 // Every one of these is async — see util/proofStore.js for why there is no synchronous read left on
 // either backend. `kind()` is the exception and does no I/O at all.
 import { durable as proofsAreDurable, count as storedProofCount, kind as proofStoreKind, durabilityNote } from './util/proofStore.js';
@@ -395,7 +395,16 @@ app.get('/proof/:contentHash', async (req, res) => {
     // was correct while there was a single circuit and becomes a wrong answer the moment there are
     // two — a verifier handed the liquidation key for a Kelly proof gets a failed verification and no
     // reason for it, which reads exactly like a forged proof.
-    verificationKey: rec.circuit ? `/proof/vk/${rec.circuit}` : '/proof/vk', verify: rec.verify,
+    verificationKey: rec.circuit ? `/proof/vk/${rec.circuit}` : '/proof/vk',
+    // DERIVED AT SERVE TIME, not read out of the stored record. `rec.verify` is whatever wording was
+    // current on the day the proof was built, and the wording was wrong until 30 July 2026: it told a
+    // reviewer to hand the whole /proof/vk/<circuit> document to snarkjs, which crashes on it. Correcting
+    // the code fixed proofs built afterwards and could never reach the ones already stored, so a reviewer
+    // fetching an existing proof would have kept getting the broken command indefinitely. Confirmed live
+    // before this change: a fresh proof carried the fix and an older one still published the old sentence.
+    // `verify` is documentation and sits in no hash preimage, so nothing verifiable moves. `rec.verify`
+    // remains the fallback for a circuit this build does not know about, which is the honest answer there.
+    verify: verifyInstruction(rec.circuit) || rec.verify,
     // Present only when at least one number in the proven statement was READ FROM A VENUE rather than
     // supplied by the caller — which is a distinction the circuit cannot carry, because it has no term
     // for where a number came from. Spread rather than assigned, and placed immediately above the

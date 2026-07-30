@@ -1,0 +1,118 @@
+{
+  "at": "2026-07-30T04:01:09.648Z",
+  "passed": true,
+  "question": "Does the gas crossover survive once the circuit has to NAME the set it claims the root covers?",
+  "whyPublicInputs": "A set-exactness statement must name the list, or it decides nothing about which set the root covers. Each 32-byte contentHash needs two BN254 public signals; the root needs two more. So the verify is priced at 2N+2 signals, not at the 8 the earlier crossover used.",
+  "measured": [
+    {
+      "circuit": "liquidation",
+      "verifier": "PlonkVerifier",
+      "publicSignals": 8,
+      "samples": 8,
+      "execGasMedian": 274109,
+      "calldataGas": 13784,
+      "totalGasMin": 286559,
+      "totalGasMedian": 287893,
+      "totalGasMax": 288847,
+      "spreadGas": 2288,
+      "spreadPct": 0.8
+    },
+    {
+      "circuit": "portfoliogate",
+      "verifier": "PlonkVerifier",
+      "publicSignals": 28,
+      "samples": 8,
+      "execGasMedian": 292222,
+      "calldataGas": 17976,
+      "totalGasMin": 308254,
+      "totalGasMedian": 310186,
+      "totalGasMax": 310736,
+      "spreadGas": 2482,
+      "spreadPct": 0.8
+    }
+  ],
+  "marginal": {
+    "perPublicSignalTotalGas": 1114.7,
+    "perPublicSignalExecGas": 905.6,
+    "spanSignals": 20,
+    "gapGas": 22293,
+    "samplingSpreadFloorGas": 2482,
+    "gapOverSpread": 9
+  },
+  "baseGasAtZeroSignals": 278976,
+  "comparison": [
+    {
+      "n": 2,
+      "directTotalGas": 8599,
+      "snarkTotalGasAt2Nplus2": 285664,
+      "publicSignals": 6,
+      "cheaper": "direct"
+    },
+    {
+      "n": 4,
+      "directTotalGas": 14545,
+      "snarkTotalGasAt2Nplus2": 290122,
+      "publicSignals": 10,
+      "cheaper": "direct"
+    },
+    {
+      "n": 8,
+      "directTotalGas": 26339,
+      "snarkTotalGasAt2Nplus2": 299040,
+      "publicSignals": 18,
+      "cheaper": "direct"
+    },
+    {
+      "n": 16,
+      "directTotalGas": 49838,
+      "snarkTotalGasAt2Nplus2": 316874,
+      "publicSignals": 34,
+      "cheaper": "direct"
+    },
+    {
+      "n": 32,
+      "directTotalGas": 96822,
+      "snarkTotalGasAt2Nplus2": 352543,
+      "publicSignals": 66,
+      "cheaper": "direct"
+    },
+    {
+      "n": 64,
+      "directTotalGas": 190931,
+      "snarkTotalGasAt2Nplus2": 423880,
+      "publicSignals": 130,
+      "cheaper": "direct"
+    },
+    {
+      "n": 128,
+      "directTotalGas": 379886,
+      "snarkTotalGasAt2Nplus2": 566556,
+      "publicSignals": 258,
+      "cheaper": "direct"
+    },
+    {
+      "n": 256,
+      "directTotalGas": 760893,
+      "snarkTotalGasAt2Nplus2": 851906,
+      "publicSignals": 514,
+      "cheaper": "direct"
+    },
+    {
+      "n": 512,
+      "directTotalGas": 1534892,
+      "snarkTotalGasAt2Nplus2": 1422607,
+      "publicSignals": 1026,
+      "cheaper": "snark"
+    },
+    {
+      "n": 1024,
+      "directTotalGas": 3133246,
+      "snarkTotalGasAt2Nplus2": 2564008,
+      "publicSignals": 2050,
+      "cheaper": "snark"
+    }
+  ],
+  "crossoverWithPublicInputs": 512,
+  "crossoverWithoutPublicInputs": 128,
+  "note": "Both columns include EIP-2028 calldata gas. The direct column is measured; the SNARK column is the measured base plus the measured per-signal marginal, extrapolated in the number of signals. The marginal is required to exceed 3x the worst sampling spread before it is used, so it cannot be noise."
+}

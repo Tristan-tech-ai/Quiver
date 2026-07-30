@@ -1,0 +1,221 @@
+{
+  "at": "2026-07-30T03:56:23.407Z",
+  "passed": true,
+  "question": "What does a zk proof add over the Merkle root and inclusion proofs risk-attest already publishes?",
+  "structuralFact": "The response publishes every leaf: attestations[].contentHash is the complete leaf set in index order. A holder of one response can therefore recompute the root in 2N-1 sha256 calls, which decides set-exactness — no item dropped AND no item hidden — with no circuit, no trusted setup and no proving key.",
+  "directOnChain": [
+    {
+      "n": 2,
+      "setExact": {
+        "execGas": 6731,
+        "calldataGas": 1868,
+        "totalGas": 8599,
+        "calldataBytes": 164,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 1,
+        "execGas": 4900,
+        "calldataGas": 1868,
+        "totalGas": 6768,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 4,
+      "setExact": {
+        "execGas": 11641,
+        "calldataGas": 2904,
+        "totalGas": 14545,
+        "calldataBytes": 228,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 2,
+        "execGas": 5978,
+        "calldataGas": 2392,
+        "totalGas": 8370,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 8,
+      "setExact": {
+        "execGas": 21387,
+        "calldataGas": 4952,
+        "totalGas": 26339,
+        "calldataBytes": 356,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 3,
+        "execGas": 7056,
+        "calldataGas": 2904,
+        "totalGas": 9960,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 16,
+      "setExact": {
+        "execGas": 40802,
+        "calldataGas": 9036,
+        "totalGas": 49838,
+        "calldataBytes": 612,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 4,
+        "execGas": 8124,
+        "calldataGas": 3404,
+        "totalGas": 11528,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 32,
+      "setExact": {
+        "execGas": 79618,
+        "calldataGas": 17204,
+        "totalGas": 96822,
+        "calldataBytes": 1124,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 5,
+        "execGas": 9191,
+        "calldataGas": 3916,
+        "totalGas": 13107,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 64,
+      "setExact": {
+        "execGas": 157379,
+        "calldataGas": 33552,
+        "totalGas": 190931,
+        "calldataBytes": 2148,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 6,
+        "execGas": 10259,
+        "calldataGas": 4428,
+        "totalGas": 14687,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 128,
+      "setExact": {
+        "execGas": 313626,
+        "calldataGas": 66260,
+        "totalGas": 379886,
+        "calldataBytes": 4196,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 7,
+        "execGas": 11337,
+        "calldataGas": 4928,
+        "totalGas": 16265,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 256,
+      "setExact": {
+        "execGas": 629229,
+        "calldataGas": 131664,
+        "totalGas": 760893,
+        "calldataBytes": 8292,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 8,
+        "execGas": 12416,
+        "calldataGas": 5428,
+        "totalGas": 17844,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 512,
+      "setExact": {
+        "execGas": 1272576,
+        "calldataGas": 262316,
+        "totalGas": 1534892,
+        "calldataBytes": 16484,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 9,
+        "execGas": 13495,
+        "calldataGas": 5964,
+        "totalGas": 19459,
+        "refusedBentSibling": true
+      }
+    },
+    {
+      "n": 1024,
+      "setExact": {
+        "execGas": 2609434,
+        "calldataGas": 523812,
+        "totalGas": 3133246,
+        "calldataBytes": 32868,
+        "refusedDrop": true,
+        "refusedHidden": true,
+        "refusedSubstitution": true
+      },
+      "inclusion": {
+        "pathLength": 10,
+        "execGas": 14562,
+        "calldataGas": 6464,
+        "totalGas": 21026,
+        "refusedBentSibling": true
+      }
+    }
+  ],
+  "plonk": {
+    "verifier": "PlonkVerifier",
+    "publicSignals": 8,
+    "samples": 12,
+    "execGasFirstSample": 275981,
+    "calldataGas": 13784,
+    "totalGasMin": 286853,
+    "totalGasMedian": 288053,
+    "totalGasMax": 289765,
+    "totalGasMean": 288009.5,
+    "spreadGas": 2912,
+    "spreadPct": 1.01,
+    "deployedBytes": 7270
+  },
+  "crossover": {
+    "n": 128,
+    "measuredInRange": true,
+    "perLeafMarginalGas": 3121.8,
+    "basis": "execution gas + EIP-2028 calldata gas on both sides, fresh EVM per measurement"
+  },
+  "tamperFailures": 0,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "note": "Plonk figures are a 12-sample distribution because proving is randomised; the direct figures are single samples because the direct checker touches no proof scalars. Both columns include EIP-2028 calldata gas, which executionGasUsed excludes and which dominates the direct check at large N."
+}

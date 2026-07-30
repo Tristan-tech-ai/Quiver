@@ -1,0 +1,266 @@
+{
+  "at": "2026-07-30T04:33:10.278Z",
+  "passed": true,
+  "finding": "A zk proof adds nothing to risk-attest. The response publishes the complete leaf set, so set-exactness — no item dropped AND no item hidden, the two halves an inclusion proof cannot reach — is decided by recomputing the root in 2N-1 sha256 calls. There is no privacy to buy because every leaf is already public, and no succinctness to buy because the verifier already holds every leaf. At the service's own batch ceiling the direct check is also cheaper on chain than a pairing check that would prove a weaker statement, and the circuit needed at that N is beyond this project's trusted setup.",
+  "whatNoCircuitCanFix": "Whether the submitter submitted its COMPLETE set of computations. The root covers what it was handed; a circuit's witness is also what it was handed. That is the input problem, and it is answered by input attestation, not by a circuit.",
+  "serviceSource": "dev tree: research startup/hackathon/veritape/src",
+  "perBatchSize": [
+    {
+      "n": 1,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 1,
+      "expectedHashes": 1,
+      "allInclusionProofsHold": true
+    },
+    {
+      "n": 2,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 3,
+      "expectedHashes": 3,
+      "allInclusionProofsHold": true
+    },
+    {
+      "n": 3,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 5,
+      "expectedHashes": 5,
+      "allInclusionProofsHold": true
+    },
+    {
+      "n": 5,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 9,
+      "expectedHashes": 9,
+      "allInclusionProofsHold": true
+    },
+    {
+      "n": 8,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 15,
+      "expectedHashes": 15,
+      "allInclusionProofsHold": true
+    },
+    {
+      "n": 13,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 25,
+      "expectedHashes": 25,
+      "allInclusionProofsHold": true
+    },
+    {
+      "n": 64,
+      "publishesEveryLeaf": true,
+      "setExact": true,
+      "hashesToDecide": 127,
+      "expectedHashes": 127,
+      "allInclusionProofsHold": true
+    }
+  ],
+  "tamperMatrix": [
+    {
+      "tamper": "a leaf is listed but the root omits it",
+      "setExactRefused": true,
+      "why": "the root is NOT the root of the published leaf set",
+      "servedInclusionProofsAllStillPass": false
+    },
+    {
+      "tamper": "the root covers a leaf the response never lists",
+      "setExactRefused": true,
+      "why": "the root is NOT the root of the published leaf set",
+      "servedInclusionProofsAllStillPass": true
+    },
+    {
+      "tamper": "a listed leaf is substituted",
+      "setExactRefused": true,
+      "why": "the root is NOT the root of the published leaf set",
+      "servedInclusionProofsAllStillPass": false
+    },
+    {
+      "tamper": "leafCount is inflated",
+      "setExactRefused": true,
+      "why": "leafCount disagrees with the published attestation list",
+      "servedInclusionProofsAllStillPass": true
+    },
+    {
+      "tamper": "the root is replaced wholesale",
+      "setExactRefused": true,
+      "why": "the root is NOT the root of the published leaf set",
+      "servedInclusionProofsAllStillPass": false
+    }
+  ],
+  "rootCommitment": {
+    "invariantUnderWithinPairSwap": true,
+    "movesUnderAcrossPairSwap": true,
+    "meaning": "the root commits to the leaf set with its pairing structure, not to the published index"
+  },
+  "serviceCeiling": {
+    "maxLeavesAccepted": 244,
+    "bytesAtCeiling": 16367,
+    "firstRefused": 245,
+    "statusOverCeiling": 413
+  },
+  "onChain": {
+    "directSetExactTotalGasAtCeiling": 708175,
+    "directExecGas": 582655,
+    "directCalldataGas": 125520,
+    "plonkSamples": [
+      {
+        "circuit": "liquidation",
+        "publicSignals": 8,
+        "samples": 12,
+        "mean": 288042.3,
+        "median": 288077,
+        "min": 286927,
+        "max": 289349,
+        "spread": 2422,
+        "sd": 690.4,
+        "se": 199.3
+      },
+      {
+        "circuit": "concentration",
+        "publicSignals": 12,
+        "samples": 12,
+        "mean": 292126.5,
+        "median": 292304,
+        "min": 290542,
+        "max": 294114,
+        "spread": 3572,
+        "sd": 945,
+        "se": 272.8
+      },
+      {
+        "circuit": "portfoliogate",
+        "publicSignals": 28,
+        "samples": 12,
+        "mean": 309801.5,
+        "median": 309672,
+        "min": 308804,
+        "max": 310798,
+        "spread": 1994,
+        "sd": 543.9,
+        "se": 157
+      }
+    ],
+    "linearityResiduals": [
+      {
+        "circuit": "liquidation",
+        "publicSignals": 8,
+        "mean": 288042.3,
+        "fitted": 287914.9,
+        "residual": 127.4,
+        "seMultiples": 0.64
+      },
+      {
+        "circuit": "concentration",
+        "publicSignals": 12,
+        "mean": 292126.5,
+        "fitted": 292285.8,
+        "residual": -159.3,
+        "seMultiples": -0.58
+      },
+      {
+        "circuit": "portfoliogate",
+        "publicSignals": 28,
+        "mean": 309801.5,
+        "fitted": 309769.6,
+        "residual": 31.9,
+        "seMultiples": 0.2
+      }
+    ],
+    "perPublicSignalGas": 1092.7,
+    "plonkBaseGasAtZeroSignals": 279173,
+    "plonkVerifyTotalGasAtCeiling": 814615,
+    "publicSignalsRequiredAtCeiling": 490,
+    "directIsCheaper": true,
+    "directDeterministic": true
+  },
+  "derivedBound": {
+    "what": "the most SNARK-favourable reading the samples admit — the only direction that can overturn the finding",
+    "perPublicSignalGasMin": 1054.7,
+    "perPublicSignalGasCentral": 1092.7,
+    "plonkVerifyTotalGasAtCeilingWorstCase": 795801,
+    "marginGasCentral": 106440,
+    "marginGasWorstCase": 87626,
+    "sigmaMultiple": 3,
+    "seOfMarginalGasPerSignal": 12.69,
+    "fractionOfCentralMarginConsumedByWorstCase": 0.1768,
+    "atN64": {
+      "directTotalGas": 190931,
+      "pairingTotalGas": 421229,
+      "ratio": 2.21
+    },
+    "tightestPointIsTheCeiling": true,
+    "survives": true
+  },
+  "circuitFloor": {
+    "constraintsAtCeiling": 22822720,
+    "ptauPowerRequired": 25,
+    "largestPtauPresent": 12,
+    "ptauFilesPresent": [
+      "hez_final_12.ptau",
+      "pot12_final.ptau"
+    ],
+    "isLowerBound": true
+  },
+  "checks": [
+    {
+      "name": "every response publishes its COMPLETE leaf set (indices 0..n-1, each a 32-byte word)",
+      "pass": true
+    },
+    {
+      "name": "set-exactness is decided from the published response alone, in 2N-1 sha256 calls",
+      "pass": true
+    },
+    {
+      "name": "the recomputation refuses every way a root can misrepresent its set",
+      "pass": true
+    },
+    {
+      "name": "a hidden extra leaf is invisible to inclusion checking and caught by the recomputation",
+      "pass": true
+    },
+    {
+      "name": "the honest response still passes the same checker",
+      "pass": true
+    },
+    {
+      "name": "the root is invariant under a WITHIN-pair swap and moves under an ACROSS-pair swap",
+      "pass": true
+    },
+    {
+      "name": "the on-chain set-exactness check accepts the real root and refuses a wrong one",
+      "pass": true
+    },
+    {
+      "name": "a Plonk verify is linear in public inputs across the measured range, to within sampling error",
+      "pass": true
+    },
+    {
+      "name": "at the service's own ceiling the direct check is cheaper than a set-exactness pairing check",
+      "pass": true
+    },
+    {
+      "name": "the direct check is deterministic, so its single sample needs no error bar",
+      "pass": true
+    },
+    {
+      "name": "the conclusion survives the most SNARK-favourable reading of every measured quantity",
+      "pass": true
+    },
+    {
+      "name": "the gas leg is decisive below the ceiling, not merely at it",
+      "pass": true
+    },
+    {
+      "name": "the circuit that would be needed is beyond the trusted setup this project has",
+      "pass": true
+    }
+  ],
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang"
+}

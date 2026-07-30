@@ -1,0 +1,122 @@
+{
+  "at": "2026-07-30T04:22:25.230Z",
+  "passed": true,
+  "finding": "The root commits to the leaf SET together with its pairing structure, not to the published index. hashPair sorts its arguments, so a within-pair transposition leaves the root unchanged; an across-pair transposition moves it. Not a defect — membership is a property of the set, both leaves stay members, and sorted pairs are what on-chain verifiers expect — but easy to assume otherwise, and a circuit would not change it.",
+  "permutationClasses": [
+    {
+      "n": 2,
+      "perfectTree": true,
+      "permutations": 2,
+      "distinctRoots": 1,
+      "collideWithIdentity": 2,
+      "internalPairings": 1,
+      "predictedClassSize": 2,
+      "agrees": true
+    },
+    {
+      "n": 3,
+      "perfectTree": false,
+      "permutations": 6,
+      "distinctRoots": 3,
+      "collideWithIdentity": 2,
+      "internalPairings": 2,
+      "predictedClassSize": null,
+      "agrees": null
+    },
+    {
+      "n": 4,
+      "perfectTree": true,
+      "permutations": 24,
+      "distinctRoots": 3,
+      "collideWithIdentity": 8,
+      "internalPairings": 3,
+      "predictedClassSize": 8,
+      "agrees": true
+    },
+    {
+      "n": 5,
+      "perfectTree": false,
+      "permutations": 120,
+      "distinctRoots": 15,
+      "collideWithIdentity": 8,
+      "internalPairings": 4,
+      "predictedClassSize": null,
+      "agrees": null
+    },
+    {
+      "n": 6,
+      "perfectTree": false,
+      "permutations": 720,
+      "distinctRoots": 45,
+      "collideWithIdentity": 16,
+      "internalPairings": 5,
+      "predictedClassSize": null,
+      "agrees": null
+    },
+    {
+      "n": 7,
+      "perfectTree": false,
+      "permutations": 5040,
+      "distinctRoots": 315,
+      "collideWithIdentity": 16,
+      "internalPairings": 6,
+      "predictedClassSize": null,
+      "agrees": null
+    },
+    {
+      "n": 8,
+      "perfectTree": true,
+      "permutations": 40320,
+      "distinctRoots": 315,
+      "collideWithIdentity": 128,
+      "internalPairings": 7,
+      "predictedClassSize": 128,
+      "agrees": true
+    }
+  ],
+  "swaps": [
+    {
+      "label": "within pair (0,1)",
+      "rootUnchanged": true,
+      "ownSelfChecksPass": true
+    },
+    {
+      "label": "within pair (4,5)",
+      "rootUnchanged": true,
+      "ownSelfChecksPass": true
+    },
+    {
+      "label": "across pairs (0,2)",
+      "rootUnchanged": false,
+      "ownSelfChecksPass": true
+    },
+    {
+      "label": "across pairs (1,7)",
+      "rootUnchanged": false,
+      "ownSelfChecksPass": true
+    }
+  ],
+  "recomputationTiming": [
+    {
+      "n": 8,
+      "hashes": 15,
+      "bestOf5Ms": 0.032
+    },
+    {
+      "n": 64,
+      "hashes": 127,
+      "bestOf5Ms": 0.301
+    },
+    {
+      "n": 244,
+      "hashes": 487,
+      "bestOf5Ms": 0.581
+    },
+    {
+      "n": 1024,
+      "hashes": 2047,
+      "bestOf5Ms": 2.591
+    }
+  ],
+  "note": "Class sizes are ENUMERATED against the real engine and cross-checked against the pairing count of the tree the engine builds; the probe throws rather than publishing either number if the two disagree. Timings are best-of-5 after a warm-up, and each run re-checks that the recomputation reproduces the engine root."
+}

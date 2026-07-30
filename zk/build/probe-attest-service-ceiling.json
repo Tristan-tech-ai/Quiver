@@ -1,0 +1,105 @@
+{
+  "at": "2026-07-30T04:02:11.960Z",
+  "passed": true,
+  "question": "Is the N at which a set-exactness SNARK would win on gas even reachable through the service?",
+  "maxLeavesAccepted": 244,
+  "firstLeafCountRefused": 245,
+  "bytesAtCeiling": 16367,
+  "statusAtCeiling": 402,
+  "statusOverCeiling": 413,
+  "bytesPerLeafMeasured": 67,
+  "samples": [
+    {
+      "n": 1,
+      "bodyBytes": 86,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 64,
+      "bodyBytes": 4307,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 256,
+      "bodyBytes": 17171,
+      "status": 413,
+      "bodyAccepted": false,
+      "code": "bad_input"
+    },
+    {
+      "n": 128,
+      "bodyBytes": 8595,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 192,
+      "bodyBytes": 12883,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 224,
+      "bodyBytes": 15027,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 240,
+      "bodyBytes": 16099,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 248,
+      "bodyBytes": 16635,
+      "status": 413,
+      "bodyAccepted": false,
+      "code": "bad_input"
+    },
+    {
+      "n": 244,
+      "bodyBytes": 16367,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 246,
+      "bodyBytes": 16501,
+      "status": 413,
+      "bodyAccepted": false,
+      "code": "bad_input"
+    },
+    {
+      "n": 245,
+      "bodyBytes": 16434,
+      "status": 413,
+      "bodyAccepted": false,
+      "code": "bad_input"
+    },
+    {
+      "n": 244,
+      "bodyBytes": 16367,
+      "status": 402,
+      "bodyAccepted": true,
+      "code": "Payment required"
+    },
+    {
+      "n": 245,
+      "bodyBytes": 16434,
+      "status": 413,
+      "bodyAccepted": false,
+      "code": "bad_input"
+    }
+  ],
+  "note": "Measured by bisecting real POSTs against the express app, with the pass and fail ends of the boundary each asserted. A 402 means the body was accepted and payment was demanded; a 413 means the body was refused. The distinction is what is being measured, so the two are not collapsed."
+}

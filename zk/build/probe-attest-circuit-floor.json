@@ -1,0 +1,67 @@
+{
+  "at": "2026-07-30T03:58:53.526Z",
+  "passed": true,
+  "question": "A real gas crossover exists past ~100 leaves. Can a circuit be built at that N?",
+  "circuitIsGivenItsBestCase": "No sorted-pair comparator: min(a,b)/max(a,b) over 256 bits is omitted and the pairing order is taken as given. Every count is a LOWER BOUND on the published recipe.",
+  "hashIsTheConstraint": "risk-attest commits with sha256 over packed bytes so that an on-chain verifier is a short loop on precompile 0x02. sha256 is the most expensive primitive to put in an arithmetic circuit; a Poseidon commitment would be ~2 orders of magnitude cheaper in-circuit but has no precompile and would cost far more on chain, which is the trade the engine already made.",
+  "measured": [
+    {
+      "n": 2,
+      "sha256Blocks": null,
+      "nonLinearConstraints": 118153,
+      "linearConstraints": 6903,
+      "totalConstraints": 125056,
+      "publicInputs": 0,
+      "privateInputs": 512,
+      "wires": 124321,
+      "compileMs": 5236
+    },
+    {
+      "n": 4,
+      "sha256Blocks": null,
+      "nonLinearConstraints": 295619,
+      "linearConstraints": 17021,
+      "totalConstraints": 312640,
+      "publicInputs": 0,
+      "privateInputs": 1024,
+      "wires": 310545,
+      "compileMs": 12117
+    },
+    {
+      "n": 8,
+      "sha256Blocks": null,
+      "nonLinearConstraints": 650551,
+      "linearConstraints": 37257,
+      "totalConstraints": 687808,
+      "publicInputs": 0,
+      "privateInputs": 2048,
+      "wires": 682993,
+      "compileMs": 26946
+    }
+  ],
+  "marginal": {
+    "constraintsPerLeaf": 93792,
+    "interceptConstraints": -62528,
+    "fromN": 4,
+    "toN": 8
+  },
+  "extrapolated": {
+    "8": 687808,
+    "16": 1438144,
+    "64": 5940160,
+    "97": 9035296,
+    "128": 11942848,
+    "1024": 95980480
+  },
+  "crossover": {
+    "n": 128,
+    "basis": "read from probe-attest-snark-need.json (measured true)",
+    "constraintsAtCrossover": 11942848,
+    "plonkPtauPowerRequired": 24
+  },
+  "ptauFilesPresentInBuild": [
+    "hez_final_12.ptau",
+    "pot12_final.ptau"
+  ],
+  "note": "Constraint counts are read from circom stdout with anchored patterns for BOTH \"non-linear constraints\" and \"linear constraints\", because a regex for the latter also matches the former and that is how a wrong count gets published. Values beyond N=8 are extrapolations from the measured marginal and are labelled as such."
+}

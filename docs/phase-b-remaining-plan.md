@@ -43,7 +43,15 @@ instrument before using it three more times is the whole reason this section is 
 
 Each rests on an identity the engine **already self-checks**, which is why they are tractable: the
 circuit statement does not have to be invented, it has to be transcribed. All three fit the ptau
-ceiling with room to spare.
+ceiling with room to spare, and that was confirmed by building them: measured from their own zkey
+headers, `concentration` and `kelly` and `divergence` all land well inside 4,096 Plonk gates.
+
+**The phrase is kept only because it was checked. It is not a safe thing to say from an R1CS count.**
+On 30 July `probe-lpclosed-cost.json` used exactly this wording for a circuit it had never compiled,
+reading 3,023 R1CS against a Plonk domain of 4,096 as though the two were the same unit. They are not:
+measured across four of this repository's own zkeys the inflation is **1.86× to 1.95×**, and the
+circuit in question compiled to **3,854 R1CS / 7,471 Plonk**, needing domain 8,192. Size a ceremony
+file from the Plonk count in a zkey header, never from an R1CS count.
 
 ### B3 · `treasury-risk` — Herfindahl concentration
 

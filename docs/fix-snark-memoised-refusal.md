@@ -169,7 +169,27 @@ The one caller-visible thing that *does* move is the point: a repeated request w
 refusal now re-derives it, so the record's `at` stamp advances and a transient refusal can become `building`
 and then `ready`. `assets/changelog.md` carries the dated entry.
 
-## 7. Still open
+## 7. It is reachable from a clone, and that was run rather than reasoned about
+
+A session on 29 July committed a `services.js` that imported a module it never copied to the mirror, so the
+repository at HEAD could not start. Grepping for the import would not have caught it; running from a clone
+does. After the push, HEAD (`a684c06`) was cloned into a scratch directory with **only `node_modules`
+junctioned in** — no other file copied, no path patched:
+
+* `npm run gate:mr` in the clone: **10 of 10 green**, 50.4 s. The gate, the fix, the two `npm` aliases, the
+  pinned fixtures and the six proving keys under `assets/zk/` all resolve at HEAD.
+* `import('./src/app.js')` in the clone resolves, so the service still starts from what was committed.
+
+The clone also settled a question that should not be settled by reasoning: **is `gate:n`'s red mine?**
+`npm run gate:n` in the dev tree fails two §8 checks. Swapping only `src/util/snark.js` between this commit
+and its parent inside the clone left the failure set **identical** — 21 pass, 2 fail either way — and the §8
+checks read `Quiver/zk/build/*.r1cs` and the register, neither of which this commit touches. What they
+actually report is a **stale disclosure**: §8 says "the 5 missing artifacts are still missing", and
+`zk/build/liquidation.r1cs` was committed to the mirror by another session in `ddcc434`, four commits before
+this one. Gate N is designed to go red on exactly that, and the register is that session's to update. Left
+alone, reported here, and flagged as its own task.
+
+## 8. Still open
 
 * **The handler still reports `status: 'building'` optimistically.** Both surfaces write
   `status: w.reason ? 'unavailable' : 'building'` into the response *before* the builder has reached the

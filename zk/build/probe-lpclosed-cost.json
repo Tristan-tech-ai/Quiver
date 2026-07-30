@@ -55,5 +55,21 @@
       "worstGapAtV": 1.1254857482322629
     }
   ],
-  "conclusion": "The ceremony file is NOT what blocks proving block 2. A closed-form circuit fits inside hez_final_12 with room to spare, and carries an exact witness across the live domain. What blocks it is that the engine serves a quadrature and this would certify the closed form: the two print a different 4-decimal percent on part of the domain, so wiring it would put a proof beside a response it visibly disagrees with. The fix is engine-side (serve Math.expm1(-v/8), which is exact and 802x cheaper) and src/engine/ is frozen."
+  "conclusion": "SUPERSEDED 30 July 2026 by the two corrections below. Both halves of it were wrong. It read: 'The ceremony file is NOT what blocks proving block 2. A closed-form circuit fits inside hez_final_12 with room to spare ... The fix is engine-side (serve Math.expm1(-v/8), which is exact and 802x cheaper) and src/engine/ is frozen.'",
+  "correction1_ceremony": {
+    "wrong": "It compared an R1CS constraint count (3023) against a PLONK domain ceiling (4096). Those are different units, so 'fits with room to spare' did not follow from the numbers in this file.",
+    "measured": "R1CS -> Plonk inflation, read out of the zkey headers of four circuits this repo already built: lpbracket 932 -> 1776 (1.9056x), ncdf 2051 -> 3812 (1.8586x), kelly 372 -> 718 (1.9301x), liquidation 667 -> 1301 (1.9505x).",
+    "consequence": "3023 R1CS projects to about 5619-5896 Plonk constraints, which needs domain 8192 at every ratio in that range, not 4096. hez_final_12 is NOT big enough. ncdf already sits at 3812 of 4096, so the ceiling is real and close.",
+    "butNotAWall": "hez_final_13 (2^13) is a public download. It touches nothing in src/engine/, so it moves neither the codeHash nor any contentHash. This is a decision about fetching a file, not a research problem."
+  },
+  "correction2_notEngineSide": {
+    "wrong": "'The fix is engine-side and src/engine/ is frozen' asked whether the engine SERVES the exact value. It does not. But that is not the question that decides it.",
+    "measured": "The question is whether the exact value can be COMPUTED from what the response already publishes, and it can. Verified against the live service: expectedDivergence.volatility comes back as 0.0123456789 and horizonPeriods as 7, both verbatim and unrounded, and both also appear in proof.inputs. So v = sigma^2 * T = 0.0010669105125133366 exactly, outside the engine.",
+    "notTotalVariance": "totalVariance is published but rounded to 6dp, and rebuilding v from it is lossier than the quadrature error at issue: at sigma 0.0123456789, T 7 it shifts the answer by 1.12e-6 percentage points, about eight times the 1.4191e-7 pp quadrature envelope.",
+    "consequence": "src/util/lpClosedForm.js computes the exact expectation from the published fields and decides agreement per call, fail closed. codeHash measured before and after adding it: q1-e1fa99d08887d6cc both times, because the hash walks src/engine/ only.",
+    "identityIsReal": "2*sqrt(r)/(1+r) is sech(X/2), and under the martingale lognormal E[sech(X/2)] equals E[sqrt(r)] = exp(-v/8). Checked against an independent fine midpoint rule at v = 0.5, 1, 5, 20, 50, 100, 200: agreement to 1.3e-13 or better. The engine's 401-point trapezoid is the approximation, peaking at 1.4191e-7 pp at v = 1.1255."
+  },
+  "correction3_mismatchCountNeedsItsDomain": {
+    "note": "The substitution mismatch counts below are meaningless without their domain, because the quadrature error peaks sharply at v = 1.13. 40,000 samples over (0, 166] give 3 mismatches; 40,000 samples over (0, 20] give 22. Both are correct for their grid."
+  }
 }

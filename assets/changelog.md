@@ -12,6 +12,56 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — the exact expected impermanent loss needed no engine change, and the ceremony claim was in the wrong units
+
+**Nothing a caller sees changes, and that is the finding.** `q1-e1fa99d08887d6cc` is unmoved, measured
+before and after this work, and no contentHash moves. A recorded probe had concluded that certifying
+`lp-risk`'s expected divergence required editing frozen engine code. It does not.
+
+**What the probe got wrong, twice.** `zk/build/probe-lpclosed-cost.json` concluded "the ceremony file is
+NOT what blocks proving block 2 ... the fix is engine-side ... and `src/engine/` is frozen".
+
+The first half compared an **R1CS** count of 3,023 against a **Plonk** domain ceiling of 4,096. Those are
+different units. Reading the zkey headers of four circuits this repo already built gives the inflation:
+`lpbracket` 932 to 1,776 (1.9056×), `ncdf` 2,051 to 3,812 (1.8586×), `kelly` 372 to 718 (1.9301×),
+`liquidation` 667 to 1,301 (1.9505×). So 3,023 R1CS projects to about **5,619 to 5,896 Plonk**, needing
+domain **8,192** at every ratio in that band. `hez_final_12` is not big enough, and `ncdf` already sits at
+3,812 of 4,096, so the ceiling is real and close. But `hez_final_13` is a **public download**: it touches
+nothing under `src/engine/`, so it moves neither the codeHash nor any contentHash.
+
+The second half asked whether the engine *serves* the exact value. It does not, and that is not the
+question that decides anything. The question is whether the exact value can be **computed** from what the
+response already publishes, and it can. Verified against the live service: `volatility` comes back as
+`0.0123456789` and `horizonPeriods` as `7`, both verbatim and unrounded, and both also appear inside
+`proof.inputs`. So `v = σ²T = 0.0010669105125133366` exactly, outside the engine.
+
+**Not from `totalVariance`.** That field is published but rounded to 6dp, and rebuilding `v` from it is
+lossier than the very error this is about: at `σ = 0.0123456789, T = 7` it shifts the answer by 1.12e-6
+percentage points, roughly eight times the 1.4191e-7 pp quadrature envelope.
+
+**The arithmetic, checked rather than recalled.** `IL(r) = 2√r/(1+r) − 1` is `sech(X/2) − 1` for `r = e^X`,
+and under the martingale lognormal the engine assumes, `E[sech(X/2)]` equals `E[√r] = exp(−v/8)`. Measured
+against an independent fine midpoint rule at `v` = 0.5, 1, 5, 20, 50, 100 and 200: agreement to 1.3e-13 or
+better throughout. So `expm1(−v/8)` is the exact expectation and the engine's 401-point trapezoid is the
+approximation, with a peak truncation error of **1.4191e-7 percentage points at v = 1.1255**.
+
+**What was added.** `src/util/lpClosedForm.js`, entirely outside the engine, recovers `v` exactly and
+evaluates the closed form. It is **fail closed**: it compares the exact value against the served figure and
+refuses when they do not round alike, when either field is missing, or when `concentrationFactor` is not 1
+(the engine amplifies or reverts in that case, so the comparison would be between two different
+quantities). Nothing here ever asserts a digit it cannot back.
+
+**One correction to our own reporting.** The mismatch count is meaningless without its domain, because the
+error peaks sharply at `v ≈ 1.13`. Forty thousand samples over `(0, 166]` give **3** last-digit
+disagreements; forty thousand over `(0, 20]` give **22**. Both are correct for their grid, and quoting
+either without the domain is not.
+
+Also recorded because it caught a real mistake: the first version of the new test asserted the gap against
+the quadrature envelope alone and failed at 1.917e-5. The served figure is already rounded to 4dp, so the
+observable gap is bounded by the display half step plus the envelope. The two are now separate fields,
+because collapsing them is a mistake this project already shipped once in a proof guard that measured
+display rounding and therefore measured nothing below a dollar.
+
 ## 30 July 2026 — the harness that proves our gates can fail was corrupting the tree it tested
 
 **Nothing a caller sees changes.** No endpoint, no response shape, no contentHash, and the engine build

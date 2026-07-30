@@ -22,13 +22,16 @@ the cheapest thing in the service to prove.**
 | "no identity restates the quadrature" | **REFUTED** — the grid is geometric; 802 exponentials collapse to **2** plus a multiply chain, worst gap **5.218e-15** over 4,000 v |
 | "no identity restates the bisection" | **REFUTED** — a bracket certificate, **1,776 Plonk gates**, built and gated below |
 | what actually blocks the quadrature | **the ceremony file.** 36,613 R1CS at 81 nodes, **8.94× hez_final_12**; needs 2^16..2^17 |
+| …and the closed-form route instead of the quadrature | **also the ceremony file, but only one power up.** 3,023 R1CS, which is **~5,619–5,896 Plonk** at the 1.86–1.95× R1CS→Plonk inflation measured off four of this repo's own zkeys, so **domain 8,192**, not 4,096. `probe-lpclosed-cost.json` said "fits `hez_final_12` with room to spare" by comparing an R1CS count against a Plonk ceiling; that is corrected in the file. **`hez_final_13` is a download, and it moves no hash.** |
+| the exact value itself | **needs no circuit and no engine change.** `expectedDivergence.volatility` and `horizonPeriods` are published verbatim and unrounded (verified live, and they are in `proof.inputs` too), so `v = σ²T` and `expm1(−v/8)` are recoverable outside the engine — `src/util/lpClosedForm.js`. `codeHash` measured before and after: `q1-e1fa99d08887d6cc` both times. **Not** from `totalVariance`, which is rounded to 6dp and loses 1.12e-6 pp, eight times the quadrature envelope |
 | new circuit | `zk/circuits/lpbracket.circom` — 932 R1CS · 1,776 Plonk · 13 public · domain 2,048 |
-| gate LP0 — prove / verify / refuse / EVM | **PASSED**, 991 ms prove, 13/13 signals refused, 8/8 dishonest witnesses refused, 277,953 gas accept / 573 gas reject |
+| gate LP0 — prove / verify / refuse / EVM | **PASSED**, 991 ms prove, 13/13 signals refused, 8/8 dishonest witnesses refused, 278,051 gas <!--gas:gateLP0-bracket#acceptGas~2%--> accept / 573 gas <!--gas:gateLP0-bracket#rejectGas--> reject (one sample each; see §the gas figure below) |
 | gate LP1 — sweep against the real engine | **PASSED**, 562 certified of 600, worst case uses **96.3%** of my derived bound |
 | gate LP2 — the closed form and its real cost | **PASSED**, and it caught a broken parser of mine before it shipped a zero |
 | engine `codeHash` | `q1-e1fa99d08887d6cc`, unmoved; `src/engine/` untouched |
 | `npm test` | **386**, unmoved, 0 fail |
-| DEFECT FOUND, not fixed | the engine's own boundedness self-check **fails on live inputs** at σ²T ≥ **116.0687** — see §6 |
+| DEFECT FOUND — **fixed on 30 July, outside the engine** | the engine's own boundedness self-check **failed on live inputs** at σ²T ≥ **116.0687**. §6 said it needed an engine change; it did not. See `FIX_LPRISK_BOUNDEDNESS.md` and `npm run gate:lb` |
+| ONE FIGURE IN §6 WAS WRONG | it published the full-precision expectation as −0.999999999999998; measured, it is **−0.999999975832329** — corrected in place below |
 
 ---
 
@@ -182,8 +185,19 @@ signals rejected when moved by one; a bent proof point rejected. Eight dishonest
 before a proof exists: a non-straddling bracket, a reversed bracket, a root off the midpoint, a
 volatility that is not the root of the midpoint, a width bound narrower than the bracket, fees at 100%
 of capital, endpoint expectations in increasing order, a zero horizon. In an in-process EVM against
-the exported Solidity verifier (solc 0.8.26, 8,330 deployed bytes): honest proof **277,953 gas**, all
-14 tampered submissions refused, cheapest refusal **573 gas**.
+the exported Solidity verifier (solc 0.8.26, 8,330 deployed bytes): honest proof
+**278,051 gas** <!--gas:gateLP0-bracket#acceptGas~2%-->, all 14 tampered submissions refused, cheapest
+refusal **573 gas** <!--gas:gateLP0-bracket#rejectGas-->.
+
+**The gas figure is ONE SAMPLE and the byte count is not.** 8,330 deployed bytes is deterministic and
+reproduces to the digit. The accept figure is read from `gateLP0-bracket.json` as written at
+2026-07-29T23:43:06.417Z, and it is a property of the particular proof rather than of the statement:
+Plonk proving is randomised, and `zk/scripts/probe-execadverse-marginal.mjs` measures a **1.24%–1.59%
+spread — 3,438 <!--gas:probe-execadverse-marginal#constantproduct.spread--> to 4,466 <!--gas:probe-execadverse-marginal#execadverse.spread--> gas — across 25 proofs of an identical statement**, on top of a 7,500-gas
+EIP-2929 cold/warm gap between the first call in an EVM instance and every later one. Re-running gate LP0
+will move this number by thousands without anything having changed. Read it as ~278k, and never subtract
+it from another figure of this kind to claim a marginal: this document's sibling
+`VERIFY_EXEC_VERIFY.md` published four different values of one marginal that way.
 
 **GATE LP1 — `zk/scripts/gateLP1-bracket-sweep.mjs` — PASSED.** 600 real service calls, fee APR
 log-uniform from 0.01% to 400%, horizons 1 to 365 periods. **562 certified**, 35 where the engine
@@ -309,7 +323,25 @@ row *below* it, "the two provable statements fit the ceiling", had passed **gree
 exactly a check that cannot fail. Both are fixed: the offset, and a non-vacuity guard requiring the
 counts to be nonzero.
 
-## 6. A defect found in passing, and not fixed
+## 6. A defect found in passing, not fixed here — and closed the same day, outside the engine
+
+**FIXED 30 July 2026 in `src/util/lpBoundedness.js`, with the build hash `q1-e1fa99d08887d6cc` unmoved.**
+The paragraph headed *"Not fixed here"* at the foot of this section was wrong twice over and both errors
+are left in place below, because what a wrong conclusion looked like is the part a reader cannot
+reconstruct afterwards:
+
+1. **It said the fix needs `src/engine/`.** It does not. The check's subject is a *derived* field, and
+   §5's own closed form recomputes it from inputs the envelope echoes, so the verdict can be
+   re-evaluated after the engine returns. Written up in `FIX_LPRISK_BOUNDEDNESS.md`; asserted by
+   `npm run gate:lb` (12 checks, 1,142 calls) and `npm run gate:lb-revert` (four reverts, all red).
+2. **One figure in it was simply wrong.** This section published the full-precision expectation at
+   σ = 0.62, T = 365 as **−0.999999999999998**. Measured: the closed form gives
+   **−0.999999975832329** and the engine's own quadrature gives **−0.999999976290989**. The published
+   value is neither; it is the expectation at a total variance near 270, not at 140.306, and it
+   understates the distance from −1 by **seven orders of magnitude** (2e-15 against 2.4e-8). The
+   defect register had the right number — `−0.9999999758323288` — all along, so the two disagreed and
+   nothing compared them. Anything reasoning about how close this value sits to the bound should use
+   the register's figure.
 
 **The engine's own boundedness self-check fails on live inputs.**
 
@@ -339,6 +371,13 @@ same class as the `DIVERGENCE_HEADROOM.md` defect.
 **Not fixed here.** `src/engine/` is frozen for this session and the build hash `q1-e1fa99d08887d6cc`
 must not move. Recorded for whoever owns the next engine change; the one-line shape is to evaluate the
 check on the unrounded fraction, not on the served percentage.
+
+> **Retained, and wrong.** The two sentences above are the reasoning that deferred this for a day. The
+> first is a non sequitur: the check being frozen does not freeze the *verdict*, which is computed from
+> published inputs and can be re-derived outside the tree the hash is taken over. The second is right
+> about the shape and wrong about the cost — evaluating on the unrounded fraction moves the build hash
+> only if you edit the engine, and nothing forced that. The figure quoted three lines above is also
+> wrong; see the correction at the head of this section.
 
 ## 7. The smallest honest statement, and the verdict
 

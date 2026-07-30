@@ -359,7 +359,10 @@ notices except the reached-bound assertion, which is why that assertion exists.
 ## 7. Regression surface, re-run 30 July
 
 `npm test` **386**, 0 fail (381 pass, 5 skipped) — the same count before and after every edit here.
-`node tools/docs-consistency.mjs` **CONSISTENT**, 252 documents.
+`node tools/docs-consistency.mjs` **CONSISTENT**. The corpus size is deliberately not quoted here: it
+read 252 documents at the start of this session and 253 at the end, because concurrent sessions are
+adding pages — a count in a report is a number that rots between two runs four seconds apart, which is
+the same failure as §8's gas row.
 `node --test gates/gateIF-inflight-eviction.mjs` 5 pass, 0 fail.
 `node gates/gateIF-revert.mjs` **PASSED, 2 of 2 reverts red**.
 `node zk/scripts/gateB7-6-eventvol-straddle.mjs` **PASSED**.

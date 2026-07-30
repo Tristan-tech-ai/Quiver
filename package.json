@@ -76,6 +76,8 @@
     "gate:z-revert": "node gates/gateZ-revert.mjs",
     "gate:z2": "node gates/gateZ2-repro-figures.mjs",
     "gate:z2-revert": "node gates/gateZ2-revert.mjs",
+    "gate:lb": "node --test gates/gateLB-lp-boundedness.mjs",
+    "gate:lb-revert": "node gates/gateLB-revert.mjs",
     "gate:g": "node --test gates/gateG-envelope-classification.mjs",
     "gate:g-revert": "node gates/gateG-revert.mjs",
     "gate:if": "node --test gates/gateIF-inflight-eviction.mjs",

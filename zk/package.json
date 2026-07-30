@@ -12,7 +12,8 @@
     "gate:b6": "node scripts/gateB6-portfolio-routes.mjs",
     "gate:b6-revert": "node scripts/gateB6-portfolio-routes.mjs --revert-binding",
     "gate:clone": "node scripts/gate-clone-portability.mjs",
-    "gate:clone-revert": "node scripts/revert-clone-portability-section1.mjs"
+    "gate:clone-revert": "node scripts/revert-clone-portability-section1.mjs",
+    "gate:clone-revert4": "node scripts/revert-clone-portability-section4.mjs"
   },
   "dependencies": {
     "@ethereumjs/common": "^4.4.0",

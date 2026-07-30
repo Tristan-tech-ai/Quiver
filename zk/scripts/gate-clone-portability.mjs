@@ -18,6 +18,15 @@
 // artifact that is not there. Missing third-party packages are reported separately, since `cd zk &&
 // npm install` is a documented step rather than a defect.
 //
+// AND — section 4, which runs before section 3 because it costs a second where section 3 costs minutes —
+// it asks all of that of the REPOSITORY AT HEAD instead of the directory it is running in. Sections 1 to
+// 3 ask the filesystem, and on the author's desk the filesystem is the wrong witness: a file that was
+// written and never committed answers `existsSync` and is absent from every clone. Section 1 reports
+// "120 artifacts found" here and "5 missing" in a clone of the same commit; on 29 July a committed
+// `src/services.js` imported a module that was in no commit and the published repository could not start
+// for two commits, with nothing in this tree able to go red. Section 4 is the part whose subject is the
+// published artifact rather than the desk it was made on.
+//
 // AND it checks that the artifact side of that claim covers EVERY circuit in `circuits/`, discovered
 // rather than listed, because the first version of this gate listed 14 of 22 and the eight it skipped
 // included `liquidation` — the circuit a paying perp-gate caller's proof is built and checked against.
@@ -135,6 +144,27 @@ const EXCLUSIONS = {
 const VK_FILE = { liquidation: 'vk_plonk.json' };
 const vkOf = (c) => VK_FILE[c] ?? `${c}_vk.json`;
 
+// WHERE AN ARTIFACT IS ALLOWED TO LIVE, and this is not a loosening.
+//
+// The service does not read `zk/build`. `src/util/proverWorker.mjs` and `src/util/snark.js` both load
+// from `assets/zk/`, because that is the directory a deploy carries, and the published repository tracks
+// the SERVING copy of the six circuits it proves with there — byte-identical to the build copy, verified
+// below at HEAD by blob id. `zk/build` is where circom writes. So an artifact is "in this checkout" if
+// either directory has it, and the check that used to look only under `zk/` reported five missing
+// liquidation artifacts to every reader who cloned while reporting 120 found on the author's desk.
+//
+// SAME CHECKOUT ONLY, and that is load-bearing. The fallback is `<zk>/../assets/zk`, which is
+// `<repo>/assets/zk` in a clone and nothing at all on the author's desk, where `zk/` is a sibling of the
+// mirror rather than inside it. Resolving the fallback through the mirror instead would have let the
+// revert harness hide `zk/build/vk_plonk.json` and still find a copy — a mutation that cannot go red.
+const ASSETS_ZK = path.join(ZK, '..', 'assets', 'zk');
+/** Every copy of a required artifact that exists in THIS checkout. Empty means genuinely missing. */
+const artifactCopies = (rel) => {
+  const here = [path.join(ZK, rel)];
+  if (rel.startsWith('build/')) here.push(path.join(ASSETS_ZK, rel.slice('build/'.length)));
+  return here.filter((p) => existsSync(p));
+};
+
 const FULLY_CHECKED = ON_DISK.filter((c) => !EXCLUSIONS[c]);
 const EXCLUDED = ON_DISK.filter((c) => EXCLUSIONS[c]);
 const fullNeeds = (c) => [
@@ -217,10 +247,12 @@ record('the artifact list is not empty',
     && REQUIRED_ARTIFACTS.length > 0,
   `${REQUIRED_ARTIFACTS.length} paths: ${FULLY_CHECKED.length} circuits x 6, plus the reduced set for ${EXCLUDED.length} exclusions`);
 
-const missing = REQUIRED_ARTIFACTS.filter((f) => !existsSync(path.join(ZK, f)));
+const missing = REQUIRED_ARTIFACTS.filter((f) => artifactCopies(f).length === 0);
+const viaAssets = REQUIRED_ARTIFACTS.filter((f) => !existsSync(path.join(ZK, f)) && artifactCopies(f).length > 0);
 record('every artifact a gate needs is present in this checkout',
   REQUIRED_ARTIFACTS.length > 0 && missing.length === 0,
-  missing.length ? `${missing.length} missing:\n           ${missing.join('\n           ')}` : `${REQUIRED_ARTIFACTS.length} artifacts found`);
+  missing.length ? `${missing.length} missing:\n           ${missing.join('\n           ')}`
+    : `${REQUIRED_ARTIFACTS.length} artifacts found${viaAssets.length ? `, ${viaAssets.length} of them in assets/zk rather than zk/build: ${viaAssets.join(', ')}` : ''}`);
 
 // ---- 2. no script hardcodes the author's directory layout -----------------------------------------
 // The literal check, because the resolver can be added and then quietly bypassed by the next script.
@@ -234,6 +266,98 @@ const offenders = readdirSync(SCRIPTS)
 record("no gate hardcodes the author's working-tree path",
   offenders.length === 0,
   offenders.length ? `these still reference ${DEV_PATH}/: ${offenders.join(', ')}` : 'checked every script under zk/scripts');
+
+// ---- 4. the REPOSITORY AT HEAD, not the directory this is running in -----------------------------
+//
+// Everything above asks the filesystem, and on the author's desk the filesystem is the wrong witness.
+// An uncommitted file answers `existsSync` and is absent from a clone, so sections 1 to 3 are green
+// exactly where the claim is not made and red where it is. That is not a hypothetical: section 1 reports
+// "120 artifacts found" on the desk this was written on and "5 missing" in a clone of the same commit,
+// and on 29 July a session committed a `src/services.js` that imports `./util/lpBoundedness.js` without
+// committing the module — the published repository could not start at all, for two commits, and nothing
+// here could go red, because nothing here looked at HEAD.
+//
+// Run against the commit that broke it (2778432) this section names both offenders and nothing else:
+// `src/services.js:46` and `src/mcp.js:48`, each importing `./util/lpBoundedness.js`.
+//
+// The three questions are the same question: is the thing we publish the thing we tested?
+import {
+  repoRoot, headFiles, headBlobIds, unresolvedImports, unresolvedIn, publishedScripts,
+} from './head-tree.mjs';
+
+console.log('\n  The repository at HEAD (git), not the working tree:');
+let HEAD = null, headWhy = '';
+try { HEAD = repoRoot(); } catch (err) { headWhy = err.message; }
+record('the git repository this checkout publishes was found', HEAD !== null,
+  HEAD ? `${HEAD.repo}\n           HEAD ${HEAD.head} — resolved as ${HEAD.label}` : headWhy);
+
+if (HEAD) {
+  const files = headFiles(HEAD.repo);
+  const imports = unresolvedImports(HEAD.repo, files);
+
+  // Floors, ratcheted, for the same reason the circuit discovery has one: a `ls-tree` that comes back
+  // empty, or a specifier scan whose regex stops matching, checks nothing and reports PASS. The first
+  // version of the scanner blanked string BODIES along with comments, turning `from './x.js'` into
+  // `from ''`, and found 0 relative imports in 410 files — it was this floor that caught it.
+  const MIN_HEAD_FILES = 780, MIN_HEAD_JS = 390, MIN_SPECIFIERS = 580;
+  record('HEAD came back whole, so this section is not checking an empty tree',
+    files.size >= MIN_HEAD_FILES && imports.scanned >= MIN_HEAD_JS && imports.specifiers >= MIN_SPECIFIERS,
+    `${files.size} paths at HEAD (floor ${MIN_HEAD_FILES}), ${imports.scanned} of them .js/.mjs/.cjs (floor ${MIN_HEAD_JS}), `
+    + `${imports.specifiers} relative imports read out of them (floor ${MIN_SPECIFIERS})`);
+
+  // POSITIVE CONTROL, on every run, against a file set this gate makes up. The floors above prove the
+  // scanner still reads; this proves the resolver still refuses. Both directions, because a resolver
+  // that flags everything is as useless as one that flags nothing.
+  const FAKE = new Set(['a/b.js', 'a/util/there.js']);
+  const control = unresolvedIn('a/b.js', "import x from './util/there.js';\nimport y from './util/gone.js';\n", FAKE);
+  const controlOk = control.specifiers === 2 && control.unresolved.length === 1
+    && control.unresolved[0].spec === './util/gone.js';
+  record('the resolver still refuses a module that is not there (positive control)', controlOk,
+    `2 imports offered, 1 present and 1 absent → flagged ${control.unresolved.length}`
+    + `${control.unresolved.length ? ` (${control.unresolved.map((u) => u.spec).join(', ')})` : ''}`);
+
+  // THE CHECK THIS SECTION EXISTS FOR.
+  record('no file committed at HEAD imports a module that is absent from HEAD',
+    imports.unresolved.length === 0,
+    imports.unresolved.length
+      ? `${imports.unresolved.length} unresolvable:\n           `
+        + imports.unresolved.map((u) => `${u.importer}:${u.line} imports ${u.spec} — nothing at HEAD matches ${u.tried[0]}`).join('\n           ')
+      : `${imports.specifiers} relative imports across ${imports.scanned} committed JS files, all resolve inside HEAD`);
+
+  // The artifact question, asked of HEAD instead of the disk. This is the half of section 1 that a
+  // reader gets: an artifact the author built and never committed is present to `existsSync` and
+  // missing from every clone. `assets/zk` counts, because the repository tracks the serving copies there.
+  const inHead = (rel) => files.has(`zk/${rel}`)
+    || (rel.startsWith('build/') && files.has(`assets/zk/${rel.slice('build/'.length)}`));
+  const notCommitted = REQUIRED_ARTIFACTS.filter((f) => !inHead(f));
+  record('every artifact a gate needs is committed at HEAD, not just built on this machine',
+    REQUIRED_ARTIFACTS.length > 0 && notCommitted.length === 0,
+    notCommitted.length ? `${notCommitted.length} on disk but not at HEAD:\n           ${notCommitted.join('\n           ')}`
+      : `${REQUIRED_ARTIFACTS.length} artifacts, every one of them in HEAD`);
+
+  // Two copies of a proving key are two chances to be wrong. The service proves against `assets/zk`
+  // and every gate verifies against `zk/build`; if those ever diverge, the gates certify a circuit the
+  // service does not run and the whole layer is decoration. Compared by blob id, which is an exact
+  // byte comparison and costs one `ls-tree`.
+  const dual = [...files].filter((f) => f.startsWith('assets/zk/') && files.has(`zk/build/${f.slice('assets/zk/'.length)}`));
+  const ids = headBlobIds(HEAD.repo, [...dual, ...dual.map((f) => `zk/build/${f.slice('assets/zk/'.length)}`)]);
+  const diverged = dual.filter((f) => ids.get(f) !== ids.get(`zk/build/${f.slice('assets/zk/'.length)}`));
+  record('where an artifact is committed twice, the two copies are byte-identical at HEAD',
+    diverged.length === 0,
+    diverged.length ? `these differ between assets/zk and zk/build: ${diverged.join(', ')}`
+      : `${dual.length} artifact(s) tracked in both assets/zk and zk/build, all with identical blob ids`);
+
+  // A command a document tells a reader to run and the manifest does not define is a false claim about
+  // a clone, in the same way a missing module is. `npm run gate:lb` was published in four documents and
+  // defined in none of the two committed manifests: the alias existed only on the author's desk.
+  const { referenced, defined } = publishedScripts(HEAD.repo, files);
+  const undefinedScripts = [...referenced].filter(([name]) => !defined.has(name));
+  record('every `npm run` a committed document publishes is defined in a committed manifest',
+    referenced.size > 0 && defined.size > 0 && undefinedScripts.length === 0,
+    undefinedScripts.length
+      ? `${undefinedScripts.length} published but undefined:\n           ${undefinedScripts.map(([n, w]) => `npm run ${n} — first published at ${w}`).join('\n           ')}`
+      : `${referenced.size} distinct scripts referenced across committed .md/.html, all defined among the ${defined.size} in package.json and zk/package.json`);
+}
 
 // ---- 3. each gate gets past module and artifact resolution ---------------------------------------
 // Run with cwd at the repo root, which is where a reader would be standing.

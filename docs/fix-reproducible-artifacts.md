@@ -353,7 +353,7 @@ it was running the reproduction as a reader rather than as its author.
 ## 6. The gate, and proof that it can fail
 
 ```
-npm run gate:z              # 54 assertions in a clean directory, ~3 min
+npm run gate:z              # 55 assertions in a clean directory, ~3 min
 npm run gate:z-revert       # four ways to break it
 ```
 
@@ -361,9 +361,10 @@ npm run gate:z-revert       # four ways to break it
 source integrity (sha256 of 79 committed sources), byte reproducibility (8 pinned r1cs/zkey digests),
 and figures (constraint counts, domains, public-signal counts, and the Groth16 power arithmetic).
 
-Run against an empty `ADV_WORK`: **54 assertions, 54 pass, 0 fail** — 2 source, 1 generator, 2 ceremony,
-25 portfolio, 16 Plonk, 8 byte-identity. With a locally generated 2^13 also present, section 4 opens and
-it is **61 assertions, 61 pass, 0 fail**. `zk/build/adversary-repro.json` records every row.
+Run against an empty `ADV_WORK`: **55 assertions, 55 pass, 0 fail** — 1 toolchain, 2 source, 1 generator,
+2 ceremony, 25 portfolio, 16 Plonk, 8 byte-identity. With a locally generated 2^13 also present, section 4
+opens and it is **61 assertions, 61 pass, 0 fail** with 9 byte-identity pins. Both numbers were measured in
+a **fresh clone** as well as in the working tree. `zk/build/adversary-repro.json` records every row.
 
 It does **not** assert gas. Plonk verify gas has a measured 1.22–1.26% spread plus a 7,500-gas EIP-2929
 cold/warm gap, so an equality assertion on gas is a gate that goes red on noise. The probes print gas;
@@ -474,7 +475,8 @@ existed. The sequence, in order:
 | + circom and the zk dependencies | **still fails** — `zk/build/hez_final_12.ptau` was in no commit |
 | + the ceremony file | **55 of 55 assertions pass**, all 8 byte-identity pins among them |
 | …but `portfolio/probe1` | **crashes** — the service tree's `node_modules` is missing, and probes 1–3 build witnesses through the service's own encoder, which reaches `ethers` |
-| + the service dependencies | **61 of 61**, and `probe1`, `adv-proofs` and `directcheck` all run |
+| + the service dependencies | `probe1` runs, and the gate goes **red on one row**: the manifest catching my own edit to `repro.mjs` made after the last manifest write |
+| fresh clone of `1761b7d`, all three supplied, a local 2^13 in the work directory | **61 of 61 pass**, **9 byte-identity pins**, `gate:z-revert` **red in all four modes** |
 
 Two of those five rows are defects this exercise created for itself and then found: the uncommitted
 ceremony file (now committed, §3/§5) and a gate that went green while three of the probes it claims to
@@ -493,7 +495,11 @@ Verified from the clone directly, not only through the gate:
 |---|---|
 | `options/adv-proofs.mjs` (route A) | spread 2.467e-13, `F·p₁−K·p₂` = 0, price off **$1.754e-7** — identical to the working tree |
 | `portfolio/probe1-groth16-n4.mjs` | 2,736 R1CS, power 12, 4-leg Groth16 zkey on the committed 2^12, **37 of 37** perturbations refused, prove 76 ms |
+| `portfolio/probe4-minimal.mjs` | `pgc6` 3,906 R1CS / **508,891 gas** / 48 of 48 refused; `pgc7` refused at budget **4,613** |
+| `options/prove-price.mjs` (route B) | 13 public signals, verify true, price **$1395.481646032** vs engine $1395.481646024, 13/13 refused, A-S leg refused |
 | `exec/directcheck.mjs` | **5,011 execution gas**, same three red rows that are the finding |
+
+Every one of those figures is identical to the working-tree run and to the prior documents, to the digit.
 
 `repro.mjs` refuses before building anything if any of the three is missing, and names which:
 

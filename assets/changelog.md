@@ -12,6 +12,49 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — a proof that was being built could be reported `unavailable`, and now cannot be
+
+**What a caller sees change.** Nothing about any response *shape*, and no contentHash moves: this is a
+correction to what `GET /proof/<hash>` says while a proof is in flight. Under load, that endpoint could
+answer `unavailable — prover busy` for a proof the prover was working on at that moment, and then land
+the real `ready` record after the caller had already stopped polling. It now stays `building` until the
+proof settles. The engine build hash `q1-e1fa99d08887d6cc` does not move — nothing under `src/engine`
+was touched — and `npm test` is unchanged at 386.
+
+**The mechanism.** `/proof/<hash>` is served out of a 200-entry cache. All six proof builders open with
+the same guard against proving one content hash twice — `store.has(contentHash) || claimed.has(contentHash)`
+— and `claimed` is released when a build is *enqueued*, not when it finishes. So from enqueue to `ready`,
+the `building` record in that cache was the only marker that the hash was in flight, and eviction was
+insertion-order and took it like any other entry. A repeat of the *same* request arriving after 200 other
+proof requests then passed the guard, started a duplicate build for a hash already in the prover, hit the
+8-deep queue limit, and wrote `unavailable` over the record. Measured on the served `event-vol` handler:
+one fixture call, 20,200 further distinct-hash requests, the same fixture again — `unavailable: prover
+busy` for a request that answers `ready` in about 3 seconds on a quiet process.
+
+**What is fixed and what is not.** Eviction now skips records that are `building`, and does not fire at
+all when overwriting a key already in the cache. At most 8 records can be `building` at once, because
+that status is written only after the queue admits the build, so the skip cannot make the cache
+unbounded — and `gates/gateIF-inflight-eviction.mjs` asserts the eviction *pressure* as its own check
+before it asserts that the in-flight marker survived, so "never evict anything" cannot pass it either.
+`gates/gateIF-revert.mjs` puts both halves of the defect back and requires the gate to go red on each,
+naming it, while the other check stays green. NOT fixed, and recorded rather than folded in: a record
+that legitimately reaches `unavailable` is still memoised in memory until it is evicted, even though the
+durable store deliberately refuses to persist a refusal for the same reason it would be wrong to reuse
+one.
+
+**Where it showed up.** `zk/scripts/gateB7-6-eventvol-straddle.mjs` — the gate for event-vol's ATM
+straddle proof — was red on exactly this, on the two checks that fetch the proof a served response points
+at. The circuit, the identity and the guard were all correct. With the fix it is green: 3,812 Plonk
+constraints, domain 4096, 7 public signals, 273,920 and 275,584 gas to accept across two runs (a 0.61%
+spread, inside the 1.22% this verifier is known to vary by), 573 gas to refuse. `hackathon/WIRE_EVENT_VOL.md`
+(mirrored to `docs/wire-event-vol.md`) also re-measures every figure in it against the rebuilt two-sided
+`ncdf` key, and records the one that had the sharpest edge on it: `TOLC = 12` is the circom *constant*,
+while the band the circuit enforces is `TOLC/2 = 6` ulp, so the published buyer envelope is conservative
+only because 12 over-covers the band by 6 while an unnamed 2.11-ulp evaluator term is missing. Correcting
+the 12 without adding that term would make the envelope unsound while looking like a fix.
+
+---
+
 ## 30 July 2026 — `lp-risk` can be asked for a proof, and it certifies a bracket rather than a number
 
 **What a caller sees change.** `POST /api/lp-risk` and the free `lp_risk` MCP tool accept

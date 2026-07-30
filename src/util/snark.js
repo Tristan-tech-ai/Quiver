@@ -216,8 +216,34 @@ export async function getProof(contentHash) {
   return cold || null;
 }
 
+// EVICTION MUST NOT TAKE THE RECORD A BUILD IS STILL WRITING TO, and a plain FIFO eviction did.
+//
+// `store.has(contentHash)` is one half of the guard that stops the six builders below proving the same
+// content hash twice — `claimed` is the other half, and it is released as soon as the build is ENQUEUED,
+// not when it settles. So between enqueue and `ready`, a `building` record in this map is the ONLY thing
+// that marks the hash as in flight. Insertion-order eviction deletes it like any other entry, and then:
+//
+//   a second request for the SAME inputs, arriving after MAX other proof requests, passes the guard,
+//   starts a DUPLICATE build, hits MAX_QUEUED, and writes `unavailable: prover busy` OVER a proof that
+//   is being proved right now. Every poller stops on any status that is not `building`, so the caller
+//   is told the proof is unavailable while it is in the prover, and the real `ready` lands afterwards
+//   with nobody looking.
+//
+// Measured on the served event-vol handler: one fixture call, then 20,200 further distinct-hash calls,
+// then the same fixture again — `getProof` returns undefined at step 2 and `unavailable: prover busy`
+// at step 3, for a request that answers `ready` in 3 s on its own. gates/proofstore-inflight.mjs is
+// that reproduction, and it goes red without the two lines below.
+//
+// At most MAX_QUEUED records can be `building` at once, because the status is written only after the
+// queue admits the build — so skipping them cannot empty the search. The fallback is here anyway: a
+// guard that assumes its own invariant is a guard that cannot fail.
+function evictOne() {
+  for (const [k, v] of store) if (v.status !== 'building') { store.delete(k); return; }
+  store.delete(store.keys().next().value);
+}
+
 function put(contentHash, rec) {
-  if (store.size >= MAX) store.delete(store.keys().next().value);
+  if (store.size >= MAX && !store.has(contentHash)) evictOne();
   const full = { ...rec, at: new Date().toISOString() };
   store.set(contentHash, full);
   // No-op unless durability is configured, and only ever for `ready`. See proofStore.js for why a

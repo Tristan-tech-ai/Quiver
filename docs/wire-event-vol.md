@@ -9,6 +9,13 @@ instead of accepted.
 The "zero new artifacts" half is FALSE.** The field is now wired on both surfaces, behind
 `snark: true`, and `gateB7-6-eventvol-straddle.mjs` proves it end to end. Nothing is deployed.
 
+> **Re-measured 30 July, after the `ncdf.circom` two-sided rebuild.** Every figure below was taken
+> again against the current key rather than carried forward, and three classes of them had moved.
+> §8 records what was stale and why, §9 records a defect the re-measurement found in
+> `src/util/snark.js` that had turned gate B7-6 red, and §10 records what a second reader must still
+> not conclude. The route itself did not change: it is the same circuit, the same single `N(x)`, and
+> still no new artifacts beyond the four the rebuild replaced.
+
 ---
 
 ## 1. The claim, tested
@@ -44,13 +51,19 @@ different float paths. Measured over 40,000 legs (vol 5–300%, horizon 6h–400
 
 | measured | value |
 | --- | --- |
-| `d2 === -d1` in doubles | 15,923 of 40,000 = **39.81%** |
+| `d2 === -d1` in doubles | 15,923 of 40,000 = **39.81%** (gate seed) · 8,124 of 20,000 = **40.62%** (independent seed) |
 | worst \|\|d2\| − d1\| | 1.465e-3 ulp of 2^-40 |
-| worst \|N(d1) − (1 − N(d2))\| | **3.662e-4 ulp** = 3.05e-3% of the circuit's 12-ulp envelope |
+| worst \|N(d1) − (1 − N(d2))\| | **3.662e-4 ulp**, identical on both sweeps = **6.104e-3%** of the 6-ulp band the circuit enforces |
 | max `x` reached | 1.56071 (the circuit's branch split is 7.07107) |
 
+The first row is a **sampling statistic**, and it is quoted with its sweep from here on. The encoder's
+own header used to state one figure as though it were reproducible and the gate that claims to
+reproduce it produced a different one; both are correct for their seed and neither is "the" number.
+The row that matters — the worst collapse — is quantised to a multiple of the grid and came out
+bit-identical on both sweeps, which is why one proof can carry the field.
+
 So the engine calls Hart four times, at two magnitudes. **One proof still carries the field** — the
-collapse is 3.05e-3% of the envelope the circuit already promises — but it is charged **per leg**, from
+collapse is 6.104e-3% of the band the circuit enforces — but it is charged **per leg**, from
 the engine's own two values, rather than assumed away. `black76(...).delta` is `ncdf(d1)` and
 `probAbove(...)` is `ncdf(d2)`; both are lifted, neither is restated.
 
@@ -66,11 +79,15 @@ four files into `assets/zk`:
 
 | file | bytes |
 | --- | --- |
-| `ncdf_plonk.zkey` | 10,262,700 |
-| `ncdf_js/ncdf.wasm` | 97,541 |
+| `ncdf_plonk.zkey` | 10,265,940 |
+| `ncdf_js/ncdf.wasm` | 99,694 |
 | `ncdf_js/witness_calculator.cjs` | 10,356 |
-| `ncdf_vk.json` | 2,041 |
-| **total added** | **10,372,638** |
+| `ncdf_vk.json` | 2,043 |
+| **total added** | **10,378,033** |
+
+Measured 30 July with `cmp` against `zk/build`: all four are **byte-identical** between `assets/zk`
+and the build the gate gates. The three that moved are the two-sided rebuild — the first cut of this
+table was taken before it.
 
 That is the largest single artifact this deploy carries, and it is why `proverWorker.mjs` loads every
 circuit lazily: a deploy where nobody asks event-vol for a proof never reads it.
@@ -133,12 +150,20 @@ float error. `n̂ ∈ [½,1]` so `1 − n̂` is exact by Sterbenz; the two produ
 
 ### Headroom, measured over 20,000 legs from the SERVED handler
 
-| | |
-| --- | --- |
-| worst honest leg / `encodingBoundUsd` | **99.9915%** |
-| worst honest leg / `envelopeUsd` | **4.0987%** |
-| exceedances | 0 |
-| legs refused | 0 |
+| | gate B7-6 (20,000 legs) | independent sweep (20,000 legs, other seed) |
+| --- | --- | --- |
+| worst honest leg / `encodingBoundUsd` | **99.9915%** | **99.9914%** |
+| worst honest leg / `envelopeUsd` | **4.0987%** | **4.0989%** |
+| exceedances | 0 | 0 |
+| legs refused | 0 | 0 |
+
+The independent sweep is not a rerun of the gate: it takes the same 20,000 served answers but measures
+the buyer side against a normal CDF that is **neither Hart nor the circuit** — Maclaurin `erf` below 2,
+the classical `erfc` continued fraction above it, the two checked against each other to 9.02e-12
+relative on their overlap before either is used as a ruler. The worst encoding case sits at spot
+**5.185737**, vol 44.0724%, horizon 353.911 days: gap 9.4333e-12 against a bound of 9.4341e-12. The
+bound is reached at a **low** spot, because the `ε·S + 0.5·ε·|R|` float term is the part that does not
+scale with the grid.
 
 The encoding bound is **reached**, not respected from a distance — which is what makes it a bound
 rather than a number nobody measured. The buyer envelope is 24.4x wider and **the whole of the
@@ -146,6 +171,33 @@ difference is a promise `ncdf.circom` makes that this engine does not need**: th
 `(12 + 0.5·φ_max)/0.5`. Tightening it means tightening `TOLC`, which is a property of the circuit, not
 of this service. Reporting 4.1% as though it were slack I chose would be the dishonest version of that
 sentence.
+
+#### And `TOLC` is not the band, which makes that expression conservative for two reasons that cancel
+
+This is the correction with the sharpest edge on it, and it was found by re-deriving the buyer bound
+rather than reading the one that shipped. `ncdf.circom` states its CDF constraint as
+`2·resid + TOLC·dHat ≤ 2·TOLC·dHat`, so what it **enforces** is `|resid| ≤ TOLC/2 = 6 ulp` — the
+circuit's own header says so and `gateB7-5`'s artifact publishes `bandUlpN: 6`. A buyer's real distance
+from the truth is three terms, all three of them measured, none of them 12:
+
+| term | ulp of 2^-40 | what it is |
+| --- | --- | --- |
+| band | 6.0000 | what the circuit enforces (`TOLC/2`, not `TOLC`) |
+| evaluator | 2.1100 | the in-circuit fixed-point Hart recurrence vs the independent ruler — **not named in `envelopeUsd`** |
+| x grid | 0.1995 | half a grid step of `x` through the Lipschitz constant (`0.5·φ_max`) |
+| **buyer envelope** | **8.3095** | = 7.5575e-12 absolute; **±1.8138e-6** on a $60,000 spot |
+
+`envelopeUsd` spends `TOLC + 0.5·φ_max = 12.1995` ulp, which is **1.4681×** that. So it is sound — but
+sound because 12 over-covers the band by 6 while the omitted evaluator term only costs 2.11. **Two
+errors of opposite sign.** Measured over the same 20,000 legs, the worst honest leg uses **6.0177%** of
+the corrected 8.3095-ulp envelope, with zero exceedances.
+
+That makes the constant a trap rather than a typo, and it is written into the encoder now: "correcting"
+`TOLC` from 12 to the band without adding the evaluator term gives 6.1995 ulp — **74.61%** of what a
+buyer actually needs — and the envelope becomes **unsound while looking like a fix**. The value was
+therefore left at 12 (gate B7-6 asserts it equals the constant it parses out of the circom, and it
+does), the comment was corrected to say which of the two it is, and the three-term decomposition is now
+written beside the expression that does not use it.
 
 Confirmed separately over 200,000 legs across a deliberately wider box (spot 1–1.1266e8, vol 1–500%,
 horizon 1h–1000d): worst use **99.9943%**, zero exceedances. That wider sweep was a **one-off probe, not
@@ -166,6 +218,12 @@ at spot 2e8 comes back `status: "unavailable"` with the envelope quoted in the r
 ceiling — beyond 1e9, nine times past a refusal that already fired — the tight bound itself would
 start to fire; the check order puts the ceiling first, so that region is unreachable on the served
 path.
+
+Because the shipped envelope is 1.4681× the corrected one, the shipped ceiling is the **tighter** of the
+two: from the 8.3095-ulp decomposition above it would sit at 1.65399e8. So the conservatism runs in the
+safe direction here as well — it refuses a band of spots between 1.1266e8 and 1.65399e8 that a correctly
+decomposed envelope would have served. That is a refusal of honest answers, not a certification of wrong
+ones, and it is the right way round.
 
 ---
 
@@ -189,8 +247,18 @@ numbers attached, not as caveats in prose.
 The second row is the one where the tightness earns its keep: a surrogate that **is** economically
 wrong is refused on every leg.
 
-The honest engine, on this domain, uses **20.71%** of the circuit's 12-ulp CDF tolerance and **21.15%**
-of its 10-ulp density tolerance over 20,000 legs — both exercised, neither exceeded.
+The honest engine, on this domain, leaves a CDF residual of **2.4853 ulp** and a density residual of
+**2.1152 ulp** over 20,000 legs — both exercised, neither exceeded. Against the bands the circuit
+actually enforces that is **41.42%** of 6 ulp and **42.30%** of 5 ulp. The gate prints those two
+residuals as fractions of `TOLC` and `TOLP`, which reads as 20.71% and 21.15% and is **2× optimistic**;
+the ulp figures are the same measurement and the denominator is the thing that was wrong. This is the
+same 2× that `gateB7-5` corrected for options-risk's domain and that never propagated here.
+
+Do not confuse that residual with Hart's own accuracy. `|N_engine(x) − ruler(x)|` over the same 20,000
+legs is **4e-4 ulp** on the CDF and **2e-4 ulp** on the density — four orders smaller. The 2.4853 ulp
+above is the distance from the engine's rounded value to the **circuit's fixed-point recurrence**, which
+is the quantity that has to fit inside the band. Two different claims, and the small one is not evidence
+about the large one.
 
 ---
 
@@ -247,10 +315,18 @@ section 4 of the gate puts 20,000 served answers through them.
 6. wrong-CDF refusal rates, measured on this service's slice
 7. the exported Solidity verifier in an in-process EVM
 
-Measured: **3,740 Plonk constraints**, domain 4096, 7 public signals, proved in 2,168 ms.
-**274,654 gas** to accept, **573** to refuse — one sample; Plonk verify gas has a measured 1.22%
-spread (~3,500 gas), so a smaller marginal than that is noise. Every one of the 7 public signals is
-refused when moved by one, and a bent proof point is refused at 573 gas.
+Measured 30 July, **twice, on the rebuilt two-sided key**: **3,812 Plonk constraints**, domain 4096,
+7 public signals — identical on both runs. Proving wall-clock 2,961 ms and 1,950 ms, which is scheduling
+noise on a contended box and not a property of the circuit. Accept gas **273,920** and **275,584**; that
+is a 1,664-gas, **0.6075%** spread between two runs of the same verifier on the same proof shape, inside
+the 1.22% (~3,500 gas) spread `probe-plonk-gas-variance` measured — so both are quoted and neither is
+"the" figure. Refusal gas was **573** on both runs. Every one of the 7 public signals is refused when
+moved by one, and a bent proof point is refused at 573 gas. `PlonkVerifier` deploys to 7,080 bytes under
+solc 0.8.26.
+
+The constraint count moved 3,740 → 3,812 in the two-sided rebuild, which is why the earlier figure in
+this file was wrong rather than merely old: 3,740 is the count for a circuit whose CDF bound held on one
+side only.
 
 `node zk/scripts/revert-eventvol-straddle.mjs` — **PASSED, 4 of 4 mutations turn the gate red**:
 
@@ -280,13 +356,168 @@ notices except the reached-bound assertion, which is why that assertion exists.
   $60,000 spot; the field is published to two decimals, 1,878x coarser. The record now publishes
   `straddleFromProofUsd` at full precision so a reader can tell a 1e-6 proof from a 1e-3 one.
 
-## 7. Regression surface
+## 7. Regression surface, re-run 30 July
 
-`npm test` **386**, 0 fail. `node tools/docs-consistency.mjs` consistent.
-`node gates/preflight.mjs` PASSED, with the proof-emitting set now
-`{http,mcp} × {perp-gate, size-gate, treasury-risk, exec-verify, event-vol}`.
-`gateV-recipe-reproduces`, `gateP-sealed-provenance`, `gateL-elapsed-timing`,
-`gateC-case-sensitivity`, `gateM-mcp-surface`, `gateR-misroute` all pass. The pinned event-vol
-contentHash `8d653115a9c4e8752725a63288b283c5c10c25be2ee63b92b0e48f82ba09fd8a` is unmoved, and a
-request that does not ask for a proof grows no `snark` key — the response shape for every existing
-caller is byte-identical.
+`npm test` **386**, 0 fail (381 pass, 5 skipped) — the same count before and after every edit here.
+`node tools/docs-consistency.mjs` **CONSISTENT**, 252 documents.
+`node --test gates/gateIF-inflight-eviction.mjs` 5 pass, 0 fail.
+`node gates/gateIF-revert.mjs` **PASSED, 2 of 2 reverts red**.
+`node zk/scripts/gateB7-6-eventvol-straddle.mjs` **PASSED**.
+`node zk/scripts/revert-eventvol-straddle.mjs` **PASSED, 4 of 4**.
+The pinned event-vol contentHash `8d653115a9c4e8752725a63288b283c5c10c25be2ee63b92b0e48f82ba09fd8a`
+is unmoved, `src/engine/` is byte-identical to the mirror, and the build hash is still
+`q1-e1fa99d08887d6cc`, read out of `buildId()` rather than quoted.
+
+`node gates/preflight.mjs` **PASSED** in the dev tree, with the proof-emitting set now **14** entries:
+`{http,mcp} × {perp-gate, size-gate, treasury-risk, exec-verify, event-vol, lp-risk, options-risk}`.
+
+That verdict changed under this session and the reason is worth recording, because a report that quoted
+either half without the other would be wrong. **When first measured, preflight was RED** on exactly two
+checks, and they named `http:options-risk` and `mcp:options_risk` and nothing else:
+
+```
+[*** FAIL ***] every handler that builds a zk proof snaps its inputs onto that grid first
+               http:options-risk, mcp:options_risk
+[*** FAIL ***] the proof-emitting set is the one that has been checked
+```
+
+A concurrent session was mid-wiring on options-risk — `src/util/optionsRiskNcdfWitness.js` exists in the
+dev tree and in no commit, `src/services.js` and `src/mcp.js` differed from the mirror, and
+`gates/preflight.mjs` did not yet. That session then updated `gates/preflight.mjs` in the dev tree,
+deciding options-risk's grid on purpose and adding it to `OTHER_GRID` and the pinned array, which is what
+the check exists to force. So the red was real, was never event-vol's, and is now resolved by the session
+that owned it. event-vol's own grid exemption was in the **passing** half of that check throughout.
+
+Two consequences a reader should not have to infer. `gates/preflight.mjs` is still **uncommitted** in the
+dev tree, so a clone at `HEAD` sees the 12-entry pin and a services.js that emits 14 — it will go red
+until that session commits, and this commit deliberately does not carry their file. And the green above is
+a measurement of the dev tree, which contains their uncommitted work: **it is not a statement that `HEAD`
+is deployable.**
+
+---
+
+## 8. What was stale, and what a re-measurement is for
+
+`ncdf.circom` was rebuilt on 30 July because its CDF bound held on one side only. That rebuild changed
+the key, the constraint count, the artifact bytes and — the part that propagated furthest — the
+**denominator** of every headroom figure, because it made explicit that the enforced band is `TOLC/2`
+and not `TOLC`. It did not touch this page, `src/util/ncdfWitness.js`, or the encoder's published
+`proves` text. So the following was wrong here until now, and every entry was found by measuring again
+rather than by reading a diff:
+
+| what it said | what it is | direction of the error |
+| --- | --- | --- |
+| 3,740 Plonk constraints | **3,812** | described a one-sided circuit |
+| 274,654 accept gas | **273,920 / 275,584** across two runs | one sample presented as a figure |
+| 10,372,638 artifact bytes | **10,378,033** | pre-rebuild |
+| collapse = 3.05e-3% of the envelope | **6.104e-3%** of the 6-ulp band | 2x optimistic |
+| honest engine uses 20.71% / 21.15% | **41.42% / 42.30%** of the 6- and 5-ulp bands | 2x optimistic |
+| `d2 === -d1` on 39.70% of legs (encoder header) | **39.81%** gate seed, **40.62%** another | a sampling statistic quoted as a constant |
+| "12 ulp is what the circuit enforces" | 12 is the **circom constant**; the band is 6 | the trap in section 2 |
+
+Two of those are the same 2x, and it is the one `gateB7-5` corrected for its own domain and never
+carried across. None of them made a served number wrong: the two headroom rows understate how much of
+the circuit the honest engine uses, and the `TOLC` row makes the published envelope wider than it needs
+to be. Both errors point at "the proof is looser than claimed", which is the safe direction — and being
+in the safe direction is not the same as being measured.
+
+**The published `proves` and `note` strings still say "pinned to within 12 ulp of 2^-40 (1.09e-11)" and
+"the density to 10 ulp".** Both sentences are **true** — a buyer's real envelope is 8.3095 ulp on the
+CDF and 7.0510 on the density — and both are **loose**. They were left alone rather than corrected,
+because tightening a published claim is a caller-visible text change with a changelog and a docs gate
+behind it, and the honest decomposition belongs to whoever makes that change deliberately. Recorded here
+so it is a known looseness rather than a later discovery.
+
+---
+
+## 9. The re-measurement found a defect in the proof store, and it had turned gate B7-6 red
+
+Gate B7-6 was **failing** before any edit on this page, on two checks in section 5:
+
+```
+[*** FAIL ***] the proof a served response points at verifies against the published key
+               /proof/8d653115... -> status unavailable
+[*** FAIL ***] the record published beside it names the reconstruction a buyer performs
+```
+
+The circuit, the identity and the guard were all fine. `src/util/snark.js` was not.
+
+**The mechanism, reproduced rather than reasoned about.** `/proof/<hash>` is answered out of a
+200-entry `Map`. All six builders open with the same guard against proving one content hash twice:
+
+```js
+if (store.has(contentHash) || claimed.has(contentHash)) return;
+```
+
+`claimed` is released when the build is **enqueued**, not when it settles. So between enqueue and
+`ready`, the `building` record in that Map is the *only* marker that the hash is in flight — and
+eviction was insertion-order and took it like any other entry. Measured on the served handler: one
+fixture call, then 20,200 further distinct-hash proof requests, then the **same** fixture again.
+
+| step | observed |
+| --- | --- |
+| first call | `building`, hash `8d653115...` |
+| after 20,200 further requests | `getProof(hash)` -> **undefined**; the in-flight marker is gone |
+| the same request again | passes the guard, starts a **duplicate** build for a hash already in the prover |
+| that duplicate | hits `MAX_QUEUED = 8`, writes `unavailable: prover busy` **over** it |
+| the poller | stops on any status that is not `building`, so it reports `unavailable` |
+| the same request on a quiet process | `ready` in ~3 s, `straddleFromProofUsd 3645.45397918846` |
+
+It is not a gate artifact. It is what a public endpoint does under any burst wider than its cache: the
+request that answers `ready` on a quiet process answers `unavailable` on a busy one, and that answer is
+**wrong** rather than merely slow — the proof was being built the whole time.
+
+**The fix** is two lines in `put()`: skip `building` records when choosing what to evict, and do not
+evict at all when overwriting a key that is already present. At most `MAX_QUEUED` records can be
+`building` at once, because that status is only written after the queue admits the build, so the skip can
+never empty the search — and there is a fallback anyway, because a guard that assumes its own invariant
+is a guard that cannot fail.
+
+**`gates/gateIF-inflight-eviction.mjs`** is the reproduction, and every check in it drives the real
+handler and reads the real store. No check reads source: a textual probe for `observationEnvelope` in
+this repository once reported 22 of 22 services and was wrong, because the call it was looking for sat in
+a nested helper. It asserts the eviction **pressure** as its own floor before asserting that the marker
+survived, so that "never evict anything" — which turns a bounded cache on a public endpoint into a
+memory-exhaustion primitive — cannot pass it. `gates/gateIF-revert.mjs` puts both halves back and
+requires the gate to name each one:
+
+| revert | goes red | stays green |
+| --- | --- | --- |
+| insertion-order eviction, back | the in-flight marker survived the flood (plus 2 downstream) | the eviction-pressure floor |
+| nothing is ever evicted | the eviction-pressure floor | the in-flight marker check |
+
+Each revert leaves the *other* assertion green, which is what makes the pair non-redundant rather than
+two names for one check. With the fix in place gate B7-6 is **PASSED**.
+
+**What is NOT fixed, and it is adjacent.** A record that legitimately reaches `unavailable` — queue
+full, or the encoder's own refusal — is then memoised: `store.has(contentHash)` short-circuits every
+later request for the same body until the entry is evicted. `src/util/proofStore.js` deliberately
+refuses to *persist* `unavailable`, on the stated grounds that "a refusal is a judgement made by one
+build of the code... Cheap to redo" — so the in-memory memoisation contradicts the durable store's own
+intent. It affects all six builders equally, it is not what turned gate B7-6 red, and it is left alone
+here rather than folded into a change about event-vol.
+
+---
+
+## 10. What this page does not establish
+
+- **The claim was true and the work was already done.** The task that produced sections 8 to 10 was
+  asked to find out whether event-vol needed a circuit built. It does not: the route was wired on
+  30 July, on both surfaces, and the `N(x)` claim holds exactly as stated. What was left was that the
+  numbers describing it had gone stale under a circuit rebuild, and that the gate proving it was red for
+  a reason that had nothing to do with the circuit.
+- **The second honest statement is still not built, and section 1.4's reasoning stands.**
+  `eventIsolation.eventMove1SigmaUsd = S*sqrt(sigA^2*TA - sigB^2*TB)` is reachable — a square root is
+  provable by squaring — but only by a *new* circuit, a new ceremony and a new verifier, which is the
+  opposite of what made the straddle worth wiring. And `checks[0]` remains a 501-point quadrature
+  agreeing with a closed form: an agreement claim between two computations, not an identity over the
+  inputs. (The brief that prompted this re-measurement attached that quadrature to the event isolation.
+  It is attached to the **straddle**. The event isolation carries only a non-negativity test on
+  `sigA^2*TA - sigB^2*TB`, and discloses an inverted term structure instead of fabricating a move.)
+- **The evaluator term is quoted from `gateB7-5`, over the whole computed branch.** 2.1100 ulp was
+  measured over `z` in `[0, 7.0711)` at 400,001 points. event-vol's `x` never exceeds 1.56071, so using
+  it here is an upper bound and therefore conservative — but it is *not* a measurement on this service's
+  slice, and a tighter buyer envelope would want one.
+- **Nothing was deployed.** No `railway up`. The four artifacts in `assets/zk` are byte-identical to
+  `zk/build`, which is the only thing that makes the gate's verdict a statement about what the service
+  would actually serve.

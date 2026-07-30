@@ -23,15 +23,17 @@
 //
 // ── THE ALGEBRA ABOVE IS NOT WHAT THE ENGINE COMPUTES, AND THAT DISTINCTION IS THE GUARD ─────────
 //
-// `d2 === -d1` holds in exact arithmetic and holds in IEEE-754 doubles on only 39.70% of legs,
-// measured over 40,000: the engine forms d1 as `(0 + 0.5*sigma*sigma*T)/(sigma*sqrtT)` and d2 as
-// `d1 - sigma*sqrtT`, and those two float paths do not land on exact negatives. So the engine
-// evaluates Hart at TWO points, not one, and a single proof certifies one of them.
+// `d2 === -d1` holds in exact arithmetic and holds in IEEE-754 doubles on a MINORITY of legs: the
+// engine forms d1 as `(0 + 0.5*sigma*sigma*T)/(sigma*sqrtT)` and d2 as `d1 - sigma*sqrtT`, and those
+// two float paths do not land on exact negatives. So the engine evaluates Hart at TWO points, not
+// one, and a single proof certifies one of them. The exact fraction is a sampling statistic and is
+// quoted with its sweep or not at all: 39.81% over gateB7-6's 40,000 legs, 40.62% over an
+// independent 20,000-leg sweep on a different seed. Anyone who needs one number should run the gate.
 //
 // The collapse is therefore charged rather than assumed, PER LEG, from the engine's own two values:
 // `black76(...).delta` is ncdf(d1) and `probAbove(...)` is ncdf(d2), both lifted, neither restated.
-// Worst measured |N(d1) − (1 − N(d2))| over 40,000 legs is 3.662e-4 ulp of 2^-40 — 3.05e-3% of the
-// circuit's own 12-ulp envelope — and it enters `envelopeUsd` as a term rather than a footnote.
+// Worst measured |N(d1) − (1 − N(d2))| is 3.662e-4 ulp of 2^-40 on both of those sweeps — 6.10e-3%
+// of the 6-ulp band the circuit enforces — and it enters `envelopeUsd` as a term, not a footnote.
 //
 // A constantproduct encoder once rearranged an engine expression into a mathematically equal,
 // numerically different form and was wrong by 64 grid steps. So nothing here recomputes a price:
@@ -51,8 +53,16 @@ export const NCDF = {
   S: 40,
   ONE: 2 ** 40,
   ULP: 2 ** -40,
-  TOLC: 12,                       // the CDF envelope the circuit enforces, in ulp
-  TOLP: 10,                       // the density envelope, in ulp
+  // TOLC AND TOLP ARE THE CIRCOM CONSTANTS, NOT THE BANDS. The circuit's comparator form is
+  // `2*resid + tol <= 2*tol`, so what it enforces is |resid| <= TOLC/2 = 6 ulp on the CDF and
+  // TOLP/2 = 5 on the density. gateB7-5's own header says so and its artifact publishes
+  // `bandUlpN: 6`. The two names below are still the circuit's constants because
+  // zk/scripts/gateB7-6 asserts them against the values it parses out of `ncdf.circom`, and a
+  // constant restated in two files is a constant that drifts unless something compares them.
+  // Read `envelopeUsd` below before changing either number: it spends TOLC where the band would
+  // do, and that is what covers a term it does not name.
+  TOLC: 12,                       // circom constant; the enforced CDF band is TOLC/2 = 6 ulp
+  TOLP: 10,                       // circom constant; the enforced density band is TOLP/2 = 5 ulp
   ZSPLIT: 7774721279939,          // 7.07106781186547 * 2^40 — above this the circuit BOUNDS, not computes
 };
 
@@ -127,13 +137,31 @@ function agreesWithServed(p, result, straddle) {
  *   `encodingBoundUsd` is what the SERVER may assert, because it holds both numbers: the only thing
  *   between the buyer's reconstruction and the engine's own unrounded straddle is one rounding of N
  *   onto the 2^-40 grid (half a step), the two-point collapse (measured, per leg), and the float
- *   error of the reconstruction itself. Worst honest leg uses 99.9943% of it over 200,000 legs —
- *   which is a bound landing on itself rather than near itself, so it is a bound something reaches.
+ *   error of the reconstruction itself. Worst honest leg uses 99.9915% of it over the 20,000 served
+ *   legs gateB7-6 sweeps, and 99.9914% over an independent 20,000-leg sweep on another seed — a bound
+ *   landing on itself rather than near itself, so it is a bound something reaches. A one-off 200,000-
+ *   leg probe over a wider box reached 99.9943%; that sweep is not in the repository, so the gate's
+ *   number is the one quoted first.
  *
  *   `envelopeUsd` is what a BUYER is entitled to, because a buyer knows only what the circuit
- *   promises: 12 ulp on N, not half a step. It is 24x wider, and the whole of the difference is a
- *   promise `ncdf.circom` makes that the engine does not need. Tightening it means tightening TOLC,
- *   which is a property of the circuit and not of this service.
+ *   promises: TOLC ulp on N, not half a step. It is 24x wider, and the whole of the difference is a
+ *   promise `ncdf.circom` makes that the engine does not need.
+ *
+ *   AND IT IS CONSERVATIVE FOR TWO REASONS THAT CANCEL, WHICH MAKES `TOLC` HERE A TRAP. A buyer's
+ *   real distance from the truth is three terms, and gateB7-5's artifact measures all three:
+ *
+ *       6.0000  the band the circuit enforces  (TOLC/2, not TOLC — see the comparator form above)
+ *     + 2.1100  the fixed-point evaluator's own distance from a reference that is neither Hart nor
+ *               A-S. NOT NAMED BELOW, and it is the term a reader is most likely to forget.
+ *     + 0.1995  half a grid step of x, through the Lipschitz constant  (= 0.5*PHI_MAX)
+ *     = 8.3095 ulp
+ *
+ *   The expression below spends `TOLC + 0.5*PHI_MAX = 12.1995` ulp, which is 1.4681x that — safe,
+ *   but safe because 12 over-covers the band by 6 and the missing evaluator term only costs 2.11.
+ *   So "correcting" TOLC to the band here WITHOUT adding the evaluator term gives 6.1995 ulp, or
+ *   74.6% of what a buyer actually needs, and the envelope becomes UNSOUND while looking like a fix.
+ *   Tightening it honestly means naming all three terms; tightening the first means tightening the
+ *   circuit, which is a property of `ncdf.circom` and not of this service.
  *
  * dStraddle/dN = 4·S, exactly, from C + P = 2S(2N − 1). No linearisation and no derivative estimate:
  * the map from N to the straddle is affine, so a bound on N times 4S IS a bound on the straddle.

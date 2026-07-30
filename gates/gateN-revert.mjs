@@ -40,7 +40,7 @@
 //                             broke. Reverting only one side of a two-sided edit is the actual defect.
 //   9. THE INDEX ROW           §10's index row goes back to "open for 3 of 4" while three of the four are
 //                             wired. Thirteen index rows were checked by nothing at all until this pair.
-//  10. AN UNCOMMITTED ARTIFACT a `liquidation.r1cs` is written into `Quiver/zk/build` and NOT committed.
+//  10. AN UNCOMMITTED ARTIFACT a real `.r1cs` is copied into the DEV build tree under a new name, so it is
 //                             §8's original test reads that directory with `readdirSync` and would now
 //                             report the clone as complete; the added test asks HEAD and goes red. This is
 //                             the 29 July failure exactly — a file present to a directory listing and
@@ -61,12 +61,20 @@
 // somewhere else is not this script's business. What is asserted is what the mutation adds.
 //
 // Run: npm run gate:n-revert
-import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, unlinkSync, copyFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// The build tree gate N discovers CIRCUITS from. Probed rather than assumed, because the layout differs
+// between the working tree and a clone of the mirror and a wrong guess here would make the ghost step write
+// nowhere and pass silently.
+const BUILD_DEV = [
+  join(ROOT, '..', '..', 'zk', 'build'),
+  join(ROOT, '..', 'zk', 'build'),
+  join(ROOT, 'zk', 'build'),
+].find((p) => existsSync(p));
 const COPIES = [...new Set([
   join(ROOT, 'docs', 'known-defects.md'),
   join(ROOT, '..', 'KNOWN_DEFECTS.md'),
@@ -129,12 +137,27 @@ function mutateLine(prefix, replacement) {
 // A file mutation rather than a text one: an artifact present to a directory listing and present in no
 // clone. Left over from a crashed run it would make the next baseline red for the wrong reason, so it is
 // cleared at startup as well as in the `finally`.
-const GHOST = join(ROOT, '..', '..', 'Quiver', 'zk', 'build', 'liquidation.r1cs');
-const GHOST_MARK = 'gateN-revert ghost artifact — not a circuit, safe to delete\n';
+// REBUILT 30 July 2026. This used to write a fake `liquidation.r1cs` into `Quiver/zk/build`, because that
+// circuit was genuinely absent from the mirror and planting it created the asymmetry under test: present to
+// `readdirSync`, absent from HEAD. §8 was then closed and the real `liquidation.r1cs` was committed, so the
+// script correctly REFUSED to start rather than overwrite a real artifact, and in refusing it stopped
+// proving anything.
+//
+// The asymmetry now has to be built from the other side. A circuit is added to the DEV build tree, where
+// `CIRCUITS` is discovered, and the mirror does not have it. `§8b` and the disk-versus-HEAD test must both go
+// red naming it. It is a COPY OF A REAL `.r1cs`, not a stub: `CIRCUITS` is built through `r1csHeader()`,
+// which asserts the magic bytes, so a text placeholder would make gate N throw at load time and that is a
+// different failure from the one being demonstrated.
+const GHOST = join(BUILD_DEV, 'ghostrevert.r1cs');
+const GHOST_SOURCE = ['kelly.r1cs', 'liquidation.r1cs', 'ncdf.r1cs'].map((f) => join(BUILD_DEV, f)).find(existsSync);
 function clearGhost() {
-  if (existsSync(GHOST) && readFileSync(GHOST, 'utf8') === GHOST_MARK) unlinkSync(GHOST);
+  if (existsSync(GHOST)) unlinkSync(GHOST);
 }
 clearGhost();
+if (!GHOST_SOURCE) {
+  console.error('gate N revert: no real .r1cs in the dev build tree to copy, so the ghost step cannot be built and would silently pass');
+  process.exit(1);
+}
 if (existsSync(GHOST)) { console.error(`gate N revert: ${short(GHOST)} already exists and is not this script's — refusing to touch it`); process.exit(1); }
 
 function restore() {
@@ -147,7 +170,7 @@ function step(name, { find, replace, line, ghost, expect, docsShould, gateShould
   let red = false, out = '', docs = [];
   try {
     if (line) mutateLine(line.prefix, line.replacement);
-    else if (ghost) writeFileSync(GHOST, GHOST_MARK, 'utf8');
+    else if (ghost) copyFileSync(GHOST_SOURCE, GHOST);
     else mutate(find, replace);
     ({ red, out } = gateN());
     if (docsShould !== undefined) docs = docsFindingsAboutRegister();
@@ -213,17 +236,23 @@ step('a status line left OPEN over a defect that is now fixed makes gate N red',
 });
 
 // 3. a count quietly edited away from the artifacts.
+// The figure moved from 18 to 20 on 30 July when lpclosed and lpclosed2 were compiled, both with nPrvIn 0.
+// The script threw rather than mutating text that was no longer there, which is the behaviour that makes
+// this file worth having: an anchor that has drifted means the mutation is testing nothing.
 step('editing the private-input count makes gate N red', {
-  find: '| with no private input at all | **18** |',
-  replace: '| with no private input at all | **17** |',
+  find: '| with no private input at all | **20** |',
+  replace: '| with no private input at all | **19** |',
   expect: ['circuits have nPrvIn = 0', "§4's table does not say so"],
 });
 
 // 4. a list short by the one entry that mattered — the original defect's own shape.
-step('dropping the missing artifact from §8 makes gate N red', {
-  find: '         build/liquidation.r1cs\n',
-  replace: '',
-  expect: ['§8 must name the missing artifacts'],
+// §8 is now closed and its artifact list is a table of what SHIPPED rather than what is missing, so the
+// mutation moved with it: drop the zkey's measured size and the section reads as "fixed" with nothing behind
+// the word. Gate N asserts that size precisely so a bare "fixed" cannot pass.
+step('dropping the shipped-artifact evidence from §8 makes gate N red', {
+  find: '| `build/liquidation_plonk.zkey` | this change | 5,436,000 |',
+  replace: '| `build/liquidation_plonk.zkey` | this change | |',
+  expect: ['§8 must carry the measured size'],
 });
 
 // 5. a gas figure left bare. Gate N catches it; docs-consistency's rule 9(b) does not reach this page.
@@ -281,7 +310,10 @@ step("putting §10's index row back to its stale count makes gate N red", {
 // says "the mirror now carries every compiled circuit" about a tree no reviewer will ever receive.
 step('an uncommitted artifact in the mirror makes gate N red rather than green', {
   ghost: true,
-  expect: ['in no clone'],
+  // The message moved with the test. The old red said "in no clone" about a planted mirror file; the red
+  // now names the circuit that exists on this desk and at no HEAD, which is the same defect seen from the
+  // other side and a strictly more useful thing to print.
+  expect: ['ghostrevert'],
 });
 
 // 11. THE ABSENCE THAT WAS NEVER MEASURED. This row said "0 of 38 compiled" for the length of one work
@@ -296,7 +328,10 @@ step('a compiled row that drops the uncommitted artifact makes gate N red and na
     prefix: '| of those, with a compiled `.r1cs`',
     replacement: '| of those, with a compiled `.r1cs` **committed** anywhere under `zk/build` | **0 of 38** |',
   },
-  expect: ['ncdfonesided', 'does not name it'],
+  // The committed count became 2 on 30 July (lpclosed, lpclosed2), so putting the row back to a bare 0 now
+  // fails on the count first rather than on the naming. Both are the same defect and the expectation names
+  // the circuits, which is the part a bare figure would let recur.
+  expect: ['lpclosed', "§13's compiled row says"],
 });
 
 // Everything must be back, byte for byte. A revert that leaves the tree edited is worse than no revert.

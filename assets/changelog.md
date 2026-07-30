@@ -12,6 +12,51 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — the flagship circuit is now rebuildable from a clone, and four published counts were stale within a day
+
+**Nothing a caller sees changes.** `q1-e1fa99d08887d6cc` is unmoved and no contentHash moves. This is about
+what a reviewer gets when they clone the repository and try to reproduce our numbers, which is the claim we
+ask to be judged on.
+
+**The defect register said five artifacts were missing while one of them was already there.** §8 of
+`KNOWN_DEFECTS.md` read "the 5 missing artifacts are still missing". Asked of `git ls-files` at HEAD one file
+at a time rather than as a group, commit `ddcc434` had already shipped `zk/build/liquidation.r1cs`, so the
+true figure was **1 of 5 closed**. The other four are shipped now: `liquidation_plonk.zkey` (5,436,000
+bytes), `vk_plonk.json` (2,043), `liquidation_js/liquidation.wasm` (47,368) and
+`liquidation_js/witness_calculator.cjs` (10,356). 5.5 MB, comfortably inside a convention this repository
+already keeps, since four zkeys it tracks are larger and the largest is 24,672,856 bytes.
+
+That matters because `gateB6-portfolio-routes.mjs` is the one gate that proves against
+`zk/build/liquidation_*`. It could not run from a clone at all, which is a harder failure than the seven
+`evmRehearsal` gates that stop for want of `solc`. It can now.
+
+**The gate caught the stale disclosure, and it was measuring the wrong thing while doing so.** §8's claim is
+about five named artifacts; the test compared which **circuits** lack a `.r1cs` in the mirror. Those drifted
+apart twice in one day. First `liquidation.r1cs` shipped, so no circuit was absent while four artifacts still
+were. Then `lpclosed` and `lpclosed2` were compiled and the test went red naming `[lpclosed,lpclosed2]`, a
+true observation about a claim §8 never made. The test now asserts the artifact list at HEAD, and the
+circuit-set question became its own check with a floor, so a mirror listing too few files cannot pass on
+nothing.
+
+**Four published counts went stale because of this work, and the gate found all four.** Compiling two
+circuits moved: circuits in this checkout 21 to **23**; circuits with no private input at all 18 to **20**,
+because both new ones declare `nPrvIn` 0 and so land on the wrong side of §4's defect; ceremony files on disk
+2 to **3**, since `lpclosed` needs `hez_final_13`; and §13's committed-artifact row 0 of 38 to **2 of 38**.
+
+The last one deserves its distinction rather than a number. Those two circuits are the only adversary sources
+a clone can rebuild: their `.r1cs` and the ceremony file they need are committed, so `plonk setup` regenerates
+the zkey in about 930 ms. The other thirty-six have no committed `.r1cs` and no clone can rebuild them at any
+price. Saying "2 of 38" without that would flatter the position.
+
+**Two checks were repaired rather than satisfied.** The ceremony assertion required every `.ptau` to be
+4,801,688 bytes, which held only while they were all power 12; it now reads each file's declared power out of
+its own header and checks the size that power should have, and also refuses a file whose name and header
+disagree. And the scripted revert that proves gate N can fail had been planting a fake `liquidation.r1cs` in
+the mirror; once the real one was committed it correctly refused to start, and in refusing it stopped proving
+anything. It now builds the same asymmetry from the other side, copying a real `.r1cs` into the dev tree under
+a name no clone has. Thirteen mutations, every one red where it should be, both register copies restored byte
+for byte.
+
 ## 30 July 2026 — the exact expected impermanent loss needed no engine change, and the ceremony claim was in the wrong units
 
 **Nothing a caller sees changes, and that is the finding.** `q1-e1fa99d08887d6cc` is unmoved, measured

@@ -601,9 +601,39 @@ test('§12 the three contradicted constants still contradict the code beneath th
 test('§13 the adversary artifacts are still absent, and their sources still unpublished', () => {
   if (!isOpen(13)) return;
   const ptau = readdirSync(BUILD).filter((f) => f.endsWith('.ptau'));
-  assert.equal(ptau.length, 2, `${ptau.length} ceremony files are on disk; §13 says two`);
+  // Was 2 (hez_final_12, pot12_final). hez_final_13 arrived on 30 July because lpclosed is 7,471 Plonk
+  // constraints and the power-12 file refuses it. The figure is asserted rather than described, so adding a
+  // fourth will go red here too, which is the point.
+  assert.equal(ptau.length, 3,
+    `${ptau.length} ceremony files are on disk (${ptau.join(', ')}); §13 says three`);
+  // This used to assert every ceremony file was 4,801,688 bytes, which held only while they were all power
+  // 12 and went red the moment a power-13 file arrived. A single hardcoded size cannot describe a set that
+  // grew, so each file is now checked against ITS OWN declared power, read out of its header. Strictly
+  // stronger: a truncated or swapped file fails even when the byte count is one this table knows.
+  const PTAU_BYTES = { 12: 4801688, 13: 9520280 };
   for (const f of ptau) {
-    assert.equal(statSync(join(BUILD, f)).size, 4801688, `${f} is not the 4,801,688-byte power-12 file §13 describes`);
+    const b = readFileSync(join(BUILD, f));
+    assert.equal(b.toString('ascii', 0, 4), 'ptau', `${f} does not begin with the ptau magic`);
+    let power = null;
+    const nSec = b.readUInt32LE(8);
+    let off = 12;
+    for (let i = 0; i < nSec; i++) {
+      const type = b.readUInt32LE(off); off += 4;
+      const size = Number(b.readBigUInt64LE(off)); off += 8;
+      if (type === 1) { let q = off; const n8 = b.readUInt32LE(q); q += 4 + n8; power = b.readUInt32LE(q); break; }
+      off += size;
+    }
+    assert.ok(power !== null, `${f} has no header section, so its power cannot be read and its size means nothing`);
+    assert.ok(PTAU_BYTES[power] !== undefined,
+      `${f} declares power ${power}, which §13 does not describe; add its expected size or explain why it is here`);
+    assert.equal(statSync(join(BUILD, f)).size, PTAU_BYTES[power],
+      `${f} declares power ${power} but is ${statSync(join(BUILD, f)).size} bytes, not the ${PTAU_BYTES[power]} that power should be`);
+    // and the filename must not disagree with the header, which is how a wrong fetch hides
+    const named = f.match(/_(\d+)\.ptau$/) || f.match(/pot(\d+)_/);
+    if (named) {
+      assert.equal(Number(named[1]), power,
+        `${f} is named for power ${named[1]} and its header declares ${power}`);
+    }
   }
   const adv = join(ZK, 'circuits', 'adv');
   if (existsSync(adv)) {
@@ -614,7 +644,19 @@ test('§13 the adversary artifacts are still absent, and their sources still unp
     // artifacts" about a directory that holds `adv/ncdfadv/ncdfonesided.r1cs`.
     const withKeys = readdirSync(adv).map((f) => f.replace(/\.circom$/, ''))
       .filter((c) => artifact(`${c}_plonk.zkey`) || artifact(`${c}.zkey`) || artifact(`${c}_final.zkey`));
-    assert.deepEqual(withKeys, [], `these adversary circuits now have zkeys: ${withKeys.map((c) => `${c} at ${artifact(`${c}_plonk.zkey`) || artifact(`${c}.zkey`) || artifact(`${c}_final.zkey`)}`).join(', ')} — §13 must be updated`);
+    // Was assert.deepEqual(withKeys, []). Two now have zkeys on this desk, and the honest position is not
+    // that the claim is broken but that it needs its distinction: a zkey that a clone can REGENERATE from
+    // committed inputs is not the same exposure as one that exists nowhere reproducible. So the requirement
+    // is that §13 names every circuit that has one, rather than that none exists.
+    for (const c of withKeys) {
+      assert.ok(SECTIONS.get(13).body.includes(c),
+        `${c} has a zkey at ${artifact(`${c}_plonk.zkey`) || artifact(`${c}.zkey`) || artifact(`${c}_final.zkey`)} `
+        + 'and §13 does not name it, so the page reads as though no adversary circuit has one');
+    }
+    if (withKeys.length) {
+      assert.match(SECTIONS.get(13).body, /uncommitted|not committed|regenerate/i,
+        `${withKeys.length} adversary circuits have zkeys on this desk; §13 must say whether a clone gets them`);
+    }
   }
 });
 

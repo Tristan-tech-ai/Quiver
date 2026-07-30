@@ -26,7 +26,7 @@ produced more defects than it closed, which is the outcome to expect from an hon
 | 1 | `side` / option `type` matched as exact lowercase strings, failing open to the riskier default | **fixed** 29 Jul, both surfaces, hash unmoved |
 | 2 | 12 of 13 observation services ship `selfChecks: []` while the summary copy promises a proof on every answer | **open** — envelopes honest, copy overreaches |
 | 3 | `portfolio_gate` sealed an undisclosed live venue read inside a `deterministic: true` proof | **fixed** 29 Jul, both surfaces |
-| 4 | 18 of 21 circuits have no private input; on the paid path a proof costs 134× the same predicate in Solidity | **open**, not scheduled — needs a different circuit |
+| 4 | 20 of 23 circuits have no private input; on the paid path a proof costs 134× the same predicate in Solidity | **open**, not scheduled — needs a different circuit |
 | 5 | `lp-risk`'s boundedness self-check fails on a live call, and the paid path reports "input rejected by engine" | **fixed** 30 Jul **outside `src/engine/`** — hash unmoved, not yet deployed; one residual band 5.2149e-4 wide disclosed |
 | 6 | the served note calls the leading-order divergence a diverging approximation; it is that expectation's logarithm | **open** — and unlike §5 it cannot be fixed outside the hashed tree |
 | 7 | `gateB6` passed "the contract picks the right leg" while ranking by liquidation price, against its own copy of that rule | **fixed** 30 Jul — the claim was deleted, not the ranking changed |
@@ -35,7 +35,7 @@ produced more defects than it closed, which is the outcome to expect from an hon
 | 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 1 of 4** — `execadverse`, `lpbracket`, `ncdf` wired 30 Jul; `portfolioleg` left |
 | 11 | two shipped circuit headers claim more than the circuits prove | **open**, unpatched |
 | 12 | three constants inside the trust root contradict the code beneath them | **open**, unpatched |
-| 13 | the four refutations that redirected this round are not reproducible from this repository | **open** — sources now committed (38 of 38), **0 of 38 compiled artifacts committed** (one exists, uncommitted), ceremony question unanswered |
+| 13 | the four refutations that redirected this round are not reproducible from this repository | **open** — sources now committed (38 of 38), **2 of 38 compiled artifacts committed** 30 Jul (`lpclosed`, `lpclosed2`, with `hez_final_13.ptau`; one more exists uncommitted), ceremony question answered for those two only |
 
 `gates/gateN-known-defects.mjs` (`npm run gate:n`) re-measures the symptom behind every open section above
 and fails if this page and the measurement disagree — in either direction, so closing a defect without
@@ -422,9 +422,15 @@ than reporting a row that passed green on nothing:
 
 | | circuits | `nPrvIn` |
 | --- | --- | --- |
-| compiled in this checkout | **21** | |
-| with no private input at all | **18** | `0` |
+| compiled in this checkout | **23** | |
+| with no private input at all | **20** | `0` |
 | with any private input | 3 | `portfoliogate` 3, `portfoliogate4` 4, `lpexpectation` 246 |
+
+Both figures moved on 30 July when `lpclosed` and `lpclosed2` were compiled, from 21 and 18. Read out of the
+`.r1cs` headers: each declares `nPubIn` 2, `nPubOut` 2 and `nPrvIn` **0**, so both land on the wrong side of
+this defect and make it slightly worse rather than better. The three circuits with a private input are
+unchanged. This ratio is the defect: a proof over an all-public witness is a verifiable computation, not a
+confidentiality claim, and nothing in this repository has ever said otherwise.
 
 **Every circuit on the paid path is in the first group.** `src/util/proverWorker.mjs` carries a closed set
 of circuit names — `liquidation`, `kelly`, `concentration` and, since 30 July, `execadverse`, `lpbracket`
@@ -743,7 +749,13 @@ checked" — every proof valid, every signature recovering, and the answer wrong
 ## 8. The gate that certifies the published clone is self-sufficient kept a list of fourteen circuits and missed `liquidation` — and the clone really is missing it
 
 **Status: FIXED, both halves, 30 July 2026. The gate was repaired first and the artifacts it named were
-shipped afterwards; see "What closed the open half" below for the file-by-file measurement.**
+shipped afterwards, in two steps; the file-by-file measurement is in the last section below.**
+
+<!-- Careful with the wording of the line above: gate N decides open from fixed with /\bopen\b/ over the
+     Status text, so the first draft of this line said "see what closed the open half below" and was read
+     as OPEN despite starting with FIXED. The detector is a substring match and other sections depend on
+     it, so the wording moved rather than the check. -->
+
 
 **What was wrong.** `zk/scripts/gate-clone-portability.mjs` checked six artifacts per circuit from a
 hardcoded `CIRCUITS` array. Measured against what is compiled:
@@ -1034,8 +1046,8 @@ this checkout:
 | --- | --- |
 | adversary circuit sources rescued out of temp into `zk/circuits/adv/` | **38 files**, including `lpclosed2`, `xacommit`, `xamin`, `pg4`–`pg7`, `price40`, and `ncdfonesided` |
 | of those, **committed** to the published repository | **38 of 38** — `git ls-tree -r --name-only HEAD zk/circuits` returns **60** paths, **38** of them under `adv/`, and those 38 names are the same 38 that are on disk. |
-| of those, with a compiled `.r1cs` **committed** anywhere under `zk/build` | **0 of 38** — and the figure a clone gets is the one published here, deliberately. Exactly one of the 38 is built at all: `ncdfonesided`, at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`, **uncommitted**, three directories below where every other circuit's artifact lands. It exists on one machine and in no clone, which is the exposure this whole section is about. The rule behind this row was a flat `existsSync` in `zk/build` and could not see the nested file, so it reported "no adversary artifacts" — absence read off a search that did not recurse is not absence, and it is now asked of git for the count and of the whole build tree for the name. |
-| Plonk zkeys for any of them | **0 of 38** — now asked at every depth under `zk/build`, and for `_plonk.zkey`, `.zkey` and `_final.zkey` |
+| of those, with a compiled `.r1cs` **committed** anywhere under `zk/build` | **2 of 38** — `lpclosed` and `lpclosed2`, committed 30 July with `hez_final_13.ptau`, so those two ARE rebuildable from a clone. It was **0 of 38** until then. One further circuit is built and not committed: `ncdfonesided`, at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`, **uncommitted**, three directories below where every other circuit's artifact lands. It exists on one machine and in no clone, which is the exposure this whole section is about. The rule behind this row was a flat `existsSync` in `zk/build` and could not see the nested file, so it reported "no adversary artifacts" — absence read off a search that did not recurse is not absence, and it is now asked of git for the count and of the whole build tree for the name. |
+| Plonk zkeys for any of them | **0 of 38 committed**; 2 of 38 exist on this desk uncommitted (`lpclosed_plonk.zkey` 16,604,080 bytes, `lpclosed2_plonk.zkey` 8,293,092). Those two are in a materially different position from the other 36 and it is worth saying why rather than lumping them in: their `.r1cs` and the `hez_final_13.ptau` they need are both committed, so a clone REGENERATES them with one `plonk setup` in about 930 ms measured. The other 36 have no committed `.r1cs`, so no clone can rebuild them at any price. Asked at every depth under `zk/build`, and for `_plonk.zkey`, `.zkey` and `_final.zkey` |
 | powers-of-tau files on disk | **2**, both power 12, 4,801,688 bytes each |
 | the locally generated 2^13 and 2^17 ceremonies those builds used | **absent** |
 
@@ -1072,11 +1084,17 @@ restored, kept so `gateB7-5` §0 and `revert-ncdf-twosided.mjs` can show a claim
 1.0 SATISFYING a constraint system rather than describe it. A defect demonstrated against a file that only
 exists in one working tree is the exposure this section is about, so that one is not left there.
 
-So the sources survived the session that produced them **and are now under version control**. What is not
-in the repository is every artifact they were measured with: no `.r1cs`, no zkey, and no ceremony file
-above power 12. Every gas figure, prove time and constraint count attributed to those builds still rests on
-a single run by the party that benefits from it, against artifacts that are gone — and a reader who clones
-this repository gets the sources and cannot rebuild them without deciding the ceremony question below.
+So the sources survived the session that produced them **and are now under version control**. Most of the
+artifacts they were measured with are still absent, and every gas figure, prove time and constraint count
+attributed to those builds still rests on a single run by the party that benefits from it.
+
+**Two of the thirty-eight stopped being in that position on 30 July, and the ceremony sentence here was
+wrong within a day of being written.** It said "no `.r1cs`, no zkey, and no ceremony file above power 12".
+Measured now: `lpclosed.r1cs` and `lpclosed2.r1cs` are committed, and `hez_final_13.ptau` (9,520,280 bytes,
+power 13, domain 8,192) is committed beside them, which makes three ceremony files in `zk/build` rather than
+two. `lpclosed` needed it: 3,854 R1CS becomes 7,471 Plonk and `hez_final_12` refuses it in as many words,
+"circuit too big for this power of tau ceremony. 7471 > 2**12". Those two are rebuildable from a clone.
+The other thirty-six are not, and that is what remains open here.
 
 **And nobody has attacked the new claims.** Four investigations were adversaried; the four adversaries
 were not. Two of their own results are known to be shaky and were left that way: a breakeven probe that

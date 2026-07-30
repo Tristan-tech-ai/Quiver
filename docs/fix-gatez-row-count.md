@@ -179,9 +179,9 @@ Two gates, four commands, ten reverts.
 
 ```
 npm run gate:z              # the reproduction, plus §5: the published counts against this run
-npm run gate:z-revert       # 5 modes + a baseline run, ~18 min
+npm run gate:z-revert       # 5 modes + a baseline run: six full reproductions
 npm run gate:z2             # the published figures against git ls-tree, seconds
-npm run gate:z2-revert      # 5 modes + a baseline run, seconds
+npm run gate:z2-revert      # 5 modes + a baseline run, seconds (4 of the 5 in a clone)
 ```
 
 **`gate:z` itself now fails on a row count that disagrees with its own artifact.** Section 5 of
@@ -243,6 +243,12 @@ last time that check was attempted.
 - `assets/whitepaper*` untouched. `npm test` is unchanged at 386; the two new gates are `gates/` entries
   with `npm run` aliases and are not in the suite.
 - Nothing was deployed.
+- `node gates/preflight.mjs` returned FAILED once, on "no scripted-revert defect or abandoned backup is
+  left in the working tree", and PASSED on the four runs around it — before this work, immediately after,
+  and twice at the end. `zk/scripts/revert-heal.mjs` reports 0 leftover artefacts and 0 marker-carrying
+  files over 757 files compared against HEAD. Five sessions share this tree and that check is exactly the
+  one that fires while another session's revert script is mid-flight, which is what it is for. Recorded
+  rather than dismissed: a transient nobody writes down is a transient nobody can rule out.
 - `package.json` in the mirror was missing `gate:lb` / `gate:lb-revert` before this session and still is:
   `gates/gateLB-lp-boundedness.mjs` and `gates/gateLB-revert.mjs` are committed, but the aliases exist
   only in the dev tree, so `npm run gate:lb` fails in a clone. That belongs to another session's work and

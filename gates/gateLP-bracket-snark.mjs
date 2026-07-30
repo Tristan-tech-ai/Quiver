@@ -122,10 +122,46 @@ test('LP.3 the closed form for the block that is NOT proven, measured against th
   }
   // The ceiling is not a tolerance: |IL| <= 1, so the truncation cannot exceed the Gaussian weight the
   // engine's |z| <= 6 window discards. Computed here, not looked up.
+  //
+  // THIS LINE USED TO BE WRONG IN THE 5TH DIGIT, and the header of src/util/lpBracket.js already said
+  // so — "the old figure was a low-accuracy erfc, wrong in the 5th digit" — while this gate, which is
+  // the only thing that makes that header reproducible, went on computing the old figure. The
+  // correction landed in the prose and never in the code. What was here was the ASYMPTOTIC Mills
+  // expansion 2*phi(6)*(1/6 - 1/6^3 + 3/6^5 - 15/6^7), which is a DIVERGENT series truncated at four
+  // terms: it returns 1.9730731536709662e-9 against a true 1.9731752900753966e-9, off by 5.176e-5
+  // relative. Nothing on a served path reads this constant, and the published 71.92% ratio is
+  // genuinely unchanged by the correction (71.924377% before, 71.920654% after) — which is exactly
+  // why it survived. A number nobody checks is still a number this project published.
+  //
+  // Replaced by the CONVERGENT continued fraction for the Mills ratio,
+  //     Q(x)/phi(x) = 1/(x + 1/(x + 2/(x + 3/(x + ...)))),
+  // evaluated backward from past convergence — and then pinned two ways, because a single formula
+  // that nobody cross-checks is how the asymptotic series lasted this long.
   const phi = (z) => Math.exp(-0.5 * z * z) / Math.sqrt(2 * Math.PI);
-  const droppedWeight = 2 * phi(6) * (1 / 6 - 1 / 6 ** 3 + 3 / 6 ** 5 - 15 / 6 ** 7);
+  const millsCF = (x, depth = 2000) => { let f = 0; for (let k = depth; k >= 1; k--) f = k / (x + f); return phi(x) / (x + f); };
+  const droppedWeight = 2 * millsCF(6);
+  // Method 2, independent of the continued fraction: Simpson on the tail integral. Coarser on purpose
+  // (this is a cross-check, not the published value), so the tolerance is the one Simpson earns.
+  const tailSimpson = (x, n = 200000, U = 30) => {
+    const h = U / n; let s = 0;
+    for (let i = 0; i <= n; i++) { const t = x + i * h; s += ((i === 0 || i === n) ? 1 : (i % 2 === 1 ? 4 : 2)) * phi(t); }
+    return s * h / 3;
+  };
+  const droppedWeightSimpson = 2 * tailSimpson(6);
+  const weightAgreement = Math.abs(droppedWeight - droppedWeightSimpson) / droppedWeight;
   console.log(`  LP.3  worst |closed - engine| = ${worst.toExponential(6)} at v=${at}`);
   console.log(`  LP.3  dropped weight outside |z|<=6 = ${droppedWeight.toExponential(6)}; the gap is ${(worst / droppedWeight * 100).toFixed(2)}% of it`);
+  console.log(`  LP.3  that weight two independent ways: continued fraction ${droppedWeight.toExponential(16)} · Simpson tail ${droppedWeightSimpson.toExponential(16)} · agreeing to ${weightAgreement.toExponential(2)} relative`);
+  assert.ok(weightAgreement < 1e-9, `the two evaluations of 2*Q(6) disagree by ${weightAgreement.toExponential(3)} relative, so neither may be published`);
+  // AND IT IS PINNED TO THE FIGURE src/util/lpBracket.js's HEADER STATES. The whole defect above was
+  // prose and code drifting apart on this exact constant, so the two are now tied together and a future
+  // edit to either has to move both.
+  assert.equal(droppedWeight, 1.9731752900753966e-9,
+    'the dropped Gaussian weight no longer equals the 1.9731752900753966e-9 that the header of src/util/lpBracket.js states and its doesNotProve string derives 71.92% from');
+  // The superseded asymptotic series, kept only to assert it is NOT what is published — so a revert to
+  // it fails here rather than printing a plausible wrong number for another week.
+  const asymptotic = 2 * phi(6) * (1 / 6 - 1 / 6 ** 3 + 3 / 6 ** 5 - 15 / 6 ** 7);
+  assert.notEqual(droppedWeight, asymptotic, 'the 4-term asymptotic Mills series is back; it is wrong in the 5th digit');
   assert.ok(worst < droppedWeight, 'the gap exceeds the truncated tail weight, so it is not the engine\'s window truncation');
   assert.ok(worst > 1e-9, 'the gap is under one grid step, which would make the closed form safe to encode — the header of lpBracket.js argues the opposite and would need rewriting');
   // And the closed form solves the breakeven outright, which is why the bisection is a search and not

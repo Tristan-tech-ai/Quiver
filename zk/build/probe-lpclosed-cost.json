@@ -1,0 +1,59 @@
+{
+  "at": "2026-07-30T07:06:38.537Z",
+  "passed": true,
+  "scheme": {
+    "internalScale": "1e-18",
+    "publishedScale": "1e-9",
+    "squarings": 8,
+    "taylorTerms": 12,
+    "rangeCheckBits": 64,
+    "tolerance": 1,
+    "rangeReductionDivisor": 2048
+  },
+  "constraints": {
+    "nonLinear": 2857,
+    "linear": 166,
+    "total": 3023,
+    "snarkjsTotal": 3023,
+    "ptauCeiling": 4096,
+    "fractionOfCeiling": 0.738037109375
+  },
+  "comparison": {
+    "lpexpectationR1cs": 36613,
+    "lpbracketR1cs": 932,
+    "lpexpectationTimesOverCeiling": 8.938720703125
+  },
+  "witness": {
+    "domain": "(0, 166]",
+    "samples": 40000,
+    "toleranceViolations": 0,
+    "worstGridStepErrorVsIndependentReference": 0,
+    "worstGridStepErrorAtV": 0,
+    "worstResidualFractionOfTolerance": {
+      "t": 0,
+      "powers": 0.9999886718750001,
+      "poly": 0.9999999999999998,
+      "squaring": 0.9999976632345446,
+      "output": 9.99978282e-10
+    }
+  },
+  "substitution": [
+    {
+      "label": "linear, 40000 v in (0, 166] — the live domain",
+      "samples": 40000,
+      "mismatches": 3,
+      "oneIn": 13333,
+      "worstGapPercent": 1.4191203945301822e-7,
+      "worstGapAtV": 1.12465
+    },
+    {
+      "label": "log-spaced, 200,001 v in [1e-8, 1e4] — the circuit's declared range",
+      "samples": 200001,
+      "mismatches": 43,
+      "oneIn": 4651,
+      "worstGapPercent": 1.4191207675651185e-7,
+      "worstGapAtV": 1.1254857482322629
+    }
+  ],
+  "conclusion": "The ceremony file is NOT what blocks proving block 2. A closed-form circuit fits inside hez_final_12 with room to spare, and carries an exact witness across the live domain. What blocks it is that the engine serves a quadrature and this would certify the closed form: the two print a different 4-decimal percent on part of the domain, so wiring it would put a proof beside a response it visibly disagrees with. The fix is engine-side (serve Math.expm1(-v/8), which is exact and 802x cheaper) and src/engine/ is frozen."
+}

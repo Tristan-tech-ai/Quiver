@@ -2,12 +2,17 @@
 //
 // "The bracket guard refuses a real divergence" is a claim about a verifier, and gate LP was written
 // after the guard it guards, so of course it passes. That says nothing about whether it would catch
-// what it was written for. This script puts a defect back — six of them, one at a time — requires gate
+// what it was written for. This script puts a defect back — EIGHT of them, one at a time — requires gate
 // LP to go RED for each, then restores every file and requires GREEN again. Red in both states would
 // mean broken rather than strict, so both halves are required.
 //
-// The six are deliberately not variations on one theme, and two of them are defects this project has
-// already shipped somewhere else.
+// The count in this header read "six" while the list below held seven, and then eight; it is now
+// counted from `REVERTS.length` at the bottom of the run rather than written down here, because a
+// hand-maintained count in a comment is the smallest possible version of the drift this whole script
+// exists to catch.
+//
+// The eight are deliberately not variations on one theme, and three of them are defects this project has
+// actually shipped — reverts 1 and 6 elsewhere, and revert 8 in this very gate.
 //
 // TWO ARE WITNESS/ENGINE MISMATCHES — the circuit is handed a bracket around the root of a function
 // the engine did not bisect:
@@ -44,6 +49,23 @@
 //      5th-decimal boundary — the same defect that refused RUNE a liquidation proof for landing a hair
 //      the wrong side of a half-cent.
 //
+// ONE IS A COURTESY RATHER THAN A GUARD:
+//
+//   7. THE SEARCH STOPS TARGETING THE SERVED DIGIT. Nothing becomes untrue — a certified 0.18731409
+//      against a served 0.18732 is a correct certificate either way — but 14 of 378 proved answers then
+//      publish a public signal that reads as a different number from the response beside it.
+//
+// AND ONE IS IN THE GATE'S OWN ARITHMETIC, which is the case this script did not cover until 30 July:
+//
+//   8. THE DROPPED GAUSSIAN WEIGHT GOES BACK TO A DIVERGENT SERIES. LP.3 computed 2*Q(6) from the
+//      4-term ASYMPTOTIC Mills expansion and got 1.9730731536709662e-9 against a true
+//      1.9731752900753966e-9 — off by 5.176e-5 relative, wrong in the 5th digit. The header of
+//      src/util/lpBracket.js had ALREADY recorded that correction; the gate that makes the header
+//      reproducible never received it. It survived because the only published consequence, the 71.92%
+//      ratio in the doesNotProve string, is identical either way (71.924377% vs 71.920654%). A
+//      verifier's own constants need a revert as much as the code it verifies, and this is the first
+//      one here that targets the gate file itself.
+//
 // It also reads the engine build id before and after. Nothing here touches src/engine/, and the
 // published q1-e1fa99d08887d6cc must be the same string on both sides of a script that rewrites files.
 //
@@ -56,6 +78,10 @@ import { fileURLToPath } from 'node:url';
 const ROOT = join(fileURLToPath(new URL('.', import.meta.url)), '..');
 const LPB = join(ROOT, 'src', 'util', 'lpBracket.js');
 const SNARK = join(ROOT, 'src', 'util', 'snark.js');
+// The gate itself is a revert target for revert 8, because the defect that revert puts back was a
+// defect IN THE GATE — a constant the gate computed one way while the code it guards documented
+// another. A verifier's own arithmetic needs a revert as much as the thing it verifies.
+const GATE = join(ROOT, 'gates', 'gateLP-bracket-snark.mjs');
 
 const REVERTS = [
   {
@@ -137,6 +163,23 @@ const REVERTS = [
     expect: /^LP\.6/,
     expectDesc: 'LP.6, which requires every proved answer to certify a volatility that displays as the served one',
   },
+  {
+    id: 8,
+    file: GATE,
+    what: 'the dropped Gaussian weight goes back to the 4-term ASYMPTOTIC Mills series, wrong in the 5th digit',
+    from: '  const droppedWeight = 2 * millsCF(6);',
+    to: '  const droppedWeight = 2 * phi(6) * (1 / 6 - 1 / 6 ** 3 + 3 / 6 ** 5 - 15 / 6 ** 7);   // SCRIPTED REVERT: a divergent series truncated at four terms',
+    // THIS ONE IS A DEFECT THIS GATE ACTUALLY SHIPPED, found on 30 July. The header of lpBracket.js said
+    // the constant had been "recomputed two independent ways" to 1.9731752900753966e-9; this gate — the
+    // only thing that makes that sentence reproducible — went on computing 1.9730731536709662e-9 from a
+    // divergent asymptotic expansion, off by 5.176e-5 relative. It survived because the ratio the
+    // doesNotProve string publishes is 71.92% either way (71.924377% vs 71.920654%), so no other number
+    // in the repository moved. That is the whole hazard: prose and code drifting apart on a constant
+    // whose published consequence is insensitive to the drift. LP.3 now pins the value itself and
+    // cross-checks it against an independent Simpson tail, so this revert has somewhere to be caught.
+    expect: /^LP\.3/,
+    expectDesc: 'LP.3, which pins the weight to the figure the lpBracket.js header states and cross-checks it a second way',
+  },
 ];
 
 function buildId() {
@@ -159,7 +202,7 @@ function runGate() {
   return { pass, fail, named };
 }
 
-console.log('GATE LP REVERT: proving the bracket guard can still say no\n');
+console.log(`GATE LP REVERT: proving the bracket guard can still say no — ${REVERTS.length} reverts, ${new Set(REVERTS.map((r) => r.file)).size} files\n`);
 
 const hashBefore = buildId();
 console.log(`  engine build id before : ${hashBefore}`);
@@ -220,6 +263,12 @@ for (const { rv, res } of outcomes) {
   console.log(`  [${hitTheRightOne ? 'PASS' : '*** FAIL ***'}] and the failure is ${rv.expectDesc}`);
   ok = ok && wentRed && hitTheRightOne;
 }
+// Every declared revert must have actually RUN. A loop that broke early would otherwise report
+// "PASSED" over a subset, which is the "never cap a search and read absence as proof" failure.
+const allRan = outcomes.length === REVERTS.length;
+console.log(`  [${allRan ? 'PASS' : '*** FAIL ***'}] all ${REVERTS.length} declared reverts ran (${outcomes.length} outcomes recorded)`);
+ok = ok && allRan;
+
 const cameBack = restored.fail === 0 && restored.pass > 0;
 const hashHeld = hashBefore === hashAfter && /^q1-[0-9a-f]{16}$/.test(hashBefore);
 console.log(`  [${cameBack ? 'PASS' : '*** FAIL ***'}] and the gate PASSES again once every revert is undone (${restored.pass} pass, ${restored.fail} fail)`);

@@ -201,7 +201,7 @@ cost whatever the circuit behind it, which is the fact the whole comparison turn
 
 | | one wide circuit | one proof per leg |
 |---|---|---|
-| gas (11 legs) | 292,124 <!--gas:gateB8-2-portfolio-evm#acceptGas--> | **2,948,931** <!--gas:gateB6-portfolio-routes#routeB.gas--> (10.1×) |
+| gas (11 legs) | 292,124 <!--gas:gateB8-2-portfolio-evm#acceptGas~2%--> | **2,948,931** <!--gas:gateB6-portfolio-routes#routeB.gas~2%--> (10.1×) |
 | cost on X Layer at 0.02 gwei | 0.0000058 OKB | **0.000059 OKB** |
 | proving | ~5.4 s, serial, unsplittable — EXTRAPOLATED | 858 ms/leg, **~1,166 ms if parallel** |
 | buildable today | **no** — needs 2^14 | **yes** — with what is already on disk |

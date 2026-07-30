@@ -138,8 +138,11 @@ GATE B6: FAILED — the price minimum IS the book's binding leg  [REVERT: the de
 
 The revert deliberately does **not** write the artifact. `PHASE_C_RESEARCH_OPUS.md` cites those gas rows;
 writing a broken configuration's `passed: false` over the real measurement would turn a demonstration
-into a corrupted record. Confirmed: the artifact's `at` stayed at `2026-07-30T01:40:31.079Z` with
-`passed: true` across a revert run.
+into a corrupted record. Confirmed by observation: across a revert run the artifact's `at` did not move
+off `2026-07-30T01:40:31.079Z` and its `passed` stayed `true`. (A later honest run at 01:52:41 replaced it
+with `2,947,291` for the 11-leg row, which is why the gas citations in this document are `~2%` tolerance
+citations and not exact ones — the checker's own rule for a non-deterministic verify sample. That
+substitution was tested: the gate was re-run, the artifact moved, and `docs-consistency` stayed green.)
 
 The flag form exists because `cmd.exe` has no `VAR=value command` syntax, so an env-only revert is
 unreachable from an npm alias on Windows. `B6_REVERT=binding` still works.
@@ -150,20 +153,20 @@ Gas is measured; the gas/leg column is integer division of it, not a second meas
 
 | legs | gas (measured) | gas/leg (derived) |
 |---|---|---|
-| 1 | 275,953 <!--gas:gateB6-portfolio-routes#gasByLegCount.0.gas--> | 275,953 |
-| 3 | 803,587 <!--gas:gateB6-portfolio-routes#gasByLegCount.1.gas--> | 267,862 |
-| 5 | 1,339,856 <!--gas:gateB6-portfolio-routes#gasByLegCount.2.gas--> | 267,971 |
-| 8 | 2,144,705 <!--gas:gateB6-portfolio-routes#gasByLegCount.3.gas--> | 268,088 |
-| 11 | **2,948,931** <!--gas:gateB6-portfolio-routes#routeB.gas--> | 268,084 |
+| 1 | 275,953 <!--gas:gateB6-portfolio-routes#gasByLegCount.0.gas~2%--> | 275,953 |
+| 3 | 803,587 <!--gas:gateB6-portfolio-routes#gasByLegCount.1.gas~2%--> | 267,862 |
+| 5 | 1,339,856 <!--gas:gateB6-portfolio-routes#gasByLegCount.2.gas~2%--> | 267,971 |
+| 8 | 2,144,705 <!--gas:gateB6-portfolio-routes#gasByLegCount.3.gas~2%--> | 268,088 |
+| 11 | **2,948,931** <!--gas:gateB6-portfolio-routes#routeB.gas~2%--> | 268,084 |
 
-Against Route A's 292,124 <!--gas:gateB8-2-portfolio-evm#acceptGas--> (read from
+Against Route A's 292,124 <!--gas:gateB8-2-portfolio-evm#acceptGas~2%--> (read from
 `gateB8-2-portfolio-evm.json`, not written down): **10.1x**.
 Proving 858 ms per leg, 9,443 ms serial, ~1,166 ms if eleven legs run on eleven workers.
 
 **These rows move between runs and that is expected.** `probe-plonk-gas-variance.mjs` measures a 1.26%
 spread across identical statements, about 3,500 gas on a single verify. The 11-leg row has been observed
-at 2,939,559 / 2,942,899 / 2,942,997 / 2,943,829 / 2,948,931 across five runs today — a 9,372 spread,
-**0.319%** across eleven verifies, inside that band. Any claim resting on a difference smaller than it is a false
+at 2,939,559 / 2,942,899 / 2,942,997 / 2,943,829 / 2,947,291 / 2,948,931 across six runs today — a 9,372
+spread, **0.319%** across eleven verifies, inside that band. Any claim resting on a difference smaller than it is a false
 claim, which is why the docs that quote 2,941,443 / 2,944,135 / 2,939,155 / 2,947,769 are not in
 disagreement with each other; they are five samples of one number.
 

@@ -25,6 +25,13 @@
 // minimum, on a book where the two disagree. That disagreement is asserted as a FAILING condition
 // below, so this gate cannot pass while quietly proving the wrong thing.
 //
+// gateB6 NOW SAYS SO ITSELF (30 July 2026). Its `the contract picks the right leg` check compared the
+// router against the router's own rule and could not fail; it is gone, its router is renamed
+// `CertifiedPriceMin`, and it asserts its own limit with `npm run gate:b6-revert` to prove that
+// assertion can go red. It was relabelled rather than retargeted because `liquidation.circom` publishes
+// no mark, and gateB6 §3b measures what substituting `p0Hat` for one costs: on a book with leg 0 marked
+// at 61,000 the engine names leg 0 at 5.099% and the substitution still names leg 10.
+//
 // Nothing is deployed. Everything runs in an in-process EVM.
 //
 // Run: node zk/scripts/gateB10-portfolio-perleg.mjs

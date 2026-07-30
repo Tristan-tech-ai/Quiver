@@ -201,15 +201,32 @@ cost whatever the circuit behind it, which is the fact the whole comparison turn
 
 | | one wide circuit | one proof per leg |
 |---|---|---|
-| gas (11 legs) | ~273,118 | **2,947,769** (10.8×) |
-| cost on X Layer at 0.02 gwei | 0.000005 OKB | **0.000059 OKB** |
-| proving | ~5.4 s, serial, unsplittable | 747 ms/leg, **~909 ms if parallel** |
+| gas (11 legs) | 292,124 <!--gas:gateB8-2-portfolio-evm#acceptGas--> | **2,948,931** <!--gas:gateB6-portfolio-routes#routeB.gas--> (10.1×) |
+| cost on X Layer at 0.02 gwei | 0.0000058 OKB | **0.000059 OKB** |
+| proving | ~5.4 s, serial, unsplittable — EXTRAPOLATED | 858 ms/leg, **~1,166 ms if parallel** |
 | buildable today | **no** — needs 2^14 | **yes** — with what is already on disk |
 
-The 10.8× gas that looked like the deciding trade is worth about five hundredths of a millicent on
-this chain. The contract picks the right leg, and one invalid leg reverts the whole call, because a
-minimum over whatever happened to verify is not a minimum. Nothing is deployed; `PortfolioMin.sol`
-exists only inside that test.
+Both gas figures are single samples: `zk/scripts/probe-plonk-gas-variance.mjs` measures a 1.26% spread
+across identical statements, and the 11-leg row moves by about 9,000 gas between runs. The wide figure
+is read from `zk/build/gateB8-2-portfolio-evm.json` rather than written down; an earlier draft of this
+table said ~273,118, which matched no artifact in the repository.
+
+The 10.1× gas that looked like the deciding trade is worth about five hundredths of a millicent on this
+chain. One invalid leg reverts the whole call, because a minimum over whatever happened to verify is not
+a minimum.
+
+**And the minimum that call takes is over the liquidation PRICE, not over the distance to it.** This
+table used to end "the contract picks the right leg", which was wrong and the gate's own check could not
+catch it — it compared the router against the router's own rule. On this eleven-leg book the price
+minimum is leg 3, **24.089%** from liquidation; the leg `portfolio-gate` reports is leg 10 at **6.103%**.
+`liquidation.circom` publishes no mark, so that router cannot be corrected in place. The gate now
+measures the aggregation shape and asserts its own limit — `npm run gate:b6-revert` in `zk/` restores
+the old claim and the gate goes red. The portfolio minimum is proved instead by
+`zk/scripts/gateB10-portfolio-perleg.mjs` over `zk/circuits/portfolioleg.circom`, which publishes the
+adverse-distance numerator and the mark and ranks them by cross-multiplication on chain. Full write-up:
+[`docs/fix-gateb6-ranking.md`](docs/fix-gateb6-ranking.md).
+
+Nothing is deployed; `CertifiedPriceMin.sol` exists only inside that test.
 
 ### Three more circuits: treasury, LP divergence, execution
 

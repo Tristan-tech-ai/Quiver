@@ -39,6 +39,10 @@ const CIRCUITS = {
   liquidation: { zkey: 'liquidation_plonk.zkey', dir: 'liquidation_js', wasm: 'liquidation.wasm' },
   kelly: { zkey: 'kelly_plonk.zkey', dir: 'kelly_js', wasm: 'kelly.wasm' },
   concentration: { zkey: 'concentration_plonk.zkey', dir: 'concentration_js', wasm: 'concentration.wasm' },
+  // 7.8 MB — the largest key this service carries, and the reason the lazy load above is not an
+  // optimisation but the thing that makes a fourth circuit affordable at all. A deploy where nobody
+  // asks exec-verify for a proof never reads it.
+  execadverse: { zkey: 'execadverse_plonk.zkey', dir: 'execadverse_js', wasm: 'execadverse.wasm' },
 };
 // The default is `liquidation` and it is load-bearing rather than tidy: a message from an older
 // parent, or from any caller that has not been taught the field, must keep proving exactly the

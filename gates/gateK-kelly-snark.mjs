@@ -487,8 +487,12 @@ test('K.8 a third party can fetch the Kelly proof and the key that checks it, an
     // WRITTEN OUT, NOT COUNTED, for the reason preflight's proof-emitting set is: this list is
     // published to anyone holding a proof they cannot check, so a circuit joining it is a decision.
     // It went red the moment `concentration` was added, which is the behaviour that makes it worth
-    // having — a silently growing list of keys is a list nobody chose.
-    assert.deepEqual(badBody.available, ['liquidation', 'kelly', 'concentration']);
+    // having — a silently growing list of keys is a list nobody chose. It went red a SECOND time when
+    // `execadverse` was wired onto exec-verify, and that is recorded here rather than absorbed: the
+    // key is 7.8 MB, it is loaded lazily by src/util/proverWorker.mjs so a deploy that never proves an
+    // execution pays nothing for it, and it is published at /proof/vk/execadverse because a proof
+    // carrying FIFTEEN public signals cannot be checked against any of the three keys above.
+    assert.deepEqual(badBody.available, ['liquidation', 'kelly', 'concentration', 'execadverse']);
 
     // The proof itself, fetched by a party who never saw the answer.
     const served = await (await fetch(`${base}/proof/${env.proof.contentHash}`)).json();

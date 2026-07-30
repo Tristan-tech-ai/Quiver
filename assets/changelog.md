@@ -12,6 +12,57 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — `exec-verify` now serves a proof, and it is the first one whose sold number is a ratio
+
+Four of twenty-two services carry a succinct proof, up from three. `exec-verify` — the fair-fill and
+sandwich check — now answers `{"snark": true}` with a PLONK proof of the adverse-execution identity,
+over `execadverse.circom`, on both the paid HTTP surface and the free MCP one.
+
+**Three nested statements, not one.** The circuit carries the constant-product benchmark forward and
+adds two more on top of it: the effective input after the fee, then the headline in basis points. Each
+carries a tolerance the circuit publishes as a public signal of its own, so a verifier sees the slack
+actually used rather than being asked to trust that it was small. The shortfall in output tokens —
+`adverseValueOut`, the figure a dispute is actually about — carries **no tolerance at all**: both terms
+are integers already on the grid, so the subtraction is exact in the field to the last unit of 1e-9.
+
+**The first proof here whose sold number is a RATIO, and that changed the guard.** `adverseExecutionBps`
+is a fraction of the benchmark fill, so its absolute precision collapses as the fill shrinks. This is
+the trap `src/engine/execVerify.js` already records about its own invariant check — an absolute budget
+"grew far looser than the output it certifies as pools get larger" — running the other way. Measured: on
+a fill of 9.97e-10 output tokens the 1e-9 grid cannot pin the headline at all, and on a fill of 8.8e-8
+it pins it only to 91 bps, against the 5 bps threshold this same engine uses to call a fill a sandwich.
+
+So there is a ceiling, and it is **derived rather than chosen**: the headline is published as
+`round(bps, 2)`, which is 0.005 bps out of the 1e4 bps a whole fill is worth — a relative precision of
+5e-7 — and that is transferred onto the quantity the headline is a ratio of. Over 54,410 trades across
+five deliberately different pool shapes, **9.5% are refused a proof** rather than served one about a
+neighbouring trade, every one of them a dust fill or a pool lopsided past 100:1. On realistic V2 pools
+it is 0%. A refused proof never refuses the answer: the number is still served, and the refusal says in
+measured terms what the grid could not pin.
+
+**The bound is derived here, not inherited from `zk/`.** Gate B5-4 already had a bound for this circuit
+and it is the wrong number for a served path: that gate feeds the encoder raw doubles, so its benchmark
+term carries `(1 + 2·y/x)/S` for snapping, and both handlers here run `gridSnapFields` first. Copying it
+across would have been a bound two to ten times wider than anything it guards. The worst honest trade
+uses 99.98% of the headline bound and 99.99% of the shortfall bound, and neither is ever exceeded.
+
+**One correction found by the revert script rather than by review.** The first version of the encoding
+bound was a first-order derivative, and the benchmark fill is *concave* in the effective input — so the
+linear term is not an upper bound. Measured, it understates the true excursion by up to 45% on a small
+trade. It is now a maximum over the eight corners of the encoding box, and `gates/gateEX-revert.mjs`
+revert 7 puts the derivative back and requires the gate to go red.
+
+Nothing published moved. Both pinned `exec-verify` content hashes are unchanged on both surfaces —
+`7be44a51…` and `9091b953…` — the advertised input schemas are untouched, the service count is
+unchanged, and the engine build hash is still `q1-e1fa99d08887d6cc`. The five snapped fields were
+already on the grid in every fixture this repo publishes, so snapping is the identity on them.
+
+New: `npm run gate:ex` (18 checks) and `npm run gate:ex-revert` (seven reverts, all seven red).
+The verification key is published at `/proof/vk/execadverse`; a proof there carries **fifteen** public
+signals, so the liquidation registry's `uint256[8]` signature will not compile against it.
+
+---
+
 ## 29 July 2026 — the concentration circuit takes the engine's grouping, and `treasury-risk` now serves a proof
 
 The third engine across the fence, and the first whose circuit inputs are not the caller's.

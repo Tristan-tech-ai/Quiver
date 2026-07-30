@@ -321,10 +321,10 @@ app.get('/proof/:contentHash', async (req, res) => {
     return res.status(404).json({
       error: 'no_proof_for_that_hash',
       note: durable
-        ? 'A proof is built only when a perp-gate or size-gate call asks for one with {"snark": true}. Finished proofs are stored by content hash and survive a redeploy, so this hash was never proved here; ask again and it will be built.'
+        ? 'A proof is built only when a perp-gate, size-gate, treasury-risk or exec-verify call asks for one with {"snark": true}. Finished proofs are stored by content hash and survive a redeploy, so this hash was never proved here; ask again and it will be built.'
         : proofStoreKind() === 'in-memory only'
-          ? 'A proof is built only when a perp-gate or size-gate call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.'
-          : `A proof is built only when a perp-gate or size-gate call asks for one with {"snark": true}. Durable storage is CONFIGURED BUT NOT WORKING here, so this miss may be the store rather than the hash: ${why}`,
+          ? 'A proof is built only when a perp-gate, size-gate, treasury-risk or exec-verify call asks for one with {"snark": true}. Proofs are held in memory, so a redeploy clears them; ask again and it will be rebuilt.'
+          : `A proof is built only when a perp-gate, size-gate, treasury-risk or exec-verify call asks for one with {"snark": true}. Durable storage is CONFIGURED BUT NOT WORKING here, so this miss may be the store rather than the hash: ${why}`,
     });
   }
   if (rec.status === 'building') return res.status(202).json({ status: 'building', retryAfterMs: 900, contentHash: h });
@@ -337,6 +337,7 @@ app.get('/proof/:contentHash', async (req, res) => {
   const circuit = rec.circuit || 'liquidation';
   const kelly = circuit === 'kelly';
   const hhi = circuit === 'concentration';
+  const exec = circuit === 'execadverse';
   res.json({
     status: 'ready', contentHash: h, protocol: rec.protocol,
     // Spread, so a liquidation response has no `circuit` key at all and its shape is unmoved. A Kelly
@@ -349,6 +350,12 @@ app.get('/proof/:contentHash', async (req, res) => {
     // itself telling a reader something false. Present only on a Kelly record.
     ...(rec.gapToServedFraction !== undefined ? { gapToServedFraction: rec.gapToServedFraction } : {}),
     ...(rec.gapToServedIndex !== undefined ? { gapToServedIndex: rec.gapToServedIndex } : {}),
+    // TWO gaps on an execadverse record, in two units, because the circuit certifies two published
+    // quantities: a ratio in basis points and a quantity of output tokens. Merging them into one
+    // "gapToServed" would be the schema telling a reader that a bps figure and a token count are the
+    // same kind of number, which is the mistake the guard in src/util/snark.js is arranged against.
+    ...(rec.gapToServedBps !== undefined ? { gapToServedBps: rec.gapToServedBps } : {}),
+    ...(rec.gapToServedShortfallOut !== undefined ? { gapToServedShortfallOut: rec.gapToServedShortfallOut } : {}),
     ...(hhi ? {
       signalLayout: ['residual', 'tolerance', 'weightSlack', 'wHat[0..7]', 'hHat'],
       proves: 'Ĥ·S = Σ ŵᵢ² over the scaled integers, with the residual R and a one-grid-step tolerance published as signals 0 and 1, and the drift of the shares from summing to the whole book published as signal 2. The proven bound is 2|R| <= S, which says Ĥ is the CORRECTLY ROUNDED Herfindahl index of these shares rather than merely a number near it.',
@@ -358,6 +365,14 @@ app.get('/proof/:contentHash', async (req, res) => {
       signalLayout: ['residual', 'tolerance', 'pHat', 'bHat', 'fHat'],
       proves: 'f*·b = p·b + p - 1 over the scaled integers, with the residual R and the tolerance b̂ published as signals 0 and 1 so a verifier sees the slack actually used rather than being asked to trust that it was small. The proven bound is 2|R| <= b̂.',
       doesNotProve: 'That the edge is real, or that the recommendation was this number. The circuit takes p and b as given and has no term for kellyFraction, so signal 4 is the FULL-Kelly ceiling; the size-gate answer this hash came from recommends a fraction of it.',
+    } : {}),
+    ...(exec ? {
+      // MEASURED off a real proof rather than read off the circuit source: seven outputs in
+      // declaration order, then the eight public inputs. Signal 6 is the shortfall in output tokens
+      // scaled by 1e9, and it is the one a dispute is about.
+      signalLayout: ['residual', 'feeResidual', 'bpsResidual', 'tolerance', 'feeTolerance', 'bpsTolerance', 'shortfall', 'xHat', 'yHat', 'dxHat', 'fHat', 'inHat', 'outHat', 'realizedHat', 'bpsHat'],
+      proves: 'Three nested statements over the scaled integers, each with its own residual and its own tolerance published as signals so a verifier sees the slack actually used rather than being asked to trust it was small. (1) in·S = dx̂·(S − f̂), bounded 2|Rf| <= S. (2) (x̂ + în)(ŷ − ô) = x̂·ŷ, bounded 2|R| <= x̂+în+ŷ−ô, which says ô is the CORRECTLY ROUNDED constant-product fill for this size rather than merely a number near it. (3) b̂·ô = 10000·S·ŝ, bounded 2|Rb| <= ô. The shortfall ŝ = ô − ẑ (signal 6) carries NO tolerance at all — both terms are integers already on the grid, so it is exact to the last unit of 1e-9 output tokens.',
+      doesNotProve: 'That the reserves were real, or that the realized fill was. Both are inputs and the circuit has no term for where a number came from — this is the arithmetic being right about a pool state it was handed, and the input problem is untouched. It does not prove the reserves were the right block: state read immediately before your own transaction UNDER-detects a sandwich, because the front-run is already in it. It does not prove the VERDICT either, and does not need to: the verdict is `bps > 5` and b̂ is signal 14, so anyone holding this proof can evaluate that threshold themselves. `unavoidableCostBps` — the fee and your own price impact — is outside it entirely.',
     } : {}),
     // Two separate claims, and the caller gets both or neither is implied. The proof says the
     // arithmetic is right; the attestation says Quiver stands behind these exact eight field
@@ -391,6 +406,11 @@ app.get('/proof/:contentHash', async (req, res) => {
         ? {
           contract: 'ConcentrationVerifier.verifyProof(uint256[24] proof, uint256[12] publicSignals)',
           note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. The verifier is generated by snarkjs from concentration_plonk.zkey and is NOT deployed — it exists in this repository at zk/build/ConcentrationVerifier.sol, gated by zk/scripts/gateB3-2-concentration-evm.mjs against a local EVM, and has no address on any chain. Twelve signals: three outputs, then eight shares and the index.',
+        }
+        : exec
+        ? {
+          contract: 'ExecadverseVerifier.verifyProof(uint256[24] proof, uint256[15] publicSignals)',
+          note: 'Pass snarkjs plonk.exportSolidityCallData output straight in. FIFTEEN signals, not eight — three residuals, three tolerances and the shortfall, then the eight pinned inputs — so the liquidation registry\'s uint256[8] signature will not compile against this proof, which is why the array width is stated here rather than left to be discovered. The verifier is generated by snarkjs from execadverse_plonk.zkey and is NOT deployed: it exists in this repository at zk/build/ExecadverseVerifier.sol, gated by zk/scripts/gateB5-5-execadverse-evm.mjs against a local EVM, and has no address on any chain. This field describes what checks the proof, not something that has happened on chain.',
         }
         : {
         contract: 'QuiverProofRegistry.submit(uint256[24] proof, uint256[8] publicSignals, bytes attestation)',

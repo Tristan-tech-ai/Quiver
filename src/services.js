@@ -2,7 +2,7 @@
 // Each drives: the paid POST route, the gated /diag/scan tester, and the / index.
 import { config } from './config.js';
 import { gridSnapFields } from './util/grid.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground } from './util/snark.js';
 import { tokenScan } from './engine/tokenScan.js';
 import { walletAudit } from './engine/walletAudit.js';
 import { tapePulse } from './engine/tapePulse.js';
@@ -818,7 +818,62 @@ export const SERVICES = [
       if (!cp && !ref) return { error: 'require {reserveIn, reserveOut, feeTier} or fairPrice' };
       return b;
     },
-    run: (i) => proofEnvelope('exec-verify', i, execVerify(i), config.version),
+    run: (i) => {
+      // `snark` is a delivery preference, not a term in the identity — the same destructure perp-gate
+      // and size-gate make, and with size-gate's caveat rather than perp-gate's: on this endpoint the
+      // flag has been an UNDECLARED key that fell straight into `proof.inputs` and therefore into the
+      // content hash, doing nothing. So a caller who was already sending `{"snark": true}` here — and
+      // receiving no proof for it — sees their content hash move once, to the hash the identical body
+      // without the flag has always returned. Every request that does not carry the flag is
+      // byte-identical, and both pinned exec-verify hashes were re-measured unmoved.
+      const { snark: wantSnark, ...raw } = i;
+      // Snap onto the 1e-9 grid `execadverse.circom` works over. FIVE FIELDS, and the two omissions
+      // are the decision rather than an oversight:
+      //
+      //   `fairPrice` reaches no circuit. It is the REFERENCE mode's benchmark — a number the caller
+      //   supplied instead of a pool — and execadverse.circom's invariant is about reserves. Snapping
+      //   it would move a content hash for a field no proof can see, which is the cost of this grid
+      //   without any of the benefit; size-gate leaves `bankroll` alone for the same reason.
+      //
+      //   `slippageTolerancePct` reaches no circuit either. It drives the "within tolerance yet
+      //   robbed" lesson, which is a comparison against the headline, not a term in it.
+      //
+      // WHAT IT MOVES. Nothing that is published. Both pinned exec-verify fixtures — the
+      // constant-product one and the reference one — are already on the grid, so snapping is the
+      // identity on them. It moves only for a caller passing more than nine decimal places, and it
+      // moves that caller onto the grid the proof they can now ask for is stated over.
+      const compute = gridSnapFields(raw, ['amountIn', 'amountOutRealized', 'reserveIn', 'reserveOut', 'feeTier']);
+      const r = execVerify(compute);
+      const env = proofEnvelope('exec-verify', compute, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        // THREE WAYS THIS ANSWER CAN HAVE NO PROOF, each named rather than collapsed into a silent
+        // absence. The third is the one that is REACHED on the served path and is the honest cost of
+        // proving a ratio: on a dust fill the 1e-9 grid cannot pin a basis-point figure to the step it
+        // is published at, so `buildExecInBackground` refuses with the measured number. That refusal
+        // is recorded on the proof rather than predicted here, because it needs the witness.
+        const why = r?.ok !== true ? 'this request was refused, so there is no fill to certify'
+          : r.mode !== 'constant-product' ? 'the answer is reference-mode (bps against the fairPrice you supplied), and the circuit here states the CONSTANT-PRODUCT identity over pre-trade reserves — there is no term in it for a benchmark price somebody handed us'
+            : null;
+        if (!why) {
+          buildExecInBackground(env.proof.contentHash, env.proof.inputs, r);
+        }
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'execadverse',
+          status: why ? 'unavailable' : 'building',
+          ...(why
+            ? { reason: why }
+            : { retrieveAt: `/proof/${env.proof.contentHash}`, verificationKey: '/proof/vk/execadverse' }),
+          // Published so a reader can check public signal 8 and the shortfall output without
+          // re-deriving them, and so the distinction below is checkable rather than only asserted.
+          ...(why ? {} : { adverseBpsProven: r.adverseExecutionBps, adverseValueOutProven: r.adverseValueOut }),
+          proves: 'Three nested statements over the eight integers pinned in the proof\'s public signals, on a 1e-9 grid. (1) The effective input after the fee: in = amountIn x (1 - feeTier). (2) The constant-product benchmark: (reserveIn + in) x (reserveOut - honestOut) = reserveIn x reserveOut, so honestOut is the fill this pool implied for THIS size. (3) The headline: adverseExecutionBps x honestOut = 10000 x (honestOut - amountOutRealized), and the shortfall in output tokens is certified EXACTLY, with no tolerance of any kind — it is a subtraction of two integers already on the grid, and it is the figure a dispute is actually about. Each of the three carries a tolerance the circuit publishes as a signal of its own. All of it is deterministic and checkable offline against /proof/vk/execadverse.',
+          doesNotProve: 'That the reserves were real. They are an INPUT, and so is your realized fill — this proves the arithmetic is right about a pool state and a fill it was handed, not that either was true. It does not prove the pool state was the right block, or the state before an attacker front-ran you: passing the reserves immediately before your own transaction UNDER-detects a sandwich, because the front-run is already baked into them. Nor does it prove the VERDICT, and it does not need to: the verdict is the predicate `bps > 5`, and the basis-point figure is a public signal, so anyone holding the proof can evaluate that threshold on a number the proof pins. `unavoidableCostBps` and the slippage-tolerance lesson are outside it entirely.',
+          note: 'A succinct proof of the adverse-execution identity for exactly these inputs, over the public Hermez reference string. Proving takes about 0.7s, so it is built off this request rather than inside it — fetch it at the URL above, free. It certifies the identity on a 1e-9 grid; the five pool and trade fields as echoed here are already snapped to that grid, so the proof and this answer describe the same trade. A basis-point figure is a RATIO of the fill, so on a very small fill the grid cannot pin it to the 0.005 bps the field is published at; that case is refused with the measured number rather than served a proof of a neighbouring trade.',
+        };
+      }
+      return env;
+    },
   },
   {
     name: 'options-risk', path: '/api/options-risk', price: config.prices.optionsRisk, register: true,

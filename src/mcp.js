@@ -34,7 +34,7 @@ import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 // every tool with a body a caller would actually send.
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground } from './util/snark.js';
 import { gridSnapFields } from './util/grid.js';
 import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
@@ -373,7 +373,46 @@ const TOOLS = [
       verdict: { description: 'plain-language verdict' },
       note: { description: 'interpretation guidance' },
     }),
-    run: (a) => proofEnvelope('exec-verify', a, execVerify(a), config.version),
+    // THE FOURTH SITE, WRITTEN IN THE SAME EDIT AS THE HTTP ONE. This handler array is separate from
+    // `SERVICES` and has been the one left behind four times — the un-snapped perp_gate proof, the
+    // missing `fetchHlAccount` import, the narrower `side` enum, the unsealed recipe. So the
+    // adverse-execution proof lands on both surfaces together, and `gates/preflight.mjs` asserts the
+    // proof-emitting set is eight entries across two surfaces, so a surface silently contributing
+    // nothing turns it red.
+    //
+    // Deliberately the same shape as services.js rather than a shared helper: the two surfaces differ
+    // in nothing here, but `gates/gateC-case-sensitivity.mjs` and gate M compare them as independent
+    // texts, and a helper both called would make them agree by construction rather than by check.
+    run: (a) => {
+      const { snark: wantSnark, ...raw } = a;
+      // See services.js for why these five and not the other two: `fairPrice` is the reference mode's
+      // caller-supplied benchmark and `slippageTolerancePct` is a comparison, and neither reaches a
+      // term in execadverse.circom.
+      const compute = gridSnapFields(raw, ['amountIn', 'amountOutRealized', 'reserveIn', 'reserveOut', 'feeTier']);
+      const r = execVerify(compute);
+      const env = proofEnvelope('exec-verify', compute, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        const why = r?.ok !== true ? 'this request was refused, so there is no fill to certify'
+          : r.mode !== 'constant-product' ? 'the answer is reference-mode (bps against the fairPrice you supplied), and the circuit here states the CONSTANT-PRODUCT identity over pre-trade reserves — there is no term in it for a benchmark price somebody handed us'
+            : null;
+        if (!why) {
+          buildExecInBackground(env.proof.contentHash, env.proof.inputs, r);
+        }
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'execadverse',
+          status: why ? 'unavailable' : 'building',
+          ...(why
+            ? { reason: why }
+            : { retrieveAt: `/proof/${env.proof.contentHash}`, verificationKey: '/proof/vk/execadverse' }),
+          ...(why ? {} : { adverseBpsProven: r.adverseExecutionBps, adverseValueOutProven: r.adverseValueOut }),
+          proves: 'Three nested statements over the eight integers pinned in the proof\'s public signals, on a 1e-9 grid. (1) The effective input after the fee: in = amountIn x (1 - feeTier). (2) The constant-product benchmark: (reserveIn + in) x (reserveOut - honestOut) = reserveIn x reserveOut, so honestOut is the fill this pool implied for THIS size. (3) The headline: adverseExecutionBps x honestOut = 10000 x (honestOut - amountOutRealized), and the shortfall in output tokens is certified EXACTLY, with no tolerance of any kind — it is a subtraction of two integers already on the grid, and it is the figure a dispute is actually about. Each of the three carries a tolerance the circuit publishes as a signal of its own. All of it is deterministic and checkable offline against /proof/vk/execadverse.',
+          doesNotProve: 'That the reserves were real. They are an INPUT, and so is your realized fill — this proves the arithmetic is right about a pool state and a fill it was handed, not that either was true. It does not prove the pool state was the right block, or the state before an attacker front-ran you: passing the reserves immediately before your own transaction UNDER-detects a sandwich, because the front-run is already baked into them. Nor does it prove the VERDICT, and it does not need to: the verdict is the predicate `bps > 5`, and the basis-point figure is a public signal, so anyone holding the proof can evaluate that threshold on a number the proof pins. `unavoidableCostBps` and the slippage-tolerance lesson are outside it entirely.',
+          note: 'A PLONK proof of the adverse-execution identity is being built off this request path — the answer above did not wait for it. Poll retrieveAt; 202 means still building. The proof is over the SAME five pool and trade fields echoed in proof.inputs, already snapped to the 1e-9 grid the circuit states the identity over. A basis-point figure is a RATIO of the fill, so on a very small fill the grid cannot pin it to the 0.005 bps the field is published at; that case is refused with the measured number rather than served a proof of a neighbouring trade.',
+        };
+      }
+      return env;
+    },
   },
   {
     name: 'options_risk',

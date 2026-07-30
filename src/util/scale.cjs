@@ -380,8 +380,204 @@ function toConcentrationWitnessInput(inputs) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// THE FOURTH IDENTITY: adverse execution, for `exec-verify`.
+//
+// THREE nested statements rather than one, and that is why this section is longer
+// than the three above it. `execadverse.circom` carries the constant-product
+// benchmark forward and adds two statements ON TOP of it:
+//
+//   fee        în·S  = dx̂·(S − f̂)                       one grid rounding
+//   invariant  (x̂ + în)(ŷ − ô) = x̂·ŷ                    one grid rounding, on ô
+//   headline   b̂·ô   = 10000·S·ŝ,  ŝ = ô − ẑ EXACT      one grid rounding, on b̂
+//
+// Each rounding is performed ONCE, here, half away from zero, which is what makes
+// each of the circuit's three windows hold by construction rather than by luck:
+//
+//   2|Rf| <= S                  because în is the grid rounding of a rational
+//   2|R|  <= x̂+în+ŷ−ô           because ô is, and R = (x̂+în)·(ô_exact − ô)
+//   2|Rb| <= ô                  because b̂ is, and Rb = ô·(b̂ − b̂_exact)
+//
+// (A) encoding: în and ô are QUOTIENTS. Snapping the request puts x, y, dx, f and
+//     the realized fill on the grid, and it does NOT put the effective input or
+//     the benchmark fill there — dx·(1−f) is a product of two nine-decimal
+//     numbers and has eighteen, and y·in/(x+in) is a division. This is the same
+//     situation as the liquidation margin derived from leverage and the shares
+//     derived by grouping: the encoding term is a rounding of a derived quantity,
+//     not of an input, and no snap can remove it. It is bounded in
+//     src/util/snark.js, propagated through the two derivatives that matter, and
+//     measured against the real engine by gates/gateEX-execverify-snark.mjs.
+// (B) residual: the three above, each half a unit of its own denominator.
+
+// Mirrored from circuits/execadverse.circom's
+// `ExecAdverse(1e9, 62, 30, 66, 34, 50, 2^50, 1)`. Fixed at compile time.
+// NB_BPS is the width of |b̂|, so it is checked as a MAGNITUDE below and not as a
+// non-negative bound like the others: a fill better than the benchmark is a real
+// and reportable outcome, and its basis points are negative.
+const EXEC_BOUNDS = { xHat: 62n, yHat: 62n, dxHat: 62n, inHat: 62n, outHat: 62n, realizedHat: 62n, fHat: 30n };
+const EXEC_BPS_BITS = 50n;
+
+/**
+ * The engine's own honest-output computation, in doubles, in the engine's own
+ * order and with the engine's own parameter list.
+ *
+ * COPIED FROM `getAmountOut` IN src/engine/execVerify.js, both lines, term for
+ * term — NOT REARRANGED. `(y * dx * (1 - f)) / (x + dx * (1 - f))` is the same
+ * identity and a different double, and the `constantproduct` encoder that made
+ * exactly that move was wrong by 64 grid steps.
+ *
+ * The parameter order is `(dx, x, y, f)` and not the alphabetical or the obvious
+ * one because that is the order `execVerify.js` declares, and
+ * gates/gateEX-execverify-snark.mjs compares the two source lines as TEXT before
+ * it compares them as numbers — a reordering would force that comparison to
+ * normalise, which is a fudge in exactly the check that exists to catch a silent
+ * rewrite. The intermediate keeps the engine's name `inEff` for the same reason.
+ */
+function engineHonestOut(dx, x, y, f) {
+  const inEff = dx * (1 - f);
+  return (y * inEff) / (x + inEff);
+}
+
+/**
+ * The engine's own headline, in doubles, in the engine's own order.
+ *
+ * COPIED FROM `adverseBps` IN src/engine/execVerify.js. `1e4 * (1 - realized /
+ * honestOut)` is the same identity and a different double; so is dividing before
+ * subtracting. The engine subtracts first, divides second, and multiplies by 1e4
+ * last, and so does this.
+ */
+function engineAdverseBps(honestOut, realized) {
+  return ((honestOut - realized) / honestOut) * 1e4;
+}
+
+/**
+ * The engine's own shortfall in output tokens. One subtraction, kept as its own
+ * function rather than inlined into the bps above, because the SERVICE publishes
+ * it as a field of its own (`adverseValueOut`) and the guard in snark.js holds it
+ * to an allowance in TOKENS while the headline is held to one in BASIS POINTS.
+ * Two quantities, two bounds — the mistake this repo is on record for is reusing
+ * one number across two units.
+ */
+function engineAdverseValue(honestOut, realized) {
+  return honestOut - realized;
+}
+
+// The effective input after the fee, as an exact rational over the scaled
+// integers, rounded once onto the grid:  în = round( dx̂·(S − f̂) / S ).
+function canonicalEffectiveIn({ dxHat, fHat }) {
+  return roundDiv(dxHat * (SCALE - fHat), SCALE);
+}
+
+// The benchmark fill, as an exact rational over the scaled integers, rounded once:
+//   ô = round( în·ŷ / (x̂ + în) )
+// This is the solve the circuit's invariant residual is measured against.
+function canonicalHonestOut({ xHat, yHat, inHat }) {
+  const denom = xHat + inHat;
+  if (denom <= 0n) throw new Error('canonicalHonestOut: empty pool');
+  return roundDiv(inHat * yHat, denom);
+}
+
+// The headline, as an exact rational over the scaled integers, rounded once:
+//   b̂ = round( 10000·S·ŝ / ô )
+// ŝ is EXACT — a subtraction of two integers already on the grid — so the only
+// rounding in the headline is this one.
+function canonicalAdverseBps({ outHat, sHat }) {
+  if (outHat <= 0n) throw new Error('canonicalAdverseBps: no benchmark fill');
+  return roundDiv(10000n * SCALE * sHat, outHat);
+}
+
+// The three integer residuals the circuit constrains, term for term what
+// execadverse.circom computes, and the three tolerances it publishes as signals.
+function execFeeResidual({ dxHat, fHat, inHat }) {
+  return inHat * SCALE - dxHat * (SCALE - fHat);
+}
+function execFeeToleranceBound() {
+  return SCALE;
+}
+function execInvariantResidual({ xHat, yHat, inHat, outHat }) {
+  return (xHat + inHat) * (yHat - outHat) - xHat * yHat;
+}
+function execInvariantToleranceBound({ xHat, yHat, inHat, outHat }) {
+  return xHat + inHat + yHat - outHat;      // TOL_MULT = 1, as gate B5-1 measured
+}
+function execBpsResidual({ outHat, sHat, bpsHat }) {
+  return bpsHat * outHat - 10000n * SCALE * sHat;
+}
+function execBpsToleranceBound({ outHat }) {
+  return outHat;
+}
+
+/**
+ * Full float -> field-element translation for the adverse-execution identity,
+ * with the range discipline applied on this side too so a refusal names the
+ * quantity that overflowed instead of arriving as an unsatisfied constraint deep
+ * inside the witness calculator.
+ *
+ * `realized` is the caller's own reported fill and is NOT re-derived from
+ * anything; `în`, `ô`, `ŝ` and `b̂` are the four derived integers and are each
+ * rounded exactly once, above.
+ */
+function toExecCircuitInputs({ dx, x, y, f, realized }) {
+  const base = {
+    xHat: toScaled(x, 'reserveIn'),
+    yHat: toScaled(y, 'reserveOut'),
+    dxHat: toScaled(dx, 'amountIn'),
+    fHat: toScaled(f, 'feeTier'),
+    realizedHat: toScaled(realized, 'amountOutRealized'),
+  };
+  // The circuit's own four IsZero guards and its fee-is-a-fraction guard, asked
+  // here so the reason is legible. A pool with no reserves has no price, a trade
+  // of nothing has no fill, a fill of nothing has no execution quality, and a fee
+  // of one or more makes the effective input non-positive and lets the invariant
+  // be satisfied by a fill that never could have happened.
+  if (base.xHat <= 0n) throw new Error('reserveIn: must be > 0');
+  if (base.yHat <= 0n) throw new Error('reserveOut: must be > 0');
+  if (base.dxHat <= 0n) throw new Error('amountIn: must be > 0');
+  if (base.realizedHat <= 0n) throw new Error('amountOutRealized: must be > 0');
+  if (base.fHat < 0n) throw new Error('feeTier: must be >= 0');
+  if (base.fHat >= SCALE) throw new Error(`feeTier: must be < 1, got ${fromScaled(base.fHat)}`);
+
+  const inHat = canonicalEffectiveIn(base);
+  if (inHat <= 0n) throw new Error('effective input after the fee rounds to zero on the 1e-9 grid');
+  const outHat = canonicalHonestOut({ ...base, inHat });
+  if (outHat <= 0n) throw new Error('benchmark fill rounds to zero on the 1e-9 grid');
+  // `Num2Bits` on `yHat - outHat` inside the circuit is what makes 0 <= ô <= ŷ
+  // true without a comparator; a benchmark at or past the whole reserve is not a
+  // fill the pool could have produced, and the circuit refuses it rather than
+  // wrapping in the field.
+  if (outHat >= base.yHat) throw new Error('benchmark fill exceeds the output reserve — not a fill this pool could produce');
+
+  const sHat = outHat - base.realizedHat;
+  const bpsHat = canonicalAdverseBps({ outHat, sHat });
+
+  const inputs = { ...base, inHat, outHat, sHat, bpsHat };
+  for (const [name, bits] of Object.entries(EXEC_BOUNDS)) {
+    const v = inputs[name];
+    if (v < 0n) throw new Error(`${name}: negative (${v}); circuit requires non-negative`);
+    if (v >= 1n << bits) throw new Error(`${name}: ${v} exceeds the ${bits}-bit bound`);
+  }
+  if (abs(bpsHat) >= 1n << EXEC_BPS_BITS) {
+    throw new Error(`bpsHat: |${bpsHat}| exceeds the ${EXEC_BPS_BITS}-bit signed bound — a fill more than ~113x off the benchmark is outside the circuit domain`);
+  }
+  return inputs;
+}
+
+function toExecWitnessInput(inputs) {
+  return {
+    xHat: inputs.xHat.toString(),
+    yHat: inputs.yHat.toString(),
+    dxHat: inputs.dxHat.toString(),
+    fHat: inputs.fHat.toString(),
+    inHat: inputs.inHat.toString(),
+    outHat: inputs.outHat.toString(),
+    realizedHat: inputs.realizedHat.toString(),
+    bpsHat: inputs.bpsHat.toString(),
+  };
+}
+
 module.exports = {
   SCALE, SCALE_DECIMALS, BOUNDS, KELLY_BOUNDS, CONCENTRATION_N, CONCENTRATION_BOUNDS,
+  EXEC_BOUNDS, EXEC_BPS_BITS,
   abs, toScaled, fromScaled, roundDiv,
   engineLiquidationPrice, canonicalLiquidationPrice,
   residual, toleranceBound, toCircuitInputs, toWitnessInput,
@@ -390,4 +586,10 @@ module.exports = {
   engineHerfindahl, engineShares, canonicalHerfindahl,
   concentrationResidual, concentrationToleranceBound, concentrationWeightSlack,
   toConcentrationCircuitInputs, toConcentrationWitnessInput,
+  engineHonestOut, engineAdverseBps, engineAdverseValue,
+  canonicalEffectiveIn, canonicalHonestOut, canonicalAdverseBps,
+  execFeeResidual, execFeeToleranceBound,
+  execInvariantResidual, execInvariantToleranceBound,
+  execBpsResidual, execBpsToleranceBound,
+  toExecCircuitInputs, toExecWitnessInput,
 };

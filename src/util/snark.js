@@ -923,10 +923,351 @@ async function buildConcentrationOnce(contentHash, echoedInputs, result) {
     .finally(() => { queued--; });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE FOURTH IDENTITY — adverse execution, for `exec-verify`.
+//
+// The first one whose circuit certifies THREE nested statements rather than one, and the first whose
+// SOLD NUMBER is a ratio. Both facts shape the guard below.
+//
+//   • THREE STATEMENTS. `execadverse.circom` carries the constant-product benchmark forward (the fill
+//     the pool honestly implied) and adds the shortfall — EXACT, no tolerance — and the headline in
+//     basis points, which is the field the registered blurb leads with. The guard therefore has to
+//     answer for two published quantities in two different units, not one.
+//
+//   • A RATIO. `adverseExecutionBps` is a fraction of the benchmark fill, so its absolute precision
+//     collapses as the fill shrinks. This is exactly the trap `src/engine/execVerify.js` records
+//     about its own invariant check — an absolute budget "grew far looser than the output it
+//     certifies as pools get larger" — running the other way: an absolute budget on the HEADLINE is
+//     unreachably tight on a dust fill. Measured, on a fill of 8.8e-8 output tokens the 1e-9 grid
+//     cannot pin the headline closer than 91 bps, against a verdict threshold of 5. So there is a
+//     ceiling, and 9.4% of a deliberately extreme sweep is REFUSED by it rather than served a proof
+//     of a neighbouring trade.
+//
+// ── THE BOUND IS DERIVED HERE AND IS NOT gate B5-4's ────────────────────────────────────────────
+// zk/scripts/gateB5-4 derived a bound for this same circuit and it is the WRONG NUMBER for this path,
+// which is the whole reason this block does not import it. That gate feeds the encoder raw doubles, so
+// its benchmark term carries `(1 + 2·y/x)/S` for snapping x, y and dx onto the grid. Both handlers
+// here run `gridSnapFields` FIRST, so those three are on the grid to within half an ulp of a double
+// and that term is two to ten times wider than anything it guards. Copying it across would have been
+// the liquidation half-cent again — the bound that "stopped being a guard below a dollar" — in the
+// generous direction instead of the tight one, and a bound nothing can approach cannot fail.
+//
+// Measured over 226,761 trades across five deliberately different pool shapes, the worst honest case
+// uses 45.9% of the headline bound and 99.9% of the shortfall bound. gates/gateEX-execverify-snark.mjs
+// re-measures both and shows each being exceeded.
+
+const EXEC_HALF_STEP = 0.5 / Number(scale.SCALE);
+
+// Half of the last digit the engine displays each published quantity at:
+//   `adverseExecutionBps: round(adverseBps, 2)`   -> 0.005 bps
+//   `adverseValueOut:     round(adverseValue, 8)` -> 0.5e-8 output tokens
+// Two constants and not one, and they are four hundred thousand times apart. The Kelly guard exists
+// as a separate object from the liquidation guard for this reason and this is the same reason again:
+// a shortfall in tokens held to half a basis point would be meaningless, and a headline in basis
+// points held to 5e-9 would refuse every trade this service has.
+const EXEC_DISPLAY_HALF_BPS = 0.005;
+const EXEC_DISPLAY_HALF_TOKENS = 0.5e-8;
+
+// One whole fill, in basis points — the engine's own `* 1e4`.
+const EXEC_BPS_FULL = 1e4;
+
+/**
+ * THE CEILING, and it is a RATIO because the number it protects is a ratio.
+ *
+ * The headline is published to 0.005 bps out of the 1e4 bps a whole fill is worth, so it is published
+ * to a relative precision of 5e-7. Transferred onto the quantity the headline is a ratio OF, that is
+ * how far the grid may have moved the benchmark fill and still leave a proof that is a proof of the
+ * answer:  gOut <= honestOut · 5e-7.
+ *
+ * NOTHING HERE IS CHOSEN. The 0.005 is the engine's own `round(bps, 2)`; the 1e4 is the engine's own
+ * basis-point scaling. Both are lifted from src/engine/execVerify.js, and the quotient is the only
+ * arithmetic performed on them. The two arms are still tested SEPARATELY below, in their own units,
+ * because `realized/honestOut` is not exactly 1 and collapsing them would hide the difference:
+ * measured, the two arms refuse 21,311 and 21,370 of the same 226,761 trades.
+ */
+const EXEC_REL_CEILING = EXEC_DISPLAY_HALF_BPS / EXEC_BPS_FULL;
+
+// The engine's display roundings, reproduced. `round(x, dp)` in src/engine/stats.js is
+// `Number(Number(x).toFixed(dp))`; written out here rather than imported for the same reason the 2dp
+// and 6dp versions above are, and gates/gateEX-execverify-snark.mjs asserts each agrees with the
+// engine's own function over a sweep weighted onto the rounding boundaries.
+const execDisplayRoundBps = (x) => Number(Number(x).toFixed(2));
+const execDisplayRoundTokens = (x) => Number(Number(x).toFixed(8));
+
+/**
+ * How far encoding the inputs can have moved the BENCHMARK FILL — measured over the whole box the
+ * encoding could have landed in, at the box's CORNERS, not linearised.
+ *
+ * O(x, y, in) = y·in/(x + in) is monotone in each coordinate separately: increasing in y and in in,
+ * decreasing in x. A function monotone in each coordinate attains its extremes over an axis-aligned
+ * box at the corners, so all eight are evaluated and the largest excursion is the bound. No
+ * derivatives are taken, and the reason is not stylistic: O is CONCAVE in `in`, so a first-order
+ * sensitivity term underestimates the downward excursion — the same shape as the sensitivity sum that
+ * failed on 153 of 357,138 liquidation positions.
+ *
+ * The half-widths, each derived:
+ *   x, y   on the grid after `gridSnapFields`, so the double sits within one ulp of the decimal that
+ *          `toScaled` reads. Two half-ulps, relative.
+ *   in     the DOMINANT term and the only one that is not an ulp: `în` is the grid rounding of an
+ *          exact rational, worth half a step outright — plus the distance from the engine's own
+ *          `inEff` double to that rational, which is dx and f encoding (one half-ulp each) and
+ *          `fl(dx * fl(1 - f))` (two more). Eight half-ulps covers all four with slack, and it is
+ *          carried rather than dropped as small because above a trade of ~1e6 tokens it OVERTAKES the
+ *          half grid step.
+ *
+ * `honestOut` is the engine's own unrounded fill, passed in rather than recomputed, so the excursion
+ * is measured from the same double the caller will compare against.
+ */
+function execEncodingShift({ x, y, inEff, honestOut }) {
+  const hx = Math.abs(x) * 2 * HALF_ULP;
+  const hy = Math.abs(y) * 2 * HALF_ULP;
+  const hin = EXEC_HALF_STEP + Math.abs(inEff) * 8 * HALF_ULP;
+  if (!(hx >= 0 && hy >= 0 && hin >= 0)) return Infinity;
+  let worst = 0;
+  for (const ex of [-hx, hx]) for (const ey of [-hy, hy]) for (const ei of [-hin, hin]) {
+    const xx = x + ex, yy = y + ey, ii = inEff + ei;
+    if (!(ii > 0) || !(xx + ii > 0)) return Infinity;   // the box crosses an empty pool
+    const v = (yy * ii) / (xx + ii);                    // O, in the engine's own form and order
+    if (!Number.isFinite(v)) return Infinity;
+    const d = Math.abs(v - honestOut);
+    if (d > worst) worst = d;
+  }
+  return worst;
+}
+
+/**
+ * Build the witness for the adverse-execution identity from an exec-verify request.
+ *
+ * Returns null when the trade is not one the circuit can speak about, rather than proving something
+ * adjacent. REFERENCE MODE IS THE FIRST SUCH CASE AND IT MATTERS: `execVerify` also answers
+ * `{fairPrice}` with `bps = (fair - realized/dx)/fair · 1e4`, which is a different identity with no
+ * pool model in it at all — `execadverse.circom` contains no term for a caller-supplied fair price,
+ * and the reserves are what its invariant is about. The engine picks the mode by which fields are
+ * present, so the same test is applied here rather than reading a `mode` the caller could set.
+ *
+ * @param echoedInputs  the request as echoed in `proof.inputs` — already grid-snapped by the handler
+ */
+export function execWitnessFor(echoedInputs) {
+  const i = echoedInputs || {};
+  const dx = Number(i.amountIn), realized = Number(i.amountOutRealized);
+  const x = Number(i.reserveIn), y = Number(i.reserveOut), f = Number(i.feeTier);
+  // The engine's own mode test, term for term: reserves AND a fee tier, or it is reference mode.
+  const haveReserves = x > 0 && y > 0 && i.feeTier != null;
+  if (!haveReserves) return null;
+  if (![dx, realized, x, y].every((v) => Number.isFinite(v) && v > 0)) return null;
+  if (!(f >= 0 && f < 1)) return null;                  // the engine's own guard on the fee
+
+  let enc;
+  try {
+    // The four derived integers are solved HERE and never read back from the response. The service
+    // publishes `round(honestOut, 8)`, and gate B5-4 measured what certifying that instead costs: the
+    // benchmark lands 30 grid steps out. The same lesson `round(M, 2)` taught the liquidation witness
+    // and `round(f*, 6)` taught the Kelly one, a third time.
+    enc = scale.toExecCircuitInputs({ dx, x, y, f, realized });
+  } catch (e) { return { outsideDomain: String((e && e.message) || e) }; }
+
+  // THE ENGINE'S OWN NUMBERS, UNROUNDED — lifted, not re-derived. `scale.engineHonestOut` and
+  // `scale.engineAdverseBps` are the engine's own lines in the engine's own order, and
+  // gates/gateEX-execverify-snark.mjs lifts those lines out of src/engine/execVerify.js, compiles
+  // them, and requires Object.is agreement over a sweep rather than taking the copy on trust.
+  const honestOut = scale.engineHonestOut(dx, x, y, f);
+  if (!(honestOut > 0) || !Number.isFinite(honestOut)) return null;
+  const bpsEngine = scale.engineAdverseBps(honestOut, realized);
+  const avEngine = scale.engineAdverseValue(honestOut, realized);
+  if (!Number.isFinite(bpsEngine) || !Number.isFinite(avEngine)) return null;
+
+  const inEff = dx * (1 - f);
+  const shift = execEncodingShift({ x, y, inEff, honestOut });
+  // How far the certified benchmark fill can sit from the engine's: the one grid rounding
+  // `canonicalHonestOut` performs, plus the encoding box above, plus the engine's own five-rounding
+  // double chain — (1-f), dx·, y·, x+, and the division.
+  const gOut = EXEC_HALF_STEP + shift + Math.abs(honestOut) * 8 * HALF_ULP;
+
+  const certOut = scale.fromScaled(enc.outHat);
+  const certBps = scale.fromScaled(enc.bpsHat);
+  const certShortfall = scale.fromScaled(enc.sHat);
+
+  // The headline's allowance, in BASIS POINTS.
+  //
+  // B(o, z) = 1e4·(o − z)/o is monotone in each argument separately — increasing in o wherever z > 0,
+  // decreasing in z — so the same CORNER argument the benchmark uses applies, and for the same reason
+  // it is not stylistic. B is convex in o, so dB/do·δ UNDERSTATES the downward excursion by a factor
+  // 1/(1 − δ/o). The first version of this guard used that derivative and the worst honest case
+  // measured 99.8% of it: a 0.2% empirical margin standing in for a term that was missing from the
+  // derivation. That is the same mistake as the liquidation sensitivity sum, and "it has not failed
+  // yet" is not a bound. Four corners, evaluated.
+  const hz = Math.abs(realized) * 2 * HALF_ULP;
+  let bpsShift = 0;
+  for (const eo of [-gOut, gOut]) for (const ez of [-hz, hz]) {
+    const oo = honestOut + eo, zz = realized + ez;
+    if (!(oo > 0)) { bpsShift = Infinity; break; }
+    const v = scale.engineAdverseBps(oo, zz);      // the engine's own form and order, at the corner
+    if (!Number.isFinite(v)) { bpsShift = Infinity; break; }
+    bpsShift = Math.max(bpsShift, Math.abs(v - bpsEngine));
+  }
+  const encodingBps = EXEC_HALF_STEP                                          // b̂ is one grid rounding
+    + bpsShift                                                                // the box, at its corners
+    + 4 * HALF_ULP * (EXEC_BPS_FULL + Math.abs(bpsEngine));                   // the engine's own chain
+  // The shortfall's allowance, in OUTPUT TOKENS. ŝ = ô − ẑ is EXACT in the field, so every term here
+  // is about the two operands rather than about the subtraction.
+  const encodingTokens = gOut + realized * HALF_ULP + Math.abs(avEngine) * HALF_ULP;
+
+  return {
+    witness: scale.toExecWitnessInput(enc), encoded: enc,
+    honestOut, bpsEngine, adverseValue: avEngine,
+    certifiedHonestOut: certOut, certifiedBps: certBps, certifiedShortfall: certShortfall,
+    gapToEngineOut: Math.abs(certOut - honestOut),
+    gapToEngineBps: Math.abs(certBps - bpsEngine),
+    gapToEngineShortfall: Math.abs(certShortfall - avEngine),
+    benchmarkBound: gOut,
+    // The ceiling, in the unit the arm is tested in. Published so a refusal can name a number.
+    benchmarkCeiling: Math.abs(honestOut) * EXEC_REL_CEILING,
+    encodingBps, encodingTokens,
+    displayBps: EXEC_DISPLAY_HALF_BPS,
+    displayTokens: EXEC_DISPLAY_HALF_TOKENS + Math.abs(avEngine) * HALF_ULP,
+    // The circuit's own three residuals and the three tolerances it publishes as signals, computed on
+    // this side so a refusal can name them and so a gate can check the residual it is about to see on
+    // chain rather than infer it.
+    feeResidual: scale.execFeeResidual(enc),
+    feeTolerance: scale.execFeeToleranceBound(),
+    invariantResidual: scale.execInvariantResidual(enc),
+    invariantTolerance: scale.execInvariantToleranceBound(enc),
+    bpsResidual: scale.execBpsResidual(enc),
+    bpsTolerance: scale.execBpsToleranceBound(enc),
+  };
+}
+
+/**
+ * Build an adverse-execution proof in the background and record it under the response's content hash.
+ *
+ * A fourth entry point rather than a circuit-name argument on one of the three above, for the reason
+ * the Kelly one gives: the guards ask different questions of different numbers in different units,
+ * and a shared function taking a circuit name would be one `if` away from asking the Kelly questions
+ * of an execution witness. Returns a promise every caller on the request path deliberately ignores.
+ * It never rejects.
+ */
+export async function buildExecInBackground(contentHash, echoedInputs, result) {
+  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  claimed.add(contentHash);
+  try {
+    await buildExecOnce(contentHash, echoedInputs, result);
+  } catch (e) {
+    put(contentHash, { status: 'failed', error: String((e && e.message) || e).slice(0, 200) });
+  } finally {
+    claimed.delete(contentHash);
+  }
+}
+
+async function buildExecOnce(contentHash, echoedInputs, result) {
+  const cold = await proofStore.read(contentHash);
+  if (cold) { store.set(contentHash, cold); return; }
+  const w = execWitnessFor(echoedInputs);
+  if (!w) { put(contentHash, { status: 'unavailable', error: 'this trade is outside the circuit domain — execadverse.circom states the CONSTANT-PRODUCT identity over pre-trade reserves and a fee tier, so a reference-mode answer (bps against a caller-supplied fairPrice) has no pool state here to be proven about' }); return; }
+  if (w.outsideDomain) { put(contentHash, { status: 'unavailable', error: `this trade is outside the circuit domain — ${w.outsideDomain}` }); return; }
+
+  const servedBps = Number(result?.adverseExecutionBps);
+  const servedValue = Number(result?.adverseValueOut);
+
+  // 1. Is there an answer to be a proof OF? A refused request has no fill to certify.
+  if (result?.ok !== true || result?.mode !== 'constant-product') {
+    put(contentHash, { status: 'unavailable', error: 'this answer is not a constant-product execution verdict, so there is no pool identity to certify' });
+    return;
+  }
+  if (!Number.isFinite(servedBps) || !Number.isFinite(servedValue)) {
+    put(contentHash, { status: 'unavailable', error: 'this answer carries no adverseExecutionBps and adverseValueOut to certify' });
+    return;
+  }
+
+  // 2. Does the witness describe the trade the engine PRICED? Asked as an EQUALITY against the
+  //    engine's own display rounding rather than against a tolerance, which is the whole of what any
+  //    tolerance could detect — a witness built on different inputs — and asked of BOTH published
+  //    quantities, because the shortfall and the headline can disagree independently: the headline is
+  //    a ratio and would absorb a proportional error in the benchmark that the shortfall would not.
+  if (execDisplayRoundBps(w.bpsEngine) !== servedBps) {
+    put(contentHash, { status: 'unavailable', error: `witness prices this trade at ${w.bpsEngine} bps, which displays as ${execDisplayRoundBps(w.bpsEngine)}; the answer served ${servedBps} — refusing to certify a different trade` });
+    return;
+  }
+  if (execDisplayRoundTokens(w.adverseValue) !== servedValue) {
+    put(contentHash, { status: 'unavailable', error: `witness puts the shortfall at ${w.adverseValue} output tokens, which displays as ${execDisplayRoundTokens(w.adverseValue)}; the answer served ${servedValue} — refusing to certify a different trade` });
+    return;
+  }
+
+  // 3. Can the 1e-9 grid pin this trade at all? THE CEILING, both arms, in their own units. On a dust
+  //    fill it cannot: the headline is a ratio, so the same 5e-10-token uncertainty in the benchmark
+  //    is 91 bps of a fill of 8.8e-8 tokens — eighteen times the 5 bps threshold this same engine uses
+  //    to call a fill a sandwich. A proof whose certified headline could sit past the verdict boundary
+  //    from the served one is not a proof of the answer however honest its arithmetic.
+  //
+  //    Unlike the Kelly ceiling this one is REACHED on the served path, which is why it is a refusal
+  //    with a measured number in it rather than a defensive check: 9.4% of a five-shape sweep lands
+  //    here, all of it dust fills and pools lopsided past 100:1.
+  if (!(w.benchmarkBound <= w.benchmarkCeiling)) {
+    put(contentHash, { status: 'unavailable', error: `the 1e-9 grid cannot pin this benchmark fill tighter than ±${w.benchmarkBound} output tokens, wider than the ±${w.benchmarkCeiling} that the ${EXEC_DISPLAY_HALF_BPS}-bps step the headline is published to allows on a fill of ${w.honestOut} — so no proof of it would be a proof of this answer` });
+    return;
+  }
+  if (!(w.encodingBps <= w.displayBps)) {
+    put(contentHash, { status: 'unavailable', error: `the 1e-9 grid cannot pin this headline tighter than ±${w.encodingBps} bps — wider than the ${w.displayBps} bps the answer is displayed to, so no proof of it would be a proof of this answer` });
+    return;
+  }
+
+  // 4. And do the circuit's integer solves actually agree with the engine's own doubles? Grid
+  //    resolution, not display resolution, and asked of each published quantity against ITS OWN
+  //    allowance in ITS OWN unit. The bound this repo is on record for getting wrong was reused
+  //    across two quantities; these two are computed separately and neither reads the other.
+  if (!(w.gapToEngineBps <= w.encodingBps)) {
+    put(contentHash, { status: 'unavailable', error: `witness diverges from the engine's own headline by ${w.gapToEngineBps} bps, past the ±${w.encodingBps} the encoding admits — refusing to certify a different trade` });
+    return;
+  }
+  if (!(w.gapToEngineShortfall <= w.encodingTokens)) {
+    put(contentHash, { status: 'unavailable', error: `witness diverges from the engine's own shortfall by ${w.gapToEngineShortfall} output tokens, past the ±${w.encodingTokens} the encoding admits — refusing to certify a different trade` });
+    return;
+  }
+
+  // 5. And are the three statements the circuit will be asked to prove actually true? All three hold
+  //    by construction from the half-away-from-zero rounding in `scale.cjs`, and checking them here
+  //    costs six BigInt multiplications and turns an unsatisfiable-constraint failure deep inside the
+  //    witness calculator into a refusal that names which of the three residuals broke.
+  const abs = (v) => (v < 0n ? -v : v);
+  for (const [label, R, T] of [
+    ['the effective input after the fee', w.feeResidual, w.feeTolerance],
+    ['the constant-product invariant', w.invariantResidual, w.invariantTolerance],
+    ['the headline in basis points', w.bpsResidual, w.bpsTolerance],
+  ]) {
+    if (!(2n * abs(R) <= T)) {
+      put(contentHash, { status: 'unavailable', error: `the integer residual for ${label} is 2|R| = ${2n * abs(R)}, past the circuit's own tolerance ${T} — this witness would not satisfy execadverse.circom` });
+      return;
+    }
+  }
+
+  if (queued >= MAX_QUEUED) {
+    put(contentHash, { status: 'unavailable', error: `prover busy — ${queued} proofs already queued; retry shortly` });
+    return;
+  }
+  put(contentHash, { status: 'building' });
+  queued++;
+  queue = queue.then(async () => {
+    const { proof, publicSignals } = await prove('execadverse', w.witness);
+    await put(contentHash, {
+      status: 'ready', protocol: PROTOCOL,
+      circuit: 'execadverse',
+      proof, publicSignals,
+      signalsAttestation: attestSignals(publicSignals),
+      encoded: Object.fromEntries(Object.entries(w.encoded).map(([k, v]) => [k, String(v)])),
+      // Named for the two quantities they are, in their own units, and never merged into one
+      // "gapToServed": one is a ratio in basis points and the other is a quantity of output tokens.
+      gapToServedBps: Math.abs(w.certifiedBps - Number(result.adverseExecutionBps)),
+      gapToServedShortfallOut: Math.abs(w.certifiedShortfall - Number(result.adverseValueOut)),
+      verify: 'snarkjs plonk verify execadverse_vk.json publicSignals proof — the verification key is published at /proof/vk/execadverse',
+    });
+  })
+    .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
+    .finally(() => { queued--; });
+}
+
 // The verification keys, one per circuit. `liquidation` keeps reading `vk_plonk.json` under that
 // exact name — it is the file `/proof/vk` has served since this service had proofs, and renaming it
 // would break a published URL for a cosmetic gain.
-const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json' };
+const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json' };
 export const CIRCUITS = Object.keys(VK_FILES);
 
 export function verificationKey(circuit = 'liquidation') {
@@ -961,4 +1302,21 @@ export const _internalHhi = {
   encodingShift: hhiEncodingShift,
   HALF_STEP: HHI_HALF_STEP,
   DISPLAY_HALF_UNIT: HHI_DISPLAY_HALF_UNIT,
+};
+
+/**
+ * And again, for the adverse-execution guard. A FOURTH object, and this one has two display constants
+ * instead of one because the circuit certifies two published quantities in two units — a headline in
+ * basis points and a shortfall in output tokens. A gate that reached for a single `DISPLAY_HALF_UNIT`
+ * here would be measuring one of them with the other's ruler, four hundred thousand times off.
+ */
+export const _internalExec = {
+  displayRoundBps: execDisplayRoundBps,
+  displayRoundTokens: execDisplayRoundTokens,
+  encodingShift: execEncodingShift,
+  HALF_STEP: EXEC_HALF_STEP,
+  DISPLAY_HALF_BPS: EXEC_DISPLAY_HALF_BPS,
+  DISPLAY_HALF_TOKENS: EXEC_DISPLAY_HALF_TOKENS,
+  BPS_FULL: EXEC_BPS_FULL,
+  REL_CEILING: EXEC_REL_CEILING,
 };

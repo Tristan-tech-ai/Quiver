@@ -194,7 +194,16 @@ check('nothing about the routing table reaches the advertised inputSchema',
 // silently meant "every service on the HTTP surface". A check that cannot reach the code where the
 // invariant breaks is not a weak check, it is a decoration, and this codebase is organised against
 // exactly that. It now enumerates BOTH handler arrays and asserts each is non-empty first.
-const EMITS_ZK = /env\.proof|obs\.snark|buildInBackground/;
+// `build\w*InBackground`, NOT `buildInBackground`, AND THE DIFFERENCE WAS ALREADY LOAD-BEARING.
+// The literal spelling matched exactly one of the four builders this file now guards: `buildKelly-
+// InBackground`, `buildConcentrationInBackground` and `buildExecInBackground` do not contain the
+// substring `buildInBackground`. Every one of them was therefore being detected only by the
+// incidental `env.proof` alternative — which any handler that reads its own content hash matches,
+// for any reason, whether it proves anything or not. So the trigger this comment block describes as
+// "an actual Plonk proof built off-request" was in fact never matching three of the four calls that
+// do it, and the set below stayed correct by luck. A fifth circuit whose handler did not happen to
+// mention `env.proof` would have been invisible. Widened here so the guard sees the CALL.
+const EMITS_ZK = /env\.proof|obs\.snark|build\w*InBackground/;
 const SNAPS = /gridSnapFields\s*\(/;
 // BOTH bodies, never one instead of the other. `SERVICES[].run` is wrapped at the foot of
 // src/services.js so every response carries its own `elapsedMs`, and a closure stringifies to the
@@ -250,9 +259,29 @@ check('every handler that builds a zk proof snaps its inputs onto that grid firs
 //     with no circuit on this host, and that handler refuses a proof for it by name rather than
 //     certifying the discrete statement about numbers that never entered it.
 //
+//   http:exec-verify / mcp:exec_verify   the adverse-execution identity, over `execadverse_plonk.zkey`.
+//     Grid: amountIn, amountOutRealized, reserveIn, reserveOut, feeTier. FIVE, and the two omissions
+//     were decided rather than skipped. `fairPrice` is the REFERENCE mode's benchmark — a number the
+//     caller supplied instead of a pool — and execadverse.circom's invariant is about reserves, so it
+//     reaches no term; that mode is refused a proof by name rather than certifying a pool statement
+//     about a trade that had no pool. `slippageTolerancePct` drives the "within tolerance yet robbed"
+//     lesson, which is a comparison against the headline and not a term in it. Snapping either would
+//     move a content hash for a field no circuit can see, which is size-gate's argument for leaving
+//     `bankroll` alone, a second time.
+//
+//     WHY FIVE AND NOT THREE. `execadverse.circom` takes eight public signals, and only these five
+//     are the caller's: the effective input, the benchmark fill, the shortfall and the basis-point
+//     figure are all DERIVED, each rounded onto the grid exactly once inside src/util/scale.cjs. So
+//     snapping the five is what makes the double the engine divides the same double a reader
+//     recomputing from `proof.inputs` would form — the treasury-risk argument, where the circuit's own
+//     inputs are quotients the engine formed. What it buys here is larger than it is there, because
+//     the benchmark is a quotient of a quotient: `dO/din` reaches 5.4e3 on a pool lopsided past 100:1,
+//     so half a grid step on the effective input moves the fill by 2.7e-6 tokens, and the guard's
+//     ceiling is what refuses that trade rather than certifying a neighbouring one.
+//
 // The list is written out rather than counted so that adding a service cannot pass by arithmetic.
 check('the proof-emitting set is the one that has been checked',
-  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk'].sort()),
+  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify'].sort()),
   `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
 
 // AND EACH CIRCUIT'S ARTIFACTS ARE ACTUALLY IN THIS BUILD. A handler that emits a proof against a key
@@ -263,6 +292,7 @@ for (const [circuit, files] of Object.entries({
   liquidation: ['liquidation_plonk.zkey', 'vk_plonk.json', 'liquidation_js/liquidation.wasm', 'liquidation_js/witness_calculator.cjs'],
   kelly: ['kelly_plonk.zkey', 'kelly_vk.json', 'kelly_js/kelly.wasm', 'kelly_js/witness_calculator.cjs'],
   concentration: ['concentration_plonk.zkey', 'concentration_vk.json', 'concentration_js/concentration.wasm', 'concentration_js/witness_calculator.cjs'],
+  execadverse: ['execadverse_plonk.zkey', 'execadverse_vk.json', 'execadverse_js/execadverse.wasm', 'execadverse_js/witness_calculator.cjs'],
 })) {
   const missing = files.filter((f) => !existsSync(join(ROOT, 'assets', 'zk', f)));
   check(`every artifact the ${circuit} circuit proves against is in this build`, missing.length === 0,

@@ -430,6 +430,16 @@ with 23 of 31 handlers building no proof at all. The count of services a caller 
 moved from three to four while this page was being written, and the private-input count did not move at
 all: `execadverse` has eight public signals, seven public outputs and nothing private.
 
+**And it kept not moving as the set kept growing.** `lpbracket` was wired to `lp-risk` on 30 July and
+measures `nWires` 912, `nPubOut` 4, `nPubIn` 9, `nPrvIn` **0**, `nConstraints` 932 — thirteen public
+signals and nothing hidden, on the cheapest circuit this host carries. It is the sharpest case on this
+page for the *succinctness* half of the complaint above, and the first one where that half does not
+land: the statement it proves is that a root lies inside a bracket, and the search that found the root
+costs 163,608 exponentials and 82,016 square roots (measured) against a certificate of six
+inequalities. A contract cannot re-execute that in eleven lines of Solidity, because eleven lines of
+Solidity cannot run a 401-point quadrature two hundred times. The 134× gas complaint below is a claim
+about identities a contract could check directly; it is not a claim about this one.
+
 **The paper is honest about the count and does not draw the consequence.** It says, and this page is
 quoting it approvingly rather than retracting it:
 
@@ -852,8 +862,11 @@ the same defect one layer up.
 
 ## 10. Three of the four circuits built this round are still unreachable from a served answer
 
-**Status: OPEN for three of four.** `execadverse` was wired on 30 July, hours after this entry was
-written, and the entry is kept and corrected rather than replaced — the interesting part is that the gap
+**Status: OPEN, and shrinking — read the table below rather than this line for the count.** `execadverse`
+was wired on 30 July, hours after this entry was written, and `lpbracket` the same day; the count in the
+heading above is what it was when the entry was opened and is left there deliberately, because a heading
+that keeps getting quietly re-numbered is how a register stops being a record. The entry is kept and
+corrected rather than replaced — the interesting part is that the gap
 existed at all and closed in one afternoon once someone owned it.
 
 **What is wrong.** `portfolioleg`, `execadverse`, `lpbracket` and `ncdf` are compiled, have Plonk zkeys,
@@ -865,7 +878,7 @@ that set decides what a response can carry:
 | --- | --- | --- |
 | `execadverse` (exec-verify) | yes | **yes, since 30 July** — `snark: true`, both surfaces, `/proof/vk/execadverse` |
 | `portfolioleg` (portfolio-gate) | yes | no |
-| `lpbracket` (lp-risk) | yes | no |
+| `lpbracket` (lp-risk) | yes | **yes, since 30 July** — `snark: true`, both surfaces, `/proof/vk/lpbracket` |
 | `ncdf` (options-risk) | yes | no |
 
 **What this entry said before `execadverse` landed**, kept because the sentence was true when it was
@@ -878,10 +891,21 @@ There is now. `preflight.mjs` prints four proof-emitting services against 23 of 
 proof, and `src/services.js` publishes a `proves` string for the new one naming all three nested
 statements and the tolerances each carries.
 
-**What a caller sees.** For the other three, nothing: `portfolio-gate`, `lp-risk` and `options-risk` answer
-with no proof and no `snark` option. The four Phase B reports each open with `buildable-and-built`, which
-is true and is not the same sentence as "wired" — and a reader who moves from `verify-lp-risk.md` to the
-live endpoint will find that gap themselves. Better that they find it here first.
+**What a caller sees.** For the ones still unwired, nothing: they answer with no proof and no `snark`
+option. The four Phase B reports each open with `buildable-and-built`, which is true and is not the same
+sentence as "wired" — and a reader who moves from `verify-lp-risk.md` to the live endpoint will find that
+gap themselves. Better that they find it here first.
+
+**`lpbracket` closed on 30 July and its residue was published rather than resolved.** The wiring is in
+`src/util/lpBracket.js` and `src/util/snark.js`; `wire-lp-risk.md` is the write-up. The residue this
+entry predicted — "certifies a bracket around two quadrature values it takes as public inputs and
+certifies neither" — is exactly what the response's `doesNotProve` now says, in those terms, with the
+two assumed integers among the public signals and a one-line closed form (`L = exp(-v/8)`) beside them
+so a reader can check what was assumed. Naming the residue is not removing it: the percentage `lp-risk`
+leads with, `expectedDivergence.expectedIlPct`, IS the assumed quadrature and is not proven. The circuit
+that would prove it, `lpexpectation.circom`, is 36,613 constraints against the 4,096 `hez_final_12`
+allows — 8.94× over, needing `powersOfTau` 16 or 17 — so that half is blocked on a ceremony file and not
+on a wiring.
 
 **Why the remaining three are not fixed.** Wiring is not a document change: each circuit needs a witness
 builder on the request path, a refusal by name for inputs outside its domain, a grid decision made on

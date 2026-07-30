@@ -48,6 +48,11 @@ const CIRCUITS = {
   // case yet for the lazy load: a deploy where nobody asks event-vol for a proof never reads it, and
   // reading it is 10,262,700 bytes (measured; a share of assets/zk would go stale as siblings land).
   ncdf: { zkey: 'ncdf_plonk.zkey', dir: 'ncdf_js', wasm: 'ncdf.wasm' },
+  // 7.1 MB, for lp-risk's breakeven bracket. 1,776 Plonk constraints — the CHEAPEST circuit on this
+  // host, and it is the one that certifies the most expensive computation the service performs
+  // (163,608 exponentials and 82,016 roots for one served breakeven, measured). That inversion is the
+  // point: a bisection result is certified by its bracket, and a bracket is six inequalities.
+  lpbracket: { zkey: 'lpbracket_plonk.zkey', dir: 'lpbracket_js', wasm: 'lpbracket.wasm' },
 };
 // The default is `liquidation` and it is load-bearing rather than tidy: a message from an older
 // parent, or from any caller that has not been taught the field, must keep proving exactly the

@@ -492,7 +492,14 @@ test('K.8 a third party can fetch the Kelly proof and the key that checks it, an
     // key is 7.8 MB, it is loaded lazily by src/util/proverWorker.mjs so a deploy that never proves an
     // execution pays nothing for it, and it is published at /proof/vk/execadverse because a proof
     // carrying FIFTEEN public signals cannot be checked against any of the three keys above.
-    assert.deepEqual(badBody.available, ['liquidation', 'kelly', 'concentration', 'execadverse']);
+    // A FOURTH and FIFTH time, on 30 July, and both are recorded rather than absorbed. `ncdf` was wired
+    // onto event-vol (see that wiring's own write-up for its key size and grid). `lpbracket` was wired
+    // onto lp-risk: a 7,094,860-byte key, loaded lazily like the others, published at
+    // /proof/vk/lpbracket because a proof carrying THIRTEEN public signals cannot be checked against
+    // any key above it — and because what it certifies is a different KIND of statement from the four
+    // arithmetic identities, a bracket around the root of a bisection rather than the value of a
+    // formula. A caller holding one and following /proof/vk/kelly would get a failure with no reason.
+    assert.deepEqual(badBody.available, ['liquidation', 'kelly', 'concentration', 'execadverse', 'ncdf', 'lpbracket']);
 
     // The proof itself, fetched by a party who never saw the answer.
     const served = await (await fetch(`${base}/proof/${env.proof.contentHash}`)).json();

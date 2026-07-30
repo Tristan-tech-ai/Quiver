@@ -2,7 +2,11 @@
 // Each drives: the paid POST route, the gated /diag/scan tester, and the / index.
 import { config } from './config.js';
 import { gridSnapFields } from './util/grid.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground } from './util/snark.js';
+// lp-risk's published `snark` block, built in ONE place for BOTH surfaces rather than duplicated the
+// way the five older ones are — the MCP handler is a separate array and has been the forgotten site
+// four times on this project, so the two claims cannot be allowed to live in two files.
+import { lpBracketSnark } from './util/lpBracket.js';
 // event-vol's encoder, imported here as well as inside snark.js so the handler can publish WHY a proof
 // is unavailable in the same response rather than making the caller poll /proof/<hash> to find out.
 // The four older handlers each rebuild that reason inline; one call answers it for this one.
@@ -27,7 +31,6 @@ import { perpGate } from './engine/perpGate.js';
 import { sizeGate } from './engine/sizeGate.js';
 import { execVerify } from './engine/execVerify.js';
 import { optionsRisk } from './engine/optionsRisk.js';
-import { lpRisk } from './engine/lpRisk.js';
 import { treasuryRisk } from './engine/treasuryRisk.js';
 import { riskAttest } from './engine/riskAttest.js';
 import { eventVol } from './engine/eventVol.js';
@@ -37,6 +40,10 @@ import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapter
 // The other half of the enum contract: repair.js resolves a value to a declared alternative where it
 // can, and reports the ones it cannot so this file can refuse them. See the wrapper below `SERVICES`.
 import { enumViolations, enumRefusal } from './util/repair.js';
+// lp-risk's boundedness self-check, re-evaluated on the exact fraction instead of on its own rounded
+// display value. Outside src/engine on purpose: the verdict was wrong, the arithmetic was not, and the
+// build hash must not move. See src/util/lpBoundedness.js.
+import { lpRiskEnvelope } from './util/lpBoundedness.js';
 // Every response carries its own timing — see the wrapper at the foot of this file, and
 // src/util/timing.js for why the field lives in the envelope and not at the top level.
 import { timedRun } from './util/timing.js';
@@ -941,7 +948,55 @@ export const SERVICES = [
       },
     },
     validate: (b) => ((Number(b?.priceRatio) > 0 || Number(b?.volatility) > 0) ? b : { error: 'require priceRatio (realized IL) and/or volatility (+ horizonPeriods) for expected divergence' }),
-    run: (i) => proofEnvelope('lp-risk', i, lpRisk(i), config.version),
+    // Not `proofEnvelope('lp-risk', i, lpRisk(i), …)` directly, because the engine's boundedness
+    // self-check ranges over its own 4-dp display value and therefore fails on a correct answer once
+    // the value rounds to exactly -100 (defect register §5; sigma^2*T >= 116.06874041832731). The
+    // check is re-evaluated on the exact fraction OUTSIDE the hashed tree — one-way and fail-closed,
+    // so no passing check can start failing — and the same wrapper is used on the free MCP surface
+    // and in the SDK so the three cannot publish different verdicts about one call.
+    // See src/util/lpBoundedness.js.
+    run: (i) => {
+      // `snark` is a delivery preference, not a term in any identity — the same destructure the other
+      // five proof-serving handlers make. It has never been a declared key on this endpoint, so a
+      // caller who was already sending it was having it hashed and ignored; that caller's content hash
+      // moves once, onto the hash the identical body without the flag has always returned. Every
+      // request that does not carry the flag is byte-identical, and both pinned lp-risk fixtures were
+      // re-measured unmoved.
+      const { snark: wantSnark, ...raw } = i;
+      // NO GRID SNAP, and it is a decision rather than an omission.
+      //
+      //   The quantity the circuit compares against is the horizon FEE FRACTION, and that is a
+      //   QUOTIENT of three echoed inputs — (feeAprPct/100) * (horizonPeriods/periodsPerYear) — which
+      //   lands off the 1e-9 grid whether or not its ingredients are on it, exactly like perp-gate's
+      //   margin derived from leverage. The encoder reads the same three doubles the engine read and
+      //   forms the quotient in the engine's own order, so the only encoding error is `toScaled` on
+      //   the quotient — and that error is already inside the derived bound, because the bracket is
+      //   required to straddle at BOTH the engine's fee fraction and the encoded one, which puts both
+      //   roots inside it. Snapping the ingredients would move content hashes for high-precision
+      //   callers and buy nothing. size-gate leaves `bankroll` alone and exec-verify leaves
+      //   `fairPrice` alone for the same reason.
+      //
+      //   `volatility` reaches no circuit AT ALL, which is worth saying out loud: the breakeven
+      //   volatility is the root of "expected divergence == fees", and the fee side does not depend on
+      //   realized vol. Volatility is required to be positive only because that is what opens the
+      //   expected-divergence block the breakeven lives in.
+      //
+      // ONE call to the wrapper, and the envelope IS the result: `proofEnvelope` spreads the engine's
+      // return value at the top level and adds `proof`. So the served fields the witness generator
+      // reads — feeVsDivergence, expectedDivergence, ok — come off exactly the object the caller
+      // receives, not off a second run of the engine that could differ from it.
+      const env = lpRiskEnvelope(raw, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        const { why, snark } = lpBracketSnark({
+          contentHash: env.proof.contentHash,
+          result: env,
+          note: 'A succinct proof of the breakeven BRACKET for exactly these inputs, over the public Hermez reference string. Proving takes about 0.9s, so it is built off this request rather than inside it — fetch it at the URL above, free. Two ways it can still come back unavailable, both recorded on the proof record with the measured number rather than guessed at here: the 1e-9 variance grid cannot pin a very small breakeven to the 5 decimals this field is published at, because sqrt(v/T) has unbounded slope at zero (measured: 14 of 770 swept answers, all of them under about 0.012% fee APR at a one-period horizon); and a bracket narrow enough to pin the answer may be too narrow for its own straddle to survive the grid.',
+        });
+        if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
+        env.snark = snark;
+      }
+      return env;
+    },
   },
   {
     name: 'treasury-risk', path: '/api/treasury-risk', price: config.prices.treasuryRisk, register: true,

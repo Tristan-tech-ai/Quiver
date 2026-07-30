@@ -252,9 +252,22 @@ check('the proof-emitting handlers are actually visible to this check',
 // directions: a listed handler that does not emit a proof, or that has quietly started snapping, is
 // as much a drift as an unlisted one that does neither. A new proof-emitting handler that neither
 // snaps nor appears here still goes red, which is the failure this check exists for.
+// A SIXTH CIRCUIT ADDS A SECOND KIND OF EXEMPTION, AND IT IS NOT event-vol's. `lpbracket.circom`
+// works over the SAME 1e-9 grid as the first four, so nothing about the grid is unusual here. What is
+// unusual is that none of its inputs is a caller field. The quantity it compares against is the
+// horizon FEE FRACTION — (feeAprPct/100) * (horizonPeriods/periodsPerYear), a quotient that lands off
+// the grid whether or not its three ingredients are on it, exactly like perp-gate's margin derived
+// from leverage — and the bracket, the endpoint expectations and the volatility are all found by a
+// SEARCH. `volatility` reaches no term at all: the breakeven is the root of "expected divergence ==
+// fees", and the fee side does not depend on realized vol. So snapping any of them would move a
+// content hash for an off-grid caller and change nothing about what the circuit is handed, which is
+// size-gate's argument about `bankroll` and treasury-risk's about `apyPct`, arriving this time for
+// every field the endpoint has.
 const OTHER_GRID = {
   'http:event-vol': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)), not caller fields',
   'mcp:event_vol': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)), not caller fields',
+  'http:lp-risk': 'lpbracket.circom, 1e-9 — every circuit input is DERIVED (a fee quotient and a searched bracket); no caller field reaches a term, and the fee quotient\'s own encoding is inside the derived bound because the bracket must straddle at both the engine\'s fee fraction and the encoded one',
+  'mcp:lp_risk': 'lpbracket.circom, 1e-9 — every circuit input is DERIVED (a fee quotient and a searched bracket); no caller field reaches a term, and the fee quotient\'s own encoding is inside the derived bound because the bracket must straddle at both the engine\'s fee fraction and the encoded one',
 };
 const unsnapped = handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map(id).sort();
 check('every handler that builds a zk proof snaps its inputs onto that grid first — on BOTH surfaces',
@@ -323,10 +336,24 @@ check('every grid exemption is still earned by the handler it names',
 //     which is why options-risk still has no proof and is not on this list.
 //     Covered: `expectedMove.straddleImpliedAbsMoveUsd`, one field of six.
 //
+//   http:lp-risk / mcp:lp_risk   the breakeven BRACKET, over `lpbracket_plonk.zkey`.
+//     Grid: NOTHING, and for a different reason from event-vol's — see the OTHER_GRID block. This is
+//     the first circuit here whose subject is the RESULT OF A SEARCH rather than the value of a
+//     formula: the engine locates `feeVsDivergence.breakevenVolatility` by bisecting 200 times over a
+//     401-point quadrature (163,608 exponentials and 82,016 roots for one served answer, measured),
+//     and the circuit evaluates that quadrature zero times, because a root does not have to be
+//     recomputed to be certified — it has to be LOCATED, and a bracket is a closed-form object.
+//     1,776 Plonk constraints, the cheapest circuit on this host, against the most expensive
+//     computation the service performs.
+//     Covered: `feeVsDivergence.breakevenVolatility`, one field of one block of three. The two
+//     endpoint expectations it straddles with are PUBLIC INPUTS and are NOT proven — that is written
+//     into the response's own `doesNotProve`, and `expectedDivergence.expectedIlPct` (the headline the
+//     service leads with) is exactly the quadrature that is assumed. `realizedIL` belongs to
+//     `divergence.circom`, which is a different circuit and is not reached from here.
+//
 // The list is written out rather than counted so that adding a service cannot pass by arithmetic.
 check('the proof-emitting set is the one that has been checked',
-  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'http:event-vol', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify', 'mcp:event_vol'].sort()),
-
+  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'http:event-vol', 'http:lp-risk', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify', 'mcp:event_vol', 'mcp:lp_risk'].sort()),
   `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
 
 // AND EACH CIRCUIT'S ARTIFACTS ARE ACTUALLY IN THIS BUILD. A handler that emits a proof against a key
@@ -341,6 +368,10 @@ for (const [circuit, files] of Object.entries({
   // 10,262,700 bytes of proving key, measured — the largest single artifact this deploy carries, and
   // the reason proverWorker.mjs loads every circuit lazily rather than at boot.
   ncdf: ['ncdf_plonk.zkey', 'ncdf_vk.json', 'ncdf_js/ncdf.wasm', 'ncdf_js/witness_calculator.cjs'],
+  // 7,094,860 bytes, measured. The cheapest circuit here by constraints (1,776, against the 4,096 the
+  // hez_final_12 ceremony file allows) is not proportionally the cheapest by key size: a Plonk key
+  // scales with the PADDED domain, which is 2048 here, not with the constraint count.
+  lpbracket: ['lpbracket_plonk.zkey', 'lpbracket_vk.json', 'lpbracket_js/lpbracket.wasm', 'lpbracket_js/witness_calculator.cjs'],
 })) {
   const missing = files.filter((f) => !existsSync(join(ROOT, 'assets', 'zk', f)));
   check(`every artifact the ${circuit} circuit proves against is in this build`, missing.length === 0,

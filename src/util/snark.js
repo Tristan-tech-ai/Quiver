@@ -42,6 +42,10 @@ import * as proofStore from './proofStore.js';
 // of that file gives — and this file's dependency set (scale.cjs, attest, proofStore) is deliberately
 // free of src/engine so the engine keeps having no importers below it.
 import { ncdfWitnessFor } from './ncdfWitness.js';
+// The sixth identity's encoder, in its own file for the same reason and one more: it is the only
+// witness generator here that has to run a SEARCH, so it carries a stopping rule, a refusal set and a
+// bound of its own, which is a different shape from the closed-form encoders in scale.cjs.
+import { bracketWitnessFor as lpBracketWitnessFor, lpDisplayRound, LP_DISPLAY_HALF_UNIT, _internalLp } from './lpBracket.js';
 
 const require = createRequire(import.meta.url);
 const scale = require('./scale.cjs');
@@ -1355,10 +1359,185 @@ async function buildNcdfOnce(contentHash, echoedInputs, result) {
     .finally(() => { queued--; });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE SIXTH IDENTITY — a bracket certificate, for `lp-risk`.
+//
+// The first one whose subject is the RESULT OF A SEARCH rather than the value of a formula, and the
+// first where what is proven is a LOCATION rather than an evaluation.
+//
+// `lp-risk` publishes three blocks and only one of them is a closed form:
+//
+//   1. `realizedIL`         IL(r) = 2*sqrt(r)/(1+r) - 1. `divergence.circom` states this identity and
+//                           gateB4 proves it. It is NOT the circuit reached from here, and no proof
+//                           this block builds says anything about `realizedIL`.
+//   2. `expectedDivergence` a 401-point quadrature over a lognormal — 802 exponentials and 402 roots
+//                           per served figure, measured. NOT PROVEN. It enters the certificate as two
+//                           public inputs and nothing certifies them.
+//   3. `feeVsDivergence`    a 200-iteration bisection over block 2 — 163,608 exponentials and 82,016
+//                           roots for one served answer, measured. `breakevenVolatility` is what is
+//                           proven here.
+//
+// A bisection result is certified by its BRACKET rather than by replaying the search: two evaluations
+// of g(v) = E[IL](v) + f that straddle, an ordering, a midpoint, a width, and the root on the squared
+// quantity. Six inequalities over published integers, in 1,776 Plonk constraints. See
+// zk/circuits/lpbracket.circom and src/util/lpBracket.js, which is the normative encoding.
+//
+// ── THE BOUND IS DERIVED IN lpBracket.js AND IS NOT THE OTHER FIVE'S ────────────────────────────
+// `breakevenVolatility: round(breakevenSigma, 5)`, so the display half-unit is 0.5e-5 — a hundred
+// times finer than the liquidation half-cent and ten times coarser than the Kelly half-millionth. A
+// bound sized off either would be wrong by three or four orders of magnitude in one direction or the
+// other, which is why there are five `_internal*` objects on this file and now a sixth.
+//
+// ── AND THE COMPARISON IS AGAINST THE ENGINE'S UNROUNDED FIGURE ─────────────────────────────────
+// Not against the served one. `src/util/lpBracket.js` replays the engine's own 200-halving bisection
+// (1.4 ms, measured, and this whole path is off the request path) so the certified volatility is
+// compared to the number the engine actually computed. Comparing to the SERVED figure with an equality
+// on the rounded value refused 28 of 770 honest cases on the first pass of this file's own sweep, all
+// of them sitting on a 5th-decimal boundary — the same defect that refused RUNE a liquidation proof.
+//
+// Measured over 882 calls to the real engine across seven volatilities, seven horizons, nine fee
+// levels and two concentration factors: 756 proved, 112 have no breakeven at all (the engine returns
+// null when horizon fees exceed the 100% a bounded loss can reach), 14 refused by the ceiling, 0
+// diverged. The worst honest case uses 99.7384% of the derived bound.
+
+/**
+ * Build a proof of the breakeven bracket in the background and record it under the response's content
+ * hash. Never rejects; every caller on the request path ignores the promise.
+ */
+export async function buildLpBracketInBackground(contentHash, echoedInputs, result) {
+  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  claimed.add(contentHash);
+  try {
+    await buildLpBracketOnce(contentHash, echoedInputs, result);
+  } catch (e) {
+    put(contentHash, { status: 'failed', error: String((e && e.message) || e).slice(0, 200) });
+  } finally {
+    claimed.delete(contentHash);
+  }
+}
+
+/**
+ * THE GUARD, as a pure function — the four questions asked of a built witness, in the order a reader
+ * would ask them, each with its own refusal so the stored record says which one failed.
+ *
+ * EXPORTED, and that is not for convenience. The sweep in gates/gateLP-bracket-snark.mjs has to
+ * exercise THIS code and not a paraphrase of it: the first draft of that gate re-implemented these
+ * four checks inline, which meant 882 rows measured a copy of the guard while the shipped guard went
+ * untested — a verifier that cannot fail, one level up. Proving 756 answers to reach the shipped guard
+ * is eleven minutes of Plonk; calling it directly is milliseconds and is the same code.
+ *
+ * @returns {string|null} the refusal, or null when the witness may be proven
+ */
+export function lpBracketRefusal(w) {
+  if (!w || w.refused) return w?.refused || 'no witness';
+
+  // 1. Does the replay describe the answer the engine SERVED? An equality against the engine's own
+  //    display rounding, asked of the REPLAY and not of the certificate — the replay is the engine's
+  //    expression in the engine's order, so it reproduces the served digit exactly or the
+  //    transcription has drifted. Measured: 0 disagreements in 770.
+  if (!w.engineSigmaDisplaysAsServed) {
+    return `the bisection replayed here lands on ${w.engineSigma}, which displays as ${lpDisplayRound(w.engineSigma)}; the answer served ${w.servedSigma} — refusing to certify a different breakeven`;
+  }
+
+  // 2. Can the 1e-9 grid pin this breakeven at all? THE CEILING, and it is REACHED on the served path.
+  //    sigma = sqrt(v/T) has an unbounded slope at v = 0, so for a small enough breakeven variance the
+  //    coarsest bracket whose straddle still survives the grid maps to a range of volatilities wider
+  //    than the 0.5e-5 the figure is published to. Measured: 14 of 770 swept answers, all of them fee
+  //    levels under about 0.012% APR at a one-period horizon, where the exceedance runs 2.2x to 26x.
+  if (!(w.sigmaBound <= w.displayHalfUnit)) {
+    return `the 1e-9 variance grid cannot pin this breakeven tighter than ±${w.sigmaBound} — wider than the ${w.displayHalfUnit} the answer is displayed to, so no proof of it would be a proof of this answer. The bracket this needed is ${w.hi - w.lo} wide in total variance, and at a breakeven variance of ${w.vStarEngine} that is ${w.sigmaBound} of volatility.`;
+  }
+
+  // 3. And does the certificate actually agree with the engine's own number? Grid resolution, not
+  //    display resolution — the comparison is against the UNROUNDED bisection, because an equality on
+  //    the rounded figure refused 28 of 770 honest cases sitting on a 5th-decimal boundary.
+  if (!(w.gapToEngine <= w.sigmaBound)) {
+    return `the certified breakeven diverges from the engine's own by ${w.gapToEngine}, past the ±${w.sigmaBound} the bracket and the grid admit — refusing to certify a different breakeven`;
+  }
+
+  // 4. And are the inequalities the circuit will be asked to prove actually true? All of them hold by
+  //    construction from the encoder's refusals, and checking them here costs a handful of BigInt
+  //    comparisons while turning an unsatisfiable-constraint failure deep inside the witness
+  //    calculator into a refusal that names which one broke.
+  const e = w.encoded;
+  const abs = (v) => (v < 0n ? -v : v);
+  const claims = [
+    ['the bracket is ordered, lo < hi', e.loHat < e.hiHat],
+    ['the straddle g(lo) > 0', e.eLoHat + e.feeHat > scale.SCALE],
+    ['the straddle g(hi) <= 0', e.eHiHat + e.feeHat <= scale.SCALE],
+    ['the endpoint values are in decreasing order', e.eHiHat <= e.eLoHat],
+    ['the root is the bracket midpoint to one grid step', w.mid >= -1n && w.mid <= 1n],
+    ['the bracket is inside its published width bound', w.widthSlack >= 0n],
+    ['the root residual is inside the circuit\'s own tolerance', 2n * abs(w.rootResidual) <= w.rootTolerance],
+  ];
+  for (const [label, holds] of claims) {
+    if (!holds) return `${label} does not hold over the encoded integers — this witness would not satisfy lpbracket.circom`;
+  }
+  return null;
+}
+
+async function buildLpBracketOnce(contentHash, echoedInputs, result) {
+  const cold = await proofStore.read(contentHash);
+  if (cold) { store.set(contentHash, cold); return; }
+
+  // Is there an answer to be a proof OF, and is the witness generator still the engine? Both are
+  // inside `bracketWitnessFor`, which refuses with a sentence rather than a null — including the
+  // per-request check that its transcription of the engine's quadrature still reproduces the
+  // 4-decimal figure this very answer published.
+  const w = lpBracketWitnessFor(echoedInputs, result);
+  const refusal = lpBracketRefusal(w);
+  if (refusal) { put(contentHash, { status: 'unavailable', error: refusal }); return; }
+  const e = w.encoded;
+
+  if (queued >= MAX_QUEUED) {
+    put(contentHash, { status: 'unavailable', error: `prover busy — ${queued} proofs already queued; retry shortly` });
+    return;
+  }
+  put(contentHash, { status: 'building' });
+  queued++;
+  queue = queue.then(async () => {
+    const { proof, publicSignals } = await prove('lpbracket', w.witness);
+    await put(contentHash, {
+      status: 'ready', protocol: PROTOCOL,
+      circuit: 'lpbracket',
+      proof, publicSignals,
+      signalsAttestation: attestSignals(publicSignals),
+      encoded: Object.fromEntries(Object.entries(w.encoded).map(([k, v]) => [k, String(v)])),
+      // THE CERTIFIED FIGURE AT FULL PRECISION, because the served one is rounded to five decimals
+      // and the bounds below are three orders of magnitude tighter than that rounding. A reader who
+      // only ever sees `0.06648` cannot tell a 1e-9 certificate from a 1e-5 one.
+      certifiedBreakevenVolatility: w.certifiedSigma,
+      gapToServedBreakeven: w.gapToServed,
+      gapToEngineBreakeven: w.gapToEngine,
+      encodingBound: w.sigmaBound,
+      displayHalfUnit: w.displayHalfUnit,
+      boundUsed: w.boundUsed,
+      // The bracket itself, and the two values that are ASSUMED rather than proven — published in the
+      // record as well as in the public signals, because "which numbers were not certified" is the
+      // single most important thing a reader of this particular proof has to know.
+      bracket: { lo: w.lo, hi: w.hi, halvings: w.halvings, doublings: w.doublings, enginePerforms: 200 },
+      assumedEndpointExpectations: {
+        lHatLo: String(e.eLoHat), lHatHi: String(e.eHiHat),
+        basis: 'L = E[IL] + 1 from the engine\'s 401-point quadrature at the two bracket ends. PUBLIC INPUTS, not proven by this circuit.',
+        closedFormLo: w.closedFormLo, closedFormHi: w.closedFormHi,
+        closedFormBasis: 'L = exp(-v/8), which is exact: 2*sqrt(r)/(1+r) = sech(ln r/2), and with a = sqrt(v)/2 the shift z = w + a leaves sech(a*w) against a pdf gaining cosh(a*w), whose product is 1. Check the two assumed values in one line each.',
+        closedFormGapLo: Math.abs(w.eLo - w.closedFormLo),
+        closedFormGapHi: Math.abs(w.eHi - w.closedFormHi),
+        closedFormWorstMeasured: 1.419121e-9,
+      },
+      straddleMarginGridSteps: { lo: w.straddleMarginLo, hi: w.straddleMarginHi },
+      reconstruct: 'The public signals are [midResidual, widthSlack, sigResidual, sigTolerance, feeHat, loHat, hiHat, vStarHat, eLoHat, eHiHat, sigHat, horizonT, widthHat]. breakevenVolatility = sigHat/1e9; the total variance it is the root of is vStarHat/1e9; check the root by squaring: sigHat^2 * horizonT - vStarHat * 1e9 is the third signal and is bounded by the fourth.',
+      verify: 'snarkjs plonk verify lpbracket_vk.json publicSignals proof — the verification key is published at /proof/vk/lpbracket',
+    });
+  })
+    .catch((e2) => put(contentHash, { status: 'failed', error: String(e2 && e2.message || e2).slice(0, 200) }))
+    .finally(() => { queued--; });
+}
+
 // The verification keys, one per circuit. `liquidation` keeps reading `vk_plonk.json` under that
 // exact name — it is the file `/proof/vk` has served since this service had proofs, and renaming it
 // would break a published URL for a cosmetic gain.
-const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json', ncdf: 'ncdf_vk.json' };
+const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json', ncdf: 'ncdf_vk.json', lpbracket: 'lpbracket_vk.json' };
 export const CIRCUITS = Object.keys(VK_FILES);
 
 export function verificationKey(circuit = 'liquidation') {
@@ -1410,4 +1589,16 @@ export const _internalExec = {
   DISPLAY_HALF_TOKENS: EXEC_DISPLAY_HALF_TOKENS,
   BPS_FULL: EXEC_BPS_FULL,
   REL_CEILING: EXEC_REL_CEILING,
+};
+
+/**
+ * And again, for the bracket guard. A FIFTH object on this file, whose constants live in
+ * `src/util/lpBracket.js` because that is where they are derived — re-exported here so a gate reading
+ * guards has one place to read them from, and so a gate that reached for `DISPLAY_HALF_UNIT` while
+ * measuring a breakeven volatility would be off by a factor of a thousand instead of silently right.
+ */
+export const _internalLpBracket = {
+  ..._internalLp,
+  displayRound: lpDisplayRound,
+  DISPLAY_HALF_UNIT: LP_DISPLAY_HALF_UNIT,
 };

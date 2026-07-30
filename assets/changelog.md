@@ -12,6 +12,67 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — `lp-risk` can be asked for a proof, and it certifies a bracket rather than a number
+
+**What a caller sees change.** `POST /api/lp-risk` and the free `lp_risk` MCP tool accept
+`{"snark": true}` and answer with a `snark` block carrying a retrieval URL, a `proves` string, a
+`doesNotProve` string, and `/proof/vk/lpbracket` for the verification key. Requests that do not carry
+the flag are byte-identical to what they were: both pinned lp-risk fixtures were re-measured and their
+contentHashes are unmoved, with and without the flag, and the engine build hash
+`q1-e1fa99d08887d6cc` does not move because nothing under `src/engine` was touched. A caller who was
+already sending `{"snark": true}` to this endpoint was having it hashed and ignored; that caller's
+contentHash moves once, onto the hash the identical body without the flag has always returned.
+
+**What is proven.** `feeVsDivergence.breakevenVolatility` — the per-period volatility at which expected
+divergence exactly eats the horizon's fees. The engine finds it by bisecting 200 times over a 401-point
+quadrature, which is 163,608 exponentials and 82,016 square roots for one served answer, measured. The
+circuit evaluates that quadrature **zero times**. A bisection result does not have to be recomputed to be
+certified; it has to be LOCATED, and a bracket is a closed-form object: `g(lo) > 0`, `g(hi) <= 0`,
+`lo < hi`, the root at the midpoint to one grid step, a published width bound, and the volatility pinned
+on the squared quantity `sigHat^2 * horizonT = vStar * 1e9`. Six inequalities over thirteen public
+integers, in 1,776 Plonk constraints — the cheapest circuit on this host, against the most expensive
+computation the service performs.
+
+**What is NOT proven, and it is the larger half.** The two endpoint expectations the bracket straddles
+with are the engine's quadrature. They arrive as PUBLIC INPUTS and nothing in the circuit certifies them,
+so a caller who supplies two wrong numbers that happen to straddle gets a valid proof of a false
+breakeven. They are published among the signals and on the proof record for exactly that reason, and each
+can be checked in one line: `E[IL](v) = exp(-v/8) - 1` is exact — `2*sqrt(r)/(1+r) = sech(ln r/2)`, and
+shifting `z = w + sqrt(v)/2` leaves `sech` against a pdf that gains `cosh`, whose product is 1. That
+closed form agrees with the engine's quadrature to at most **1.419121e-9**, which is 71.92% of the
+Gaussian weight the engine's `|z| <= 6` window discards — so the gap is the engine's truncation, not
+either side's arithmetic. It is also more than one grid step, which is why the closed form is the
+cross-check and the engine's quadrature is what gets encoded.
+
+`expectedDivergence.expectedIlPct`, the percentage this service leads with, IS that assumed quadrature
+and is not covered. `realizedIL` belongs to a different circuit. Monotonicity of expected divergence in
+variance — what makes a straddled root unique — is established by sweep, not by any proof.
+
+**The bound, and what the worst honest case uses of it.** `breakevenVolatility` is published as
+`round(sigma, 5)`, so the display half-unit is 0.5e-5 — a hundred times finer than the liquidation
+guard's half-cent and ten times coarser than the Kelly guard's half-millionth, which is why it is a sixth
+constant rather than a reuse. Swept over 882 real answers: 756 proved, 112 have no breakeven at all
+(horizon fees exceed the 100% a bounded loss can reach), **14 refused by the ceiling**, and **0** exceeded
+the bound. The worst honest case uses **99.7384%** of the derived bound. The ceiling is reached, not
+defensive: `sqrt(v/T)` has unbounded slope at zero, so below about 0.012% fee APR at a one-period horizon
+the coarsest bracket whose straddle survives the 1e-9 grid maps to a wider range of volatilities than the
+five decimals the figure is published at, and those answers are refused with the measured number rather
+than served a proof of a neighbouring breakeven.
+
+The comparison is against the engine's UNROUNDED bisection, replayed in
+`src/util/lpBracket.js`, not against the served five-decimal figure. An equality on the rounded value
+refused 28 of 770 honest answers, all of them sitting on a 5th-decimal boundary — the same defect that
+once refused RUNE a liquidation proof for landing a hair the wrong side of a half-cent.
+
+**How to check it.** `node --test gates/gateLP-bracket-snark.mjs` — 13 checks, including 13 of 13 moved
+public signals refused, a bent proof point refused, 9 of 9 dishonest witnesses refused before a proof
+exists, and a smallest rejected volatility perturbation of one grid step (1e-9).
+`node gates/gateLP-revert.mjs` puts seven defects back one at a time and requires the gate to go red for
+each. Two of those seven were GREEN on the first run, which is how the gate acquired the two checks it
+was missing; `docs/wire-lp-risk.md` records both, with the numbers.
+
+---
+
 ## 30 July 2026 — the `ncdf` verification key changed, because the circuit behind it did
 
 **What a caller sees change.** `/proof/vk/ncdf` serves a different verification key than it did earlier

@@ -18,7 +18,6 @@ import { perpGate } from './engine/perpGate.js';
 import { sizeGate } from './engine/sizeGate.js';
 import { execVerify } from './engine/execVerify.js';
 import { optionsRisk } from './engine/optionsRisk.js';
-import { lpRisk } from './engine/lpRisk.js';
 import { treasuryRisk } from './engine/treasuryRisk.js';
 import { riskAttest } from './engine/riskAttest.js';
 import { eventVol } from './engine/eventVol.js';
@@ -34,7 +33,7 @@ import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 // every tool with a body a caller would actually send.
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground } from './util/snark.js';
 // Same encoder the paid surface uses, imported rather than restated so the two cannot drift into two
 // accounts of why one answer has no proof.
 import { ncdfWitnessFor } from './util/ncdfWitness.js';
@@ -44,6 +43,11 @@ import { suggestService } from './util/routing.js';
 import { repairBody, correctedExample, enumViolations, enumRefusal } from './util/repair.js';
 import { timedRun } from './util/timing.js';
 import { sealContentHashRecipe } from './util/recipe.js';
+// Same wrapper the paid HTTP surface uses for lp-risk, imported rather than restated so the free and
+// paid surfaces cannot drift into two verdicts about one call. See src/util/lpBoundedness.js.
+import { lpRiskEnvelope } from './util/lpBoundedness.js';
+// And the same `snark` block builder the paid surface uses, for the same reason: one claim, one file.
+import { lpBracketSnark } from './util/lpBracket.js';
 
 // ── Capability metadata (MCP 2025-06-18: title / annotations / outputSchema) ────────────────────────────
 // outputSchema property sets mirror the REAL top-level keys each engine returns (captured by running the
@@ -480,7 +484,25 @@ const TOOLS = [
       feeVsDivergence: { description: 'net forecast and breakeven volatility vs the fee APR' },
       model: { description: 'model assumptions used' },
     }),
-    run: (a) => proofEnvelope('lp-risk', a, lpRisk(a), config.version),
+    // The engine's boundedness self-check fails on a correct high-volatility answer because it ranges
+    // over its own rounded display value; re-evaluated on the exact fraction outside the hashed tree.
+    run: (a) => {
+      // Same wiring as the paid HTTP handler, and the `proves` / `doesNotProve` pair is not restated
+      // here: `lpBracketSnark` builds it once for both surfaces. See src/services.js for why no field
+      // on this endpoint is grid-snapped and why `volatility` reaches no circuit at all.
+      const { snark: wantSnark, ...raw } = a;
+      const env = lpRiskEnvelope(raw, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        const { why, snark } = lpBracketSnark({
+          contentHash: env.proof.contentHash,
+          result: env,
+          note: 'A PLONK proof of the breakeven BRACKET is being built off this request path — the answer above did not wait for it. Poll retrieveAt; 202 means still building. It certifies WHERE the root of "expected divergence == horizon fees" lies, in 1,776 constraints, against a bisection the engine runs 200 times over a 401-point quadrature. It does NOT certify that quadrature: read doesNotProve before you rely on this.',
+        });
+        if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
+        env.snark = snark;
+      }
+      return env;
+    },
   },
   {
     name: 'treasury_risk',

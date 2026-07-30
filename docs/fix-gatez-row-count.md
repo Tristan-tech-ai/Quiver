@@ -151,25 +151,25 @@ the one its sentence appeared to ask. Both denominators, measured:
 | 199,061,444 B in 654 files | the repository at `620c041^`, the commit before this work | `git ls-tree -r -l` summed |
 | 762,139,277 B (726.8 MiB) | the derived binaries the four adversaries produced and this repository does not carry | §2's own class table, which sums exactly to it |
 
-Against the current committed set of 5,383,102 B / 581,414 B of text:
+Two numerators, and the distinction matters because one of them is the set the brief was reporting on and
+the other is the set as it stands after this fix added two gates to it:
 
-| ratio | value |
-|---|---|
-| **repository growth**, ceremony file included | **2.70%** |
-| **repository growth**, ceremony file excluded | **0.29%** |
-| share of the derived binaries left out, included | **0.706%** |
-| share of the derived binaries left out, excluded | **0.076%** |
+| numerator | repo growth (incl. / excl. ceremony) | share of the derived binaries |
+|---|---|---|
+| **5,377,931 B / 576,243 B** — the set as the write-up defined it, its own bytes included | **2.70% / 0.29%** | 0.706% / 0.076% |
+| **5,385,805 B / 584,117 B** — the set as committed now, write-up excluded, two new gates in | **2.71% / 0.29%** | 0.707% / 0.077% |
 
-So the reported +2.70% / +0.29% is confirmed, and the published 0.706% / 0.076% was **measured against a
-different baseline** — the discarded artifacts, not the repository. The shipped sentence read "the
-repository grows by **0.706%** of what the refutations produced", which is true if the trailing clause is
-read as the denominator and false as it will be read. Both ratios are now stated with their denominators
-attached in their own sentences, and both are asserted; near-four-times is too large a gap to leave to a
-reader's parse.
+So **the reported +2.70% / +0.29% is confirmed exactly** for the set the report was about, and the
+published 0.706% / 0.076% was **measured against a different baseline** — the discarded artifacts, not
+the repository. The shipped sentence read "the repository grows by **0.706%** of what the refutations
+produced", which is true if the trailing clause is read as the denominator and false as it will be read.
+Both ratios are now stated with their denominators attached in their own sentences, and both are
+asserted; near-four-times is too large a gap to leave to a reader's parse.
 
-The published pair happens to still round to 0.706% / 0.076% after this session's additions, which is a
-coincidence and not a confirmation: the numerator moved from 5,377,786 to 5,383,102 and the third decimal
-did not.
+Worth noticing in that table: this fix's own two gates moved the *third* decimal of the derived-binaries
+share, 0.706% → 0.707%. That is the drift the gate now catches, and it caught it during this session —
+the figure was written as 0.706% four times while the gate files were still being edited, and went red
+each time until it was recomputed.
 
 ---
 

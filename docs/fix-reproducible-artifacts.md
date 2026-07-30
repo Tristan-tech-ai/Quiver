@@ -94,7 +94,7 @@ step needs a download, write the fetch with a checksum assertion.**
 | artifact class | decision | reason |
 |---|---|---|
 | 37 `.circom` | **commit** — 245,992 B | text, and the only irreducible input. Six of them are generator output and are checked against a regeneration |
-| 47 probe/gate `.mjs` | **commit** — 313,525 B | text. These *are* the refutations. Two of them, `figures.mjs` and `gateZ2-repro-figures.mjs`, check this document rather than a circuit |
+| 47 probe/gate `.mjs` | **commit** — 316,228 B | text. These *are* the refutations. Two of them, `figures.mjs` and `gateZ2-repro-figures.mjs`, check this document rather than a circuit |
 | 5 `probe*.json` from the original run | **commit** — 5,701 B | the original verdicts, for comparison against a re-run |
 | `MANIFEST.json`, `README.md` | **commit** — 16,196 B | the pins and the map |
 | `.r1cs`, `.sym`, `.wasm` | **script** | deterministic circom output. 23.7 MiB regenerated in ~2 s per circuit |
@@ -105,8 +105,8 @@ step needs a download, write the fetch with a checksum assertion.**
 | every other `.ptau` | **script** | see §5. 270 MiB more, and not byte-reproducible when generated |
 | `build/pot12_final.ptau` | **neither** | it is `hez_final_12.ptau` with a different name and the same sha256. Committing a byte-identical duplicate would be 4.58 MiB spent on nothing |
 
-**Total committed: 5,383,102 bytes (5.13 MiB) across 92 files**, read out of `git ls-tree` at HEAD —
-581,414 bytes (567.8 KiB) of text in 91 files, plus the 4,801,688-byte ceremony file, plus 12 lines of
+**Total committed: 5,385,805 bytes (5.14 MiB) across 92 files**, read out of `git ls-tree` at HEAD —
+584,117 bytes (570.4 KiB) of text in 91 files, plus the 4,801,688-byte ceremony file, plus 12 lines of
 `.gitattributes`. Every figure in this section is asserted by `npm run gate:z2`, which recomputes it
 from `git ls-tree` and goes red on a disagreement; the five ways it can go red are in `gate:z2-revert`.
 
@@ -123,19 +123,19 @@ and why the two other honest resolutions are worse. Its size, if you want it:
 |---|---|---|
 | `zk/circuits/adv/` — the `.circom` pinned in `MANIFEST.json` | 245,992 | 37 |
 | `zk/scripts/adversary/` | 319,864 | 50 |
-| `gates/gateZ*.mjs` — the two gates and their two reverts | 15,558 | 4 |
+| `gates/gateZ*.mjs` — the two gates and their two reverts | 18,261 | 4 |
 | `zk/build/hez_final_12.ptau` | **4,801,688** | 1 |
-| **total** | **5,383,102** | **92** |
+| **total** | **5,385,805** | **92** |
 
 Two growth statements, each naming its own denominator, because the first version of this paragraph
 did not and was read as the other one.
 
 <!--figures:growth-repo-->Against the repository as it stood at `620c041^` (199,061,444 bytes in 654
-files), this work grows it by **2.70%**, or **0.29%** with the ceremony file excluded.
+files), this work grows it by **2.71%**, or **0.29%** with the ceremony file excluded.
 
 <!--figures:growth-derived-->Against the 762,139,277 bytes (726.8 MiB) of derived binaries §2
-enumerates and this repository deliberately does not carry, what is committed is **0.706%** of it, or
-**0.076%** with the ceremony file excluded.
+enumerates and this repository deliberately does not carry, what is committed is **0.707%** of it, or
+**0.077%** with the ceremony file excluded.
 
 The published figure used to be "the repository grows by 0.706%". That is the second ratio wearing the
 first one's sentence: 0.706% is committed bytes over *discarded artifacts*, and against the repository
@@ -509,7 +509,10 @@ document — the mirror's `docs/fix-reproducible-artifacts.md` and the submissio
   bytes rather than by grepping for the import, which is what produced eight false positives the last
   time it was attempted.
 
-Five reverts, one per shipped defect rather than one per line of code:
+Five reverts, one per shipped defect rather than one per line of code. `mirror-drop` is the one that
+cannot be exercised inside a clone — there is no second tree to drop a file from — and the harness marks
+it `n/a` there rather than green, granting the exemption only when the gate itself reported that row
+skipped:
 
 ```
   (unmodified)        exit   0 ·  0 red rows · green, so the reverts below mean something
@@ -519,7 +522,7 @@ Five reverts, one per shipped defect rather than one per line of code:
   derived-denominator exit   1 ·  2 red rows · the gate FAILED as required
   mirror-drop         exit   1 ·  1 red rows · the gate FAILED as required
 
-GATE Z2 REVERT: PASSED — all 5 assertions are load-bearing
+GATE Z2 REVERT: PASSED — all 5 exercised assertions are load-bearing
 ```
 
 ---

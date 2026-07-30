@@ -54,8 +54,39 @@ if (base.status !== 0 || base.red !== 0) {
   process.exit(1);
 }
 
+// ONE MODE IS INAPPLICABLE IN A CLONE, AND THE EXEMPTION IS GRANTED BY EVIDENCE, NOT BY A FLAG.
+//
+// `mirror-drop` breaks the dev-tree/mirror comparison, and inside a clone there is no second tree to
+// compare against — the mirror IS the tree — so gate Z2 reports that row as `skipped` and breaking it
+// changes nothing. Running the harness in a clone therefore reported "THE GATE STAYED GREEN" for a
+// structural reason, which reads as a broken gate and is not one.
+//
+// The exemption is derived from the BASELINE OUTPUT rather than from an "am I in a clone" test: the mode
+// is excused only if the unmodified gate itself declared that row skipped. If the gate is asserting the
+// mirror row and `mirror-drop` still comes back green, that is a decoration and it is reported as one.
+// An exemption that a checker grants itself on request is how a verifier stops being able to fail.
+//
+// It reads the gate's own `mirror-check:` line and nothing else. The first version of this scraped the
+// prose — `/dev tree[\s\S]{0,200}?skipped/` — and matched the word "skipped" in the summary count two
+// lines below, so it excused the mode in a working tree where the row was live and asserting. A
+// one-line machine-readable statement from the gate is the fix; a wider regex would not have been.
+const mirror = (base.out.match(/^\s*mirror-check: (\w+)\s*$/m) || [])[1];
+if (!mirror) {
+  console.log('\nGATE Z2 REVERT: FAILED — the gate printed no `mirror-check:` line, so this harness cannot'
+    + ' tell whether mirror-drop is applicable. Guessing would be the defect this line exists to prevent.');
+  process.exit(1);
+}
+const MIRROR_SKIPPED = mirror === 'skipped';
+const INAPPLICABLE = MIRROR_SKIPPED ? { 'mirror-drop': 'the mirror row is skipped in this checkout — no second tree to drop from' } : {};
+
 let bad = 0;
+let na = 0;
 for (const mode of MODES) {
+  if (INAPPLICABLE[mode]) {
+    na++;
+    console.log(`  ${mode.padEnd(20)}${'n/a'.padStart(8)} · ${INAPPLICABLE[mode]}`);
+    continue;
+  }
   const r = run(mode);
   const { out, red } = r;
   // Exit 1 with no red row is NOT a pass: figures.mjs throws on an unparseable document and that also
@@ -66,7 +97,8 @@ for (const mode of MODES) {
     + (wentRed ? 'the gate FAILED as required' : '*** THE GATE STAYED GREEN — assertion is decoration ***'));
   if (!wentRed) console.log(out.split('\n').slice(-6).map((l) => `      ${l}`).join('\n'));
 }
+const ran = MODES.length - na;
 console.log(`\nGATE Z2 REVERT: ${bad === 0
-  ? `PASSED — all ${MODES.length} assertions are load-bearing`
-  : `FAILED (${bad} of ${MODES.length} could not be broken)`}`);
+  ? `PASSED — all ${ran} exercised assertions are load-bearing${na ? `, ${na} inapplicable here` : ''}`
+  : `FAILED (${bad} of ${ran} could not be broken)`}`);
 process.exit(bad === 0 ? 0 : 1);

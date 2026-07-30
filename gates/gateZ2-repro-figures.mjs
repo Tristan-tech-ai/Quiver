@@ -82,6 +82,14 @@ for (const r of out.rows) {
   const mark = r.ok === null ? 'skipped' : r.ok ? 'ok' : '*** FAIL ***';
   console.log(`  ${r.label}\n      ${r.value}  ${mark}`);
 }
+// A machine-readable line for gateZ2-revert.mjs, because one of its five modes — `mirror-drop` — is
+// inapplicable in a checkout with no second tree, and it must learn that from THIS gate rather than
+// guess. The first version of that harness scraped the prose with a regex, which matched the word
+// "skipped" in the summary line below and excused the mode in a working tree where the row was live.
+// A test whose exemption is decided by a substring is an exemption granted by accident.
+const mirrorRow = out.rows.find((r) => r.kind === 'mirror');
+console.log(`\n  mirror-check: ${!mirrorRow ? 'absent' : mirrorRow.ok === null ? 'skipped' : 'asserted'}`);
+
 const skipped = out.rows.filter((r) => r.ok === null).length;
 console.log(`\n  ${out.rows.length - skipped - out.fails} pass  ${out.fails} fail  ${skipped} skipped`);
 console.log(`  ${out.fails === 0 ? 'GATE Z2: PASSED' : `GATE Z2: FAILED (${out.fails})`}`);

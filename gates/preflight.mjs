@@ -233,10 +233,45 @@ for (const surface of ['http', 'mcp']) {
 check('the proof-emitting handlers are actually visible to this check',
   emitting.length > 0,
   emitting.length ? `found ${emitting.join(', ')}` : `NOTHING MATCHED across ${handlers.length} handlers — this check proved nothing`);
+// ── THE GUARD ABOVE ASSUMED ONE GRID, AND A FIFTH CIRCUIT BROKE THE ASSUMPTION ───────────────────
+//
+// "snaps its inputs onto THAT grid" meant the 1e-9 grid, because every circuit this host proved
+// against carried its quantities as integers scaled by 1e9. `ncdf.circom` does not: it carries them
+// at 2^-40, and its public signals are not caller fields at all. They are (x, N(x), φ(x)) — three
+// quantities the ENGINE derives, each rounded exactly once onto the 2^-40 grid inside
+// src/util/ncdfWitness.js. There is no caller field to snap, and snapping `spot`, `atmIvPct` or
+// `daysToEvent` onto 1e-9 would move a content hash for every off-grid caller while changing nothing
+// about what the circuit is handed.
+//
+// That argument is not new. size-gate makes it about `bankroll` and `kellyFraction`, and
+// treasury-risk about `apyPct`, `pegTarget` and `depegProbAnnual`: snapping a field no circuit can
+// see moves a hash and buys nothing. What is new is that for event-vol it applies to EVERY caller
+// field, so the handler snaps nothing at all and the blanket form of this check called that a defect.
+//
+// So the exemption is by NAME, with the grid written down, and the list is policed in both
+// directions: a listed handler that does not emit a proof, or that has quietly started snapping, is
+// as much a drift as an unlisted one that does neither. A new proof-emitting handler that neither
+// snaps nor appears here still goes red, which is the failure this check exists for.
+const OTHER_GRID = {
+  'http:event-vol': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)), not caller fields',
+  'mcp:event_vol': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)), not caller fields',
+};
+const unsnapped = handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map(id).sort();
 check('every handler that builds a zk proof snaps its inputs onto that grid first — on BOTH surfaces',
-  handlers.every((h) => !EMITS_ZK.test(h.body) || SNAPS.test(h.body)),
-  handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map(id).join(', ')
-    || `${emitting.join(', ')} snap; the other ${handlers.length - emitting.length} build no proof`);
+  handlers.every((h) => !EMITS_ZK.test(h.body) || SNAPS.test(h.body) || OTHER_GRID[id(h)]),
+  handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body) && !OTHER_GRID[id(h)]).map(id).join(', ')
+    || `${emitting.filter((e) => !OTHER_GRID[e]).join(', ')} snap onto 1e-9; ${Object.keys(OTHER_GRID).join(', ')} prove over a different grid and are exempted by name; the other ${handlers.length - emitting.length} build no proof`);
+// The exemption list is not allowed to rot. Every entry must still be a proof-emitting handler that
+// still does not snap — otherwise it is either dead or it is hiding a handler that has changed shape.
+//
+// A SUBSET, NOT AN EQUALITY, and the difference is deliberate. An equality here would make this check
+// fail whenever ANY other handler is unsnapped — which is the check directly above's job, reported in
+// its own words, naming the handler. Asserting it twice would mean a future handler's missing entry
+// showed up as two failures with one cause, and the second of them would be blaming this list for
+// something that is not in it.
+check('every grid exemption is still earned by the handler it names',
+  Object.keys(OTHER_GRID).every((k) => emitting.includes(k) && unsnapped.includes(k)),
+  `exempted [${Object.keys(OTHER_GRID).sort().join(', ')}] · actually unsnapped [${unsnapped.join(', ')}]`);
 // FOUR ENTRIES NOW, AND EACH ADDITION IS A DECISION RECORDED HERE RATHER THAN A DRIFT NOTICED LATER.
 //
 //   http:perp-gate / mcp:perp_gate   the liquidation identity, over `liquidation_plonk.zkey`.
@@ -279,9 +314,19 @@ check('every handler that builds a zk proof snaps its inputs onto that grid firs
 //     so half a grid step on the effective input moves the fill by 2.7e-6 tokens, and the guard's
 //     ceiling is what refuses that trade rather than certifying a neighbouring one.
 //
+//   http:event-vol / mcp:event_vol   the standard normal CDF at the ATM point, over `ncdf_plonk.zkey`.
+//     Grid: NOTHING, and the emptiness is the decision — see the OTHER_GRID block above. This is the
+//     first circuit here that certifies a TRANSCENDENTAL rather than an arithmetic rearrangement, and
+//     the first that serves a circuit built for another purpose with no new circuit and no new
+//     ceremony. It reaches only because the straddle is struck AT the forward: K = F kills ln(F/K),
+//     so d1 = σ√T/2 and the ATM straddle is 2S(2N(d1) − 1) — one CDF point. options-risk's d1 is not,
+//     which is why options-risk still has no proof and is not on this list.
+//     Covered: `expectedMove.straddleImpliedAbsMoveUsd`, one field of six.
+//
 // The list is written out rather than counted so that adding a service cannot pass by arithmetic.
 check('the proof-emitting set is the one that has been checked',
-  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify'].sort()),
+  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'http:event-vol', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify', 'mcp:event_vol'].sort()),
+
   `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
 
 // AND EACH CIRCUIT'S ARTIFACTS ARE ACTUALLY IN THIS BUILD. A handler that emits a proof against a key
@@ -293,6 +338,9 @@ for (const [circuit, files] of Object.entries({
   kelly: ['kelly_plonk.zkey', 'kelly_vk.json', 'kelly_js/kelly.wasm', 'kelly_js/witness_calculator.cjs'],
   concentration: ['concentration_plonk.zkey', 'concentration_vk.json', 'concentration_js/concentration.wasm', 'concentration_js/witness_calculator.cjs'],
   execadverse: ['execadverse_plonk.zkey', 'execadverse_vk.json', 'execadverse_js/execadverse.wasm', 'execadverse_js/witness_calculator.cjs'],
+  // 10,262,700 bytes of proving key, measured — the largest single artifact this deploy carries, and
+  // the reason proverWorker.mjs loads every circuit lazily rather than at boot.
+  ncdf: ['ncdf_plonk.zkey', 'ncdf_vk.json', 'ncdf_js/ncdf.wasm', 'ncdf_js/witness_calculator.cjs'],
 })) {
   const missing = files.filter((f) => !existsSync(join(ROOT, 'assets', 'zk', f)));
   check(`every artifact the ${circuit} circuit proves against is in this build`, missing.length === 0,

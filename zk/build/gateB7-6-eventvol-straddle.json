@@ -1,0 +1,84 @@
+{
+  "at": "2026-07-30T04:13:35.802Z",
+  "passed": true,
+  "circuitParams": {
+    "S": 40,
+    "TOLC": 12,
+    "TOLP": 10,
+    "ZSPLIT": 7774721279939
+  },
+  "serviceParams": {
+    "S": 40,
+    "ONE": 1099511627776,
+    "ULP": 9.094947017729282e-13,
+    "TOLC": 12,
+    "TOLP": 10,
+    "ZSPLIT": 7774721279939
+  },
+  "points": {
+    "legs": 40000,
+    "d2EqNegD1": 15923,
+    "worstCollapseUlp": 0.0003662109375,
+    "worstPointGapUlp": 0.00146484375,
+    "xMax": 1.5607144174984429
+  },
+  "guard": {
+    "servedLegsCertified": 20000,
+    "servedLegsRefused": 0,
+    "worstUsedEncodingBound": 0.9999150248354288,
+    "worstUsedBuyerEnvelope": 0.04098715279986541,
+    "exceedances": 0,
+    "spotCeiling": 112659763.48875844,
+    "derived": 112659763.60163654
+  },
+  "honestEngineInsideCircuitTolerance": {
+    "legs": 20000,
+    "usedC": 0.20710661199725772,
+    "usedP": 0.21151862510629768
+  },
+  "served": {
+    "contentHash": "8d653115a9c4e8752725a63288b283c5c10c25be2ee63b92b0e48f82ba09fd8a",
+    "status": "ready",
+    "straddleFromProofUsd": 3645.45397918846,
+    "gapToServedUsd": 0.0039791884601072525,
+    "envelopeUsd": 0.000002662911693299222
+  },
+  "wrongCdf": [
+    {
+      "name": "Abramowitz-Stegun 7.1.26",
+      "legs": 8000,
+      "worstRelStraddle": 0.0000068676406228107955,
+      "meanRelStraddle": 6.137511081856618e-7,
+      "refused": 7999,
+      "denom": 8000,
+      "refusalRate": 0.999875,
+      "worstUlpOverBound": 6385.159776721342,
+      "underBound": 1,
+      "accepted": 1,
+      "tried": 1
+    },
+    {
+      "name": "logistic 1.702x",
+      "legs": 8000,
+      "worstRelStraddle": 0.06657002420958058,
+      "meanRelStraddle": 0.04473942594176867,
+      "refused": 8000,
+      "denom": 8000,
+      "refusalRate": 1,
+      "worstUlpOverBound": 869193665.2342906,
+      "underBound": 0,
+      "accepted": 0,
+      "tried": 0
+    }
+  ],
+  "plonkConstraints": 3740,
+  "domainSize": 4096,
+  "nPublic": 7,
+  "proveMs": 2168,
+  "evm": {
+    "acceptGas": "274654",
+    "rejectGas": "573",
+    "deployedSize": 7080,
+    "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang"
+  }
+}

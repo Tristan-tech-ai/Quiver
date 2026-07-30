@@ -37,6 +37,11 @@ import { dirname, join } from 'node:path';
 import { fork } from 'node:child_process';
 import { attestSignals } from './attest.js';
 import * as proofStore from './proofStore.js';
+// The fifth identity's encoder. It lives in its own file because it is the only one that has to call
+// INTO the engine — `black76` and `probAbove`, lifted rather than restated, for the reason the header
+// of that file gives — and this file's dependency set (scale.cjs, attest, proofStore) is deliberately
+// free of src/engine so the engine keeps having no importers below it.
+import { ncdfWitnessFor } from './ncdfWitness.js';
 
 const require = createRequire(import.meta.url);
 const scale = require('./scale.cjs');
@@ -1264,10 +1269,96 @@ async function buildExecOnce(contentHash, echoedInputs, result) {
     .finally(() => { queued--; });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE FIFTH IDENTITY — the normal CDF itself, for `event-vol`.
+//
+// The first one on this host that certifies a TRANSCENDENTAL rather than an arithmetic rearrangement,
+// and the first that reuses a circuit built for a different purpose with no new circuit, no new
+// ceremony and no new verifier — `ncdf.circom` was compiled and gated (zk/scripts/gateB7-5) as a
+// research answer to "erf is where this stops being arithmetic", and served nothing.
+//
+// WHY THE GUARD IS THINNER THAN THE OTHER FOUR, and it is not an oversight. Those four encode CALLER
+// FIELDS onto a 1e-9 grid, so their guards spend most of their length bounding how far the grid moved
+// a quotient of the caller's inputs. This circuit's public signals are not caller fields at all: they
+// are (x, N(x), φ(x)), each DERIVED by the engine and rounded exactly once onto the 2^-40 grid inside
+// src/util/ncdfWitness.js. There is no quotient of caller inputs to bound, which is also why this
+// handler does NOT call `gridSnapFields` — see the block in gates/preflight.mjs, and size-gate's
+// argument for leaving `bankroll` alone, which is the same argument twice.
+//
+// WHAT IS DELIBERATELY NOT PRE-CHECKED. The other four verify the circuit's own integer residuals
+// before spending 700 ms discovering them the hard way. Doing that here needs Hart's 192-entry
+// exponential table and both Horner polynomials, and zk/scripts/gateB7-5 refuses on principle to read
+// them from `build/ncdf-consts.json` because that file and the circuit come from one generator run —
+// so a copy shipped in the service would be a third statement of the same constants with nothing
+// comparing it to the circuit. The gate parses the circom source and sweeps the honest engine against
+// it instead: worst leg uses 20.71% of the 12-ulp CDF bound and 21.15% of the 10-ulp density bound
+// over 20,000 legs. A witness that somehow fell outside surfaces as `failed`, not as a wrong proof.
+
+/**
+ * Build the ATM-straddle CDF proof in the background and record it under the response's content hash.
+ * The fifth twin of `buildInBackground`, separate for the reason the other four are.
+ */
+export async function buildNcdfInBackground(contentHash, echoedInputs, result) {
+  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  claimed.add(contentHash);
+  try {
+    await buildNcdfOnce(contentHash, echoedInputs, result);
+  } catch (e) {
+    put(contentHash, { status: 'failed', error: String((e && e.message) || e).slice(0, 200) });
+  } finally {
+    claimed.delete(contentHash);
+  }
+}
+
+async function buildNcdfOnce(contentHash, echoedInputs, result) {
+  const cold = await proofStore.read(contentHash);
+  if (cold) { store.set(contentHash, cold); return; }
+
+  // ONE CALL, AND EVERY REFUSAL CARRIES ITS OWN SENTENCE. `ncdfWitnessFor` runs the five published-
+  // field equalities, both range conditions the circuit enforces, the display ceiling and the
+  // encoding agreement, and returns `{ reason }` for whichever one broke. Restating those tests here
+  // would be a second copy of a guard, which is what the four sections above each avoided by putting
+  // their arithmetic in one place.
+  const w = ncdfWitnessFor(echoedInputs, result);
+  if (w.reason) { put(contentHash, { status: 'unavailable', error: w.reason }); return; }
+
+  // The one condition that is this file's rather than the encoder's: the queue.
+  if (queued >= MAX_QUEUED) {
+    put(contentHash, { status: 'unavailable', error: `prover busy — ${queued} proofs already queued; retry shortly` });
+    return;
+  }
+  put(contentHash, { status: 'building' });
+  queued++;
+  queue = queue.then(async () => {
+    const { proof, publicSignals } = await prove('ncdf', w.witness);
+    await put(contentHash, {
+      status: 'ready', protocol: PROTOCOL,
+      circuit: 'ncdf',
+      proof, publicSignals,
+      signalsAttestation: attestSignals(publicSignals),
+      encoded: Object.fromEntries(Object.entries(w.encoded).map(([k, v]) => [k, String(v)])),
+      // The reconstruction, published at full precision, because the served field is rounded to two
+      // decimals and the whole point of the bounds below is that they are four orders of magnitude
+      // tighter than that rounding. A reader who only ever sees `3645.45` cannot tell a 1e-8 proof
+      // from a 1e-3 one.
+      straddleFromProofUsd: w.reconstructedUsd,
+      gapToServedUsd: w.gapToServedUsd,
+      gapToEngineUsd: w.gapToEngineUsd,
+      encodingBoundUsd: w.encodingBoundUsd,
+      envelopeUsd: w.envelopeUsd,
+      twoPointCollapseUlp: w.collapseUlp,
+      reconstruct: 'straddleImpliedAbsMoveUsd = 2*spot*(2*nHat/2^40 - 1), with nHat the fifth public signal. The point x = xMag/2^40 is the fourth; check it against your own sigma and horizon by squaring: 4*x^2 = sigma^2*T.',
+      verify: 'snarkjs plonk verify ncdf_vk.json publicSignals proof — the verification key is published at /proof/vk/ncdf',
+    });
+  })
+    .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
+    .finally(() => { queued--; });
+}
+
 // The verification keys, one per circuit. `liquidation` keeps reading `vk_plonk.json` under that
 // exact name — it is the file `/proof/vk` has served since this service had proofs, and renaming it
 // would break a published URL for a cosmetic gain.
-const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json' };
+const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json', ncdf: 'ncdf_vk.json' };
 export const CIRCUITS = Object.keys(VK_FILES);
 
 export function verificationKey(circuit = 'liquidation') {

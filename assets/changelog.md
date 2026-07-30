@@ -12,6 +12,47 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — `event-vol` can now hand you a succinct proof of its expected-move number
+
+**What a caller sees change.** Send `snark: true` to `/api/event-vol` (or the `event_vol` MCP tool) and
+the response grows a `snark` block naming a PLONK proof, built off the request path and fetchable free
+at `/proof/<contentHash>`. It certifies **one** published field —
+`expectedMove.straddleImpliedAbsMoveUsd` — as `2·spot·(2·N(x) − 1)` for a public point `x`, with `N`
+the standard normal CDF **evaluated inside the circuit** by Hart (1968) rather than asserted. Every
+answer that does not ask for a proof is byte-identical to before, including its contentHash. The one
+request shape that does move is a call that was already passing `snark: true` to this service: that key
+used to be hashed into `proof.inputs` and is now read as a preference, exactly as it already was for
+`perp-gate`, `size-gate`, `exec-verify` and `treasury-risk`.
+
+**Why this service and not `options-risk`.** The circuit pins `N(x)` *given* `x`, and pinning
+options-risk's `d1 = [ln(F/K) + ½σ²T]/(σ√T)` needs a logarithm. event-vol's straddle is struck **at the
+forward**, so `K = F`, `ln(F/K) = 0`, and `d1 = σ√T/2` — one point of the CDF, no logarithm. The
+remaining binding, that `x` really is `σ√T/2`, is a squaring a reader performs on the public signals in
+one line; it is **not** in the proof, and the `doesNotProve` field says so.
+
+**The number it pins, and the number it does not.** The certified straddle sits within **±2.663e-6** of
+`2·spot·(2·N(x) − 1)` on a $60,000 spot, against a served precision of 0.005 — so the proof is 1,878x
+tighter than the digit the field is published at, and the record carries `straddleFromProofUsd` at full
+precision so that is visible. Above a spot of about **1.13e8** the circuit's own 12-ulp envelope is
+wider than that last digit, and the proof is **refused with the envelope quoted** rather than served as
+a statement about a neighbouring number. Five of the six published fields are outside it:
+`probabilityMoveBeyond` needs the CDF at six further points, `eventIsolation` is a variance difference
+and a root, `oneSigmaUsd`/`oneSigmaPct`/`rangeOneSigma` contain no transcendental at all, and `checks[0]`
+is a 501-point quadrature — an agreement claim between two computations rather than an identity.
+
+**And the honest size of what it catches.** A service running Abramowitz-Stegun 7.1.26 instead of Hart
+is refused on 99.99% of legs while pricing this particular field only **0.0007%** wrong — on
+options-risk's wider domain the same surrogate is 19.4% wrong. So what the proof buys here is that the
+evaluator is *pinned*, not that you are protected from a large mispricing. A surrogate that is
+economically wrong (a logistic, 6.66% worst) is refused on every leg.
+
+**The engine build hash is still `q1-e1fa99d08887d6cc`. Nothing in `src/engine/` was touched** — the
+whole directory is byte-identical to the mirror. `zk/scripts/gateB7-6-eventvol-straddle.mjs` proves the
+route end to end, including the proof a served response actually points at, and
+`zk/scripts/revert-eventvol-straddle.mjs` turns that gate red four different ways.
+
+---
+
 ## 30 July 2026 — a high-volatility `lp-risk` call no longer ships a failed self-check over a correct answer
 
 **What a caller sees change.** Ask `lp-risk` about an LP position in a 62%-per-period-volatility asset

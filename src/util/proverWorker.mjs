@@ -43,6 +43,11 @@ const CIRCUITS = {
   // optimisation but the thing that makes a fourth circuit affordable at all. A deploy where nobody
   // asks exec-verify for a proof never reads it.
   execadverse: { zkey: 'execadverse_plonk.zkey', dir: 'execadverse_js', wasm: 'execadverse.wasm' },
+  // 10.3 MB, the largest key on this host — 26 range-checked truncating multiplies and a 45-bit
+  // decomposition cost more constraints than any arithmetic identity here. It is also the strongest
+  // case yet for the lazy load: a deploy where nobody asks event-vol for a proof never reads it, and
+  // reading it is 10,262,700 bytes (measured; a share of assets/zk would go stale as siblings land).
+  ncdf: { zkey: 'ncdf_plonk.zkey', dir: 'ncdf_js', wasm: 'ncdf.wasm' },
 };
 // The default is `liquidation` and it is load-bearing rather than tidy: a message from an older
 // parent, or from any caller that has not been taught the field, must keep proving exactly the

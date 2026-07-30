@@ -34,7 +34,10 @@ import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 // every tool with a body a caller would actually send.
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground } from './util/snark.js';
+// Same encoder the paid surface uses, imported rather than restated so the two cannot drift into two
+// accounts of why one answer has no proof.
+import { ncdfWitnessFor } from './util/ncdfWitness.js';
 import { gridSnapFields } from './util/grid.js';
 import { SERVICES, legsFetchedLive } from './services.js';
 import { suggestService } from './util/routing.js';
@@ -597,7 +600,39 @@ const TOOLS = [
       eventIsolation: { description: 'the event\'s own priced-in move, isolated from the term structure (when before/after IVs are given)' },
       method: { description: 'technique + assumptions used' },
     }),
-    run: (a) => proofEnvelope('event-vol', a, eventVol(a), config.version),
+    // THE FOURTH SITE, written in the same edit as the HTTP one. This array has been the forgotten
+    // surface four times. See services.js for why this handler does NOT snap, and for the reasoning
+    // behind every sentence below — the text is deliberately identical so the free and paid surfaces
+    // cannot publish two different accounts of what one proof covers.
+    run: (a) => {
+      const { snark: wantSnark, ...raw } = a;
+      const r = eventVol(raw);
+      const env = proofEnvelope('event-vol', raw, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        const w = ncdfWitnessFor(env.proof.inputs, r);
+        env.snark = {
+          protocol: 'plonk',
+          circuit: 'ncdf',
+          status: w.reason ? 'unavailable' : 'building',
+          ...(w.reason
+            ? { reason: w.reason }
+            : {
+              retrieveAt: `/proof/${env.proof.contentHash}`,
+              verificationKey: '/proof/vk/ncdf',
+              fieldProven: 'expectedMove.straddleImpliedAbsMoveUsd',
+              pointProven: w.point,
+              cdfAtPoint: w.nEngine,
+              envelopeUsd: w.envelopeUsd,
+              encodingBoundUsd: w.encodingBoundUsd,
+            }),
+          proves: 'That the published straddleImpliedAbsMoveUsd is the Black-76 at-the-money straddle for the public point x — 2·spot·(2·N(x) − 1), which at r = 0 IS the risk-neutral expected absolute move E|S_T − S₀| — with N the standard normal CDF EVALUATED INSIDE THE CIRCUIT by Hart (1968), not asserted. Every multiply in that evaluator carries a range-checked remainder, so the prover cannot choose a rounding, and the result is pinned to within 12 ulp of 2^-40 (1.09e-11). The density at the same point is pinned to 10 ulp. x, N(x) and φ(x) are public signals, so a reader sees the point the CDF was taken at rather than being asked to accept a number about it.',
+          doesNotProve: 'That x is σ√T/2 for the vol and horizon you sent. x is a public signal and the circuit takes it as given; binding it to σ and T is one squaring (4x² = σ²T) that a reader performs on the public signals in rational arithmetic — no trust needed, but it is not what the proof asserts. Nor that the vol was read from a real options book: it is an input, and no circuit can attest where a number came from. It also covers ONE field. `probabilityMoveBeyond` needs the CDF at two FURTHER points per threshold — six for the three defaults — and has no proof here. `oneSigmaUsd`, `oneSigmaPct` and `rangeOneSigma` are rational arithmetic with no transcendental in them and no circuit either. `eventIsolation` is a variance difference and a square root, also uncovered. And `checks[0]` is a 501-point quadrature: an agreement claim between two computations rather than an identity over the inputs, which is a different kind of statement and not one this circuit shape can carry.',
+          note: 'A succinct proof over the public Hermez reference string, built off this request rather than inside it; fetch it at the URL above, free. The engine evaluates Hart at d1 AND d2, which are exact negatives on only 39.81% of legs in IEEE-754 (measured over 40,000 legs by zk/scripts/gateB7-6-eventvol-straddle.mjs, which reproduces it); this proof certifies the point d1 and the collapse N(d2) = 1 − N(d1) is charged per leg as `twoPointCollapseUlp` — worst measured 3.662e-4 ulp, 3.05e-3% of the circuit\'s own envelope. Above a spot of about 1.13e8 the 12-ulp envelope is wider than the two decimals this straddle is displayed to, and the proof is refused rather than served as a statement about a neighbouring number.',
+        };
+        if (!w.reason) buildNcdfInBackground(env.proof.contentHash, env.proof.inputs, r);
+      }
+      return env;
+    },
   },
 ];
 

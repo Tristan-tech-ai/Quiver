@@ -104,11 +104,22 @@ if (!process.argv.includes('--write-manifest')) {
       + `    It is 4,801,688 bytes (4.58 MiB) and its sha256 is pinned in ptau.mjs.\n`
       + `    Run:  node zk/scripts/adversary/ptau.mjs fetch 12`);
   }
+  // The fourth gap, found the same way as the third. This gate does not itself need the service tree's
+  // dependencies — it passed 55 assertions in a clone without them — but portfolio probes 1, 2 and 3 do:
+  // they build their witnesses through the SERVICE'S OWN encoder (util/snark.js), which reaches
+  // src/util/attest.js and therefore `ethers`. A gate that goes green while three of the probes it
+  // claims to cover cannot start is a gate narrower than its own name, so this is fatal here.
+  if (!existsSync(path.join(P.VT, 'node_modules', 'ethers'))) {
+    gaps.push(`  the service tree's node_modules is missing (gitignored).\n`
+      + `    portfolio probes 1-3 encode witnesses through util/snark.js, which needs \`ethers\`.\n`
+      + `    Run:  npm install --prefix "${P.VT}"`);
+  }
   if (gaps.length) {
     console.error('\nCANNOT REPRODUCE — the toolchain is incomplete:\n');
     for (const g of gaps) console.error(`${g}\n`);
-    console.error('Both are recorded in docs/fix-reproducible-artifacts.md §9 as the two things a reader');
-    console.error('must supply. Everything else the four refutations need is in the repository.');
+    console.error(`${gaps.length === 1 ? 'It is' : 'All of these are'} recorded in`
+      + ' docs/fix-reproducible-artifacts.md §9 as what a reader supplies.');
+    console.error('Everything else the four refutations need is in the repository.');
     process.exit(2);
   }
   let ver = '';

@@ -462,21 +462,40 @@ Five defects found in the rescued material, four unpatched, each recorded:
 
 ---
 
-## 9. The two things the repository does not carry, and the reader test that found a third
+## 9. The three things a reader supplies, and how the clone test found two of them
 
-**The clone test.** `git clone` of the mirror at `620c041` into an empty directory, then
-`npm run gate:z`:
+**Everything in this section came out of actually cloning the repository and running the gate.** Every
+check that ran inside a working tree passed, which is precisely why none of it surfaced until a clone
+existed. The sequence, in order:
 
-- bare clone → **refuses**, naming `zk/circom.exe` and `zk/node_modules`, exit 2
-- with those two supplied → **still fails**, because `zk/build/hez_final_12.ptau` was not committed
-- with all three → **55 of 55 assertions pass, including all 8 byte-identity pins**
+| clone state | result |
+|---|---|
+| bare clone of `620c041` | **refuses**, naming `zk/circom.exe` and `zk/node_modules`, exit 2 |
+| + circom and the zk dependencies | **still fails** — `zk/build/hez_final_12.ptau` was in no commit |
+| + the ceremony file | **55 of 55 assertions pass**, all 8 byte-identity pins among them |
+| …but `portfolio/probe1` | **crashes** — the service tree's `node_modules` is missing, and probes 1–3 build witnesses through the service's own encoder, which reaches `ethers` |
+| + the service dependencies | **61 of 61**, and `probe1`, `adv-proofs` and `directcheck` all run |
 
-The third gap is now closed by the commit (§3, §5), so a clone needs only the two below. The byte-identity
-rows passing *in a clone* is the load-bearing result: `xamin`, `xapriv`, `xacommit` and `lpclosed2`
-rebuild to zkeys whose sha256 matches artifacts produced last night in a temp directory, from nothing but
-committed inputs.
+Two of those five rows are defects this exercise created for itself and then found: the uncommitted
+ceremony file (now committed, §3/§5) and a gate that went green while three of the probes it claims to
+cover could not start (now a hard refusal). The second is the more instructive one — **a gate can pass 55
+assertions and still be narrower than its own name**, and the only thing that showed it was running a
+probe rather than the gate.
 
-`repro.mjs` refuses before building anything if either is missing, and names it:
+The load-bearing result is that the byte-identity rows pass **in a clone**: `xamin`, `xapriv`, `xacommit`
+and `lpclosed2` rebuild to zkeys whose sha256 matches artifacts produced last night in a temp directory,
+from nothing but committed inputs. And the committed ceremony file comes out of `git clone` with its
+pinned digest intact, `core.autocrlf=true` notwithstanding.
+
+Verified from the clone directly, not only through the gate:
+
+| probe | from the clone |
+|---|---|
+| `options/adv-proofs.mjs` (route A) | spread 2.467e-13, `F·p₁−K·p₂` = 0, price off **$1.754e-7** — identical to the working tree |
+| `portfolio/probe1-groth16-n4.mjs` | 2,736 R1CS, power 12, 4-leg Groth16 zkey on the committed 2^12, **37 of 37** perturbations refused, prove 76 ms |
+| `exec/directcheck.mjs` | **5,011 execution gas**, same three red rows that are the finding |
+
+`repro.mjs` refuses before building anything if any of the three is missing, and names which:
 
 ```
 CANNOT REPRODUCE — the toolchain is incomplete:

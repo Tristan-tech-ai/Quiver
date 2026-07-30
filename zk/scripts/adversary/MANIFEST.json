@@ -111,6 +111,6 @@
     "scripts/adversary/portfolio/probe5-plonk-parity.mjs": "db8a5b9132a1bc366e56e6df9218bb99cc2b98d4fb0b29aa69ddf9f16ee5ee5c",
     "scripts/adversary/ptau.mjs": "546a1a53ebb82b6e6142f9f75a2163d4b2c9d4a64432cadc0a33793e9fa64298",
     "scripts/adversary/r1cs-probe.mjs": "d2a65858778e7f7b2c571c27c1dc883346e86ff6bfcb4a87cd61150de22a0710",
-    "scripts/adversary/repro.mjs": "baad62e988be0f0133162d6ad689a21edfd3211e5ca42c4b6628577b149aab75"
+    "scripts/adversary/repro.mjs": "60b4c97aa765fc2340eb964d31f54c4a6c14aa2bdb75dcfbe82742aa9f19f1c1"
   }
 }

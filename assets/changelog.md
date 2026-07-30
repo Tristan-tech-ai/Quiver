@@ -12,6 +12,45 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 31 July 2026 — the X Layer rail could not be paid, because we told payers the wrong signing domain
+
+**This is the most serious thing found in this round, and it was on the primary rail.** X Layer is the chain
+the ERC-8004 identity lives on and the first entry in every `accepts` array we serve. A buyer following our
+own 402 challenge could not pay it. Not "would be overcharged", not "would get a confusing error": the
+signature they built was rejected by the token, with the request well-formed and the balance present.
+
+**What was wrong.** The 402 challenge publishes `extra: {name, version}` for each rail, and an x402 `exact`
+payer builds the EIP-712 domain for its `transferWithAuthorization` signature out of exactly those two
+strings. We published `{"name":"USDT","version":"2"}`. Read from the token itself at
+`0x779Ded0c9e1022225f8E0630b35a9b54bE713736` on chain 196:
+
+```
+on-chain DOMAIN_SEPARATOR    0xd591d9baf744328d9400b923cb02c9474d367d591ca1ab24d8c4068be527599d
+rebuilt from "USDT" / "2"    0xb219b85d43866ca0283e4ec96d5e1acbbb33416df8f36e6defac5918b55a72a4
+rebuilt from "USD₮0" / "1"   0xd591d9baf744328d9400b923cb02c9474d367d591ca1ab24d8c4068be527599d   ← match
+```
+
+The token's `name()` returns **`USD₮0`**, not `USDT`, and its version is **1**. So every signature a payer
+built from our challenge hashed under a domain the token does not recognise.
+
+**Base was checked in the same run and is correct.** `{"name":"USD Coin","version":"2"}` rebuilds Base's
+separator exactly, which is consistent with the fact that a real 0.01 USDC payment has already settled there.
+The defect was on X Layer only.
+
+**Why nothing caught it.** Every test that touches payment asserts the *shape* of the 402 challenge, and the
+shape was perfect: two rails, correct asset addresses, correct decimals, correct `payTo`, correct amounts.
+Nothing rebuilt the domain those two strings imply and compared it to the chain. A field can be
+well-formed, well-typed, present on both rails, and still wrong in the only way that matters.
+
+**What changed.** The two defaults in `src/config.js`, and both remain overridable by environment, because
+the right answer is a property of the deployed token rather than of our source. `gates/preflight.mjs` now
+rebuilds the separator from whatever the config produces, for every rail, and compares it to the token. A
+rail whose token cannot be read is a **failure** rather than a skip, because a rail nobody can read is a rail
+nobody has checked, and that is exactly how this survived.
+
+**No hash moves.** `src/config.js` is outside `src/engine/`, the codeHash is `q1-e1fa99d08887d6cc` before and
+after, and no contentHash is affected: this changes what a payer signs over, not what any service computes.
+
 ## 30 July 2026 — correcting the verify instruction did not reach the proofs that were already stored
 
 **Fixing the code fixed the future and left the past broken, which is worth stating plainly.** The previous

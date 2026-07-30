@@ -14,8 +14,28 @@ const primaryNet = {
   facilitatorBase: env('OKX_FACILITATOR_BASE', 'https://web3.okx.com/api/v6/pay/x402'),
   facilitatorAuth: 'okx', // OKX facilitator needs signed requests (okxsign.js)
   facilitatorToken: '',
-  eip712Name: env('X402_ASSET_712_NAME', 'USDT'),
-  eip712Version: env('X402_ASSET_712_VERSION', '2'),
+  // MEASURED AGAINST THE TOKEN, 31 July 2026. These two strings go into the 402 challenge as `extra`, and a
+  // payer builds the EIP-712 domain for its `transferWithAuthorization` signature out of them. If they do
+  // not match the token's own domain, the signature is rejected by the token and the rail cannot be paid at
+  // all.
+  //
+  // They did not match. The defaults were 'USDT' and '2'. Read from the contract at
+  // 0x779Ded0c9e1022225f8E0630b35a9b54bE713736 on chain 196:
+  //
+  //   on-chain DOMAIN_SEPARATOR   0xd591d9baf744328d9400b923cb02c9474d367d591ca1ab24d8c4068be527599d
+  //   rebuilt from 'USDT' / '2'   0xb219b85d43866ca0283e4ec96d5e1acbbb33416df8f36e6defac5918b55a72a4
+  //   rebuilt from 'USD₮0' / '1'  0xd591d9baf744328d9400b923cb02c9474d367d591ca1ab24d8c4068be527599d  ← match
+  //
+  // `name()` on that contract returns "USD₮0", not "USDT", and its version is 1. Base was checked the same
+  // way in the same run and MATCHES on 'USD Coin' / '2', which is consistent with the fact that a real
+  // payment has settled there. So this was wrong on the X Layer rail only, which is the rail the ERC-8004
+  // registry lives on and the first entry in every `accepts` array we serve.
+  //
+  // Both stay overridable by env, because the right answer is a property of the deployed token and not of
+  // this file. gates/preflight.mjs now rebuilds the separator from whatever these produce and compares it
+  // to the chain, so a wrong value is caught before it ships rather than by a buyer who cannot pay.
+  eip712Name: env('X402_ASSET_712_NAME', 'USD₮0'),
+  eip712Version: env('X402_ASSET_712_VERSION', '1'),
 };
 
 // Base (second EVM network). The real Base facilitator is Coinbase's CDP x402 service at

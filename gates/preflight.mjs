@@ -21,6 +21,8 @@ import { GENUINE, UNREACHABLE_BY_SHAPE, invalidFixtures, coverageSummary, noisyO
 import { handleRpc, TOOLS } from '../src/mcp.js';
 import { _internal, engineSourceFiles } from '../src/engine/proof.js';
 import { verifyInstruction } from '../src/util/snark.js';
+import { config } from '../src/config.js';
+import { keccak256, encodeAbiParameters, parseAbiParameters, stringToHex } from 'viem';
 import { readFileSync, existsSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
@@ -607,6 +609,61 @@ if (vkDoc) {
     liveSaysField
       ? 'live already carries the corrected wording'
       : 'live still tells callers to hand the whole document to snarkjs, which crashes it — this deploy fixes that');
+}
+
+// ── a payer following our own 402 challenge can actually sign ────────────────────────────────────
+// The challenge publishes `extra: {name, version}` per rail, and a payer builds the EIP-712 domain for its
+// `transferWithAuthorization` signature from exactly those two strings. If they disagree with the token's
+// own domain, the token rejects the signature and the rail cannot be paid — the request is well-formed, the
+// balance is there, and it still fails.
+//
+// It was wrong on X Layer: 'USDT'/'2' against a token whose domain is 'USD₮0'/'1'. Nothing caught it,
+// because every test that touches payment asserts the 402 SHAPE, and the shape was perfect. So this
+// rebuilds the separator from whatever config produces and compares it to the chain.
+const DOMAIN_TYPEHASH = keccak256(stringToHex('EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)'));
+const rebuildSeparator = (name, version, chainId, token) => keccak256(encodeAbiParameters(
+  parseAbiParameters('bytes32, bytes32, bytes32, uint256, address'),
+  [DOMAIN_TYPEHASH, keccak256(stringToHex(name)), keccak256(stringToHex(version)), BigInt(chainId), token],
+));
+// The network config carries no RPC, so one is supplied here. An unmapped rail is a FAILURE rather than a
+// skip: a rail nobody can read is a rail nobody has checked, and quietly passing it is how the X Layer
+// mismatch survived in the first place. Base is env-gated and usually absent from a local config, so this
+// loop normally sees one rail locally and both on the deployed container.
+const RPC_FOR = {
+  'eip155:196': 'https://rpc.xlayer.tech',
+  'eip155:8453': 'https://mainnet.base.org',
+};
+for (const net of config.networks) {
+  const chainId = Number(String(net.network).split(':')[1]);
+  const rpc = net.rpcUrl || net.rpc || RPC_FOR[net.network];
+  if (!rpc) {
+    check(`the ${net.network} token's EIP-712 domain could be read`, false,
+      'no RPC is known for this rail, so its signing domain is UNCHECKED');
+    continue;
+  }
+  let onchain = null;
+  try {
+    const r = await fetch(rpc, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: net.asset, data: '0x3644e515' }, 'latest'] }),
+    });
+    onchain = (await r.json())?.result || null;
+  } catch { onchain = null; }
+  if (!onchain || onchain === '0x') {
+    // Unreachable is not a pass. A rail whose token cannot be read has not been checked, and saying nothing
+    // here is how the original defect survived.
+    check(`the ${net.network} token's EIP-712 domain could be read`, false,
+      `no DOMAIN_SEPARATOR from ${net.asset} — this rail is UNCHECKED, not verified`);
+    continue;
+  }
+  const rebuilt = rebuildSeparator(net.eip712Name, net.eip712Version, chainId, net.asset);
+  check(`a payer can sign for ${net.network} using the extra we publish`,
+    rebuilt === onchain,
+    rebuilt === onchain
+      ? `name ${JSON.stringify(net.eip712Name)} version ${JSON.stringify(net.eip712Version)} rebuilds the chain's separator`
+      : `we publish name ${JSON.stringify(net.eip712Name)} version ${JSON.stringify(net.eip712Version)}, which rebuilds `
+        + `${rebuilt.slice(0, 18)}… but the token's own separator is ${onchain.slice(0, 18)}… — every signature built `
+        + 'from our challenge would be REJECTED by the token');
 }
 
 // ── verdict ──────────────────────────────────────────────────────────────────────────────────────

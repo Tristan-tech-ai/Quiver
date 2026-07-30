@@ -12,6 +12,34 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 31 July 2026 — every one of the 22 answers correctly when asked correctly, and the input-attestation census is confirmed against the paid service
+
+**Verification only, nothing changed.** The earlier sweep left six services returning HTTP 400. Every one of
+those was our caller's fault, not the service's: each declares its required fields in the 402 challenge's
+own `outputSchema.input.body`, and reading that rather than guessing produced bodies all thirteen paid-only
+services accept. **13 of 13 returned 200.** `tape-pulse` wants `{chain, address}`, not a symbol and a bar;
+`exec-verify` wants `{amountIn, amountOutRealized}`. The services were right and the caller was wrong.
+
+**The input-attestation register was then checked against live paid answers rather than against source.**
+`src/util/inputClaims.js` holds the census and it is confirmed: **2 available** (`perp-gate` via HyperEVM
+precompiles, `portfolio-gate` via dYdX ICS-23 store proofs), **3 possible but unbuilt** (`lp-desk`,
+`calldata-x`, `poly-desk`), **1 partial** (`protocol-pulse`), **8 with no mechanism at all**, and **8 that
+need none** because they compute from caller inputs only. `gate:d4`, the negative gate that checks the
+services which *cannot* attest do not claim they can, is **32 of 32**.
+
+**Where the road actually goes.** The three marked possible-unbuilt are the tractable increment, and they
+are tractable for one reason: they read **chain state**, which already has a canonical commitment in the
+block `stateRoot`. An `eth_getProof` makes those inputs verifiable with no new trust assumption and no new
+hardware. The eight marked none read venue APIs, which commit to nothing a third party can check, and no
+amount of circuit work reaches them. That is the honest end of this road: it is a TEE or zkTLS problem, not
+a proving problem.
+
+**A correction to our own measurement, recorded because it is the kind that flatters.** A behavioural probe
+classified 14 of 22 as observation services by looking for an `observation` key on the response. That key is
+the **envelope** — engine, version, codeHash — and every service carries it, so the probe was measuring a
+key name rather than a meaning. It also counted `poly-fill` as deterministic when its 200 carried a refusal,
+because the market slug we sent was invented. The register was right on both and the probe was wrong.
+
 ## 31 July 2026 — all 22 services bought with real money on the rail that had been unpayable
 
 **Verification, not a change.** Immediately after the fix below shipped, every one of the 22 services was

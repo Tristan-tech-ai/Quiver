@@ -968,8 +968,8 @@ this checkout:
 
 | | |
 | --- | --- |
-| adversary circuit sources rescued out of temp into `zk/circuits/adv/` | **37 files**, including `lpclosed2`, `xacommit`, `xamin`, `pg4`–`pg7`, `price40` |
-| of those, present in the published repository | **0** — `git ls-files zk/circuits` returns 22 paths and none is under `adv/` |
+| adversary circuit sources rescued out of temp into `zk/circuits/adv/` | **38 files**, including `lpclosed2`, `xacommit`, `xamin`, `pg4`–`pg7`, `price40`, and `ncdfonesided` |
+| of those, present in the published repository | **37 of 38** — `git ls-files zk/circuits` returns 59 paths and 37 are under `adv/`. This row said **0** and was stale: the rescue was committed. The 38th is `ncdfonesided.circom`, added 30 July and committed with the change that made it necessary — it is `ncdf.circom` as it stood before the range check on its shifted CDF residual was restored, kept so `gateB7-5` §0 and `revert-ncdf-twosided.mjs` can show a claimed at-the-money call delta of 1.0 SATISFYING a constraint system rather than describe it. A defect demonstrated against a file that only exists in one working tree is the exposure this section is about, so this one is not left there. |
 | Plonk zkeys for any of them | **0** |
 | powers-of-tau files on disk | **2**, both power 12, 4,801,688 bytes each |
 | the locally generated 2^13 and 2^17 ceremonies those builds used | **absent** |

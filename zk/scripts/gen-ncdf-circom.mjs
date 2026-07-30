@@ -44,8 +44,15 @@ export const P = {
   //
   // DERIVED in probe-ncdf-tol.mjs, term by term: 19 ulp of accumulated exp error times b/d <= 0.5,
   // plus 3.4e-3 from b, 1.7e-3 from d, plus 1.0023 for the c relation's own remainder = 10.507 ulp,
-  // worst at z = 0. TOLC = ceil + 1. The sweep's worst real leg uses 18.3% of it: the derivation is
-  // conservative because it adds twelve independent truncations as if they all pushed the same way.
+  // worst at z = 0. TOLC = ceil + 1.
+  //
+  // AND THESE ARE HALF-WIDTHS, NOT WIDTHS, which the first generation of this file did not say and
+  // which changes every number derived from it. The constraint emitted below is
+  // `2*resid + tol <= 2*tol`, so the band it enforces is |resid| <= TOL/2 — SIX ulp for the CDF, not
+  // twelve. gateB7-5 divided by TOL and reported 18.3% headroom used; against the band that is
+  // actually enforced the same measurement is 36.6%, and the worst honest residual anywhere on the
+  // domain (not just on a sampled leg) is 2.5428 ulp = 42.4%. TOLC stays at 12 because 2.5428 < 6
+  // with room; what changed is that the number is now measured against the band in force.
   TOLC: 12,
   TOLP: 10,       // one SQRT2PI remainder plus 19/sqrt(2*pi) = 8.580, +1
 };
@@ -179,10 +186,22 @@ function emit(C, P) {
   const bits = (v) => BigInt(v).toString(2).length;
   const bMax = BC.reduce((a, c) => (a * ZSPLIT >> BigInt(S)) + c, 0n);   // b(7.0711), same recurrence
   const dMax = DC.reduce((a, c) => (a * ZSPLIT >> BigInt(S)) + c, 0n);
-  // cShift = 2*(cHat*dHat - eHat*bHat) + (dHat + ONE); cHat <= ONE/2, eHat <= ONE.
-  const NB_R = Math.max(bits(ONE / 2n * dMax), bits(ONE * bMax)) + 2;
-  // pShift = 2*(pHat*SQRT2PI - eHat*ONE) + SQRT2PI; pHat < ONE.
-  const NB_P = Math.max(bits(ONE * SQRT2PI), bits(ONE * ONE)) + 2;
+  // THE WIDTHS ARE THE SHIFT'S, NOT THE PRODUCTS'.
+  //
+  // They used to be sized to the widest product that appears — cHat*dHat and eHat*bHat, ~2^99 — on the
+  // reasoning that LessEqThan's own decomposition would then catch a shift that had wrapped negative.
+  // It does not, and the measurement is in gateB7-5 §0: LessThan(n) decomposes `in[0] + 2^n - in[1]`,
+  // and for a field-negative in[0] = p - v the two wraps CANCEL mod p, leaving 2^n - v - in[1], which
+  // is a perfectly ordinary 101-bit number with bit n clear. So the comparison returned 1 and the
+  // bound was ONE-SIDED: a prover could drive the upper tail arbitrarily far BELOW the truth, which
+  // for x > 0 means claiming a call delta of 1.0, and the price with it.
+  //
+  // A range check on the SHIFT closes it, and the shift is small: an accepted cShift lies in
+  // [0, 2*TOLC*dHat] and an accepted pShift in [0, 2*TOLP*SQRT2PI]. Sizing the two components to THAT
+  // rather than to the products makes the pair cheaper than the broken version, not dearer — the
+  // Num2Bits is added and the LessEqThan shrinks by more than the Num2Bits costs.
+  const NB_R = bits(2n * BigInt(P.TOLC) * dMax);
+  const NB_P = bits(2n * BigInt(P.TOLP) * SQRT2PI);
   const L = [];
   const w = (s = '') => L.push(s);
 
@@ -219,6 +238,9 @@ function emit(C, P) {
   w('//   for the public point x, the public value n is the normal CDF at x, and the public value p is');
   w('//   its density, both evaluated by the recurrences below. The evaluator is pinned, not asserted:');
   w('//   every multiply carries a range-checked remainder, so the prover cannot choose a rounding.');
+  w(`//   The band is TWO-SIDED at |resid| <= TOL/2 — ${P.TOLC / 2} ulp on the CDF and ${P.TOLP / 2} on the density — and it is`);
+  w('//   two-sided only because of the Num2Bits on each shift. The first generation of this file left');
+  w('//   both out and the bound held on one side only; see the block at the c relation.');
   w('//');
   w('// ── WHAT IS NOT ──');
   w('//   this pins n GIVEN x. It does not pin x. For options-risk, x is d1 or d2, and pinning those');
@@ -266,8 +288,8 @@ function emit(C, P) {
   w(`    var S      = ${S};`);
   w(`    var ONE    = ${ONE};                 // 1.0`);
   w(`    var NB_X   = ${NB_X};`);
-  w(`    var NB_R   = ${NB_R};                       // derived: max(cHat*dHat, eHat*bHat) + 2, not rounded up`);
-  w(`    var NB_P   = ${NB_P};`);
+  w(`    var NB_R   = ${NB_R};                        // derived: bits(2*TOLC*dHat), the widest ACCEPTED cShift`);
+  w(`    var NB_P   = ${NB_P};                        // derived: bits(2*TOLP*SQRT2PI), the widest ACCEPTED pShift`);
   w(`    var TOLC   = ${P.TOLC};                        // ulp; derived, see the block at the c relation`);
   w(`    var TOLP   = ${P.TOLP};`);
   w(`    var ZSPLIT = ${ZSPLIT};      // 7.07106781186547, where Hart changes branch`);
@@ -365,19 +387,24 @@ function emit(C, P) {
   w('    // here as T*dHat, so the tolerance is TOLC*dHat and TOLC reads directly in ulp.');
   w(`    // TOLC = ${P.TOLC}, DERIVED in probe-ncdf-tol.mjs and not chosen: 19 ulp of accumulated exp error`);
   w('    // times b/d <= 0.5, plus 3.4e-3 from b, 1.7e-3 from d, plus 1.0023 for this relation\'s own');
-  w('    // floor remainder = 10.507 ulp worst, at z = 0. The real engine\'s worst leg uses 18.3% of it,');
-  w(`    // and gateB7-5 shows a value ${P.TOLC + 1} ulp out IS refused — otherwise it is not a bound.`);
+  w('    // floor remainder = 10.507 ulp worst, at z = 0. It is a HALF-width: the constraint below is');
+  w(`    // 2*resid + tol <= 2*tol, so the band in force is |resid| <= TOLC/2 = ${P.TOLC / 2} ulp. The worst`);
+  w(`    // honest residual anywhere on the domain is 2.5428 ulp = ${((2.5428 / (P.TOLC / 2)) * 100).toFixed(1)}% of it, measured over 2e6 points`);
+  w('    // in gateB7-5 rather than over sampled legs, because a sweep of legs does not reach z -> 0.');
   w('    signal lhs;   lhs <== cHat * dHat;');
   w('    signal eb;    eb  <== eHat * bHat;');
   w('    signal resid; resid <== computed * (lhs - eb);');
   w('    signal tolC;  tolC <== TOLC * dHat;');
   w('    signal cShift; cShift <== 2 * resid + tolC;');
-  w('    // NO separate Num2Bits on cShift. LessEqThan(n) already decomposes in[0] + 2^n - in[1] into');
-  w('    // n+1 bits, so a cShift that is out of range — including a field-wrapped negative one — makes');
-  w('    // that decomposition unsatisfiable and the prover cannot produce a witness at all. The extra');
-  w('    // check the sibling circuits carry can only turn an accept into a refusal, never the reverse,');
-  w('    // and it costs NB_R constraints. gateB7-5 confirms the refusal by hand rather than trusting');
-  w('    // this paragraph.');
+  w('    // THE RANGE CHECK THIS CIRCUIT WAS FIRST GENERATED WITHOUT, and the defect it leaves behind is');
+  w('    // the reason nothing was served off it. The removed version argued that LessEqThan(n) already');
+  w('    // decomposes in[0] + 2^n - in[1], so a field-wrapped negative cShift could not produce a');
+  w('    // witness. It can: for in[0] = p - v the two wraps cancel mod p and the comparison sees the');
+  w('    // ordinary number 2^n - v - in[1], bit n clear, out = 1. So the bound was ONE-SIDED — resid');
+  w('    // could go arbitrarily NEGATIVE, i.e. the upper tail arbitrarily below the truth, i.e. a call');
+  w('    // delta of 1.0 on an at-the-money leg. gateB7-5 §0 proves that against the old key and shows');
+  w('    // this line refusing it. Every sibling circuit carried this check; this one alone dropped it.');
+  w('    component rcBits = Num2Bits(NB_R); rcBits.in <== cShift;');
   w('    component cOk = LessEqThan(NB_R); cOk.in[0] <== cShift; cOk.in[1] <== 2 * tolC; cOk.out === 1;');
   w('');
   w('    // ---- the density, which the CDF has already computed ----------------------------------');
@@ -390,6 +417,9 @@ function emit(C, P) {
   w('    signal presid; presid <== computed * (pd - pe);');
   w('    signal tolP;  tolP <== TOLP * SQRT2PI;');
   w('    signal pShift; pShift <== 2 * presid + tolP;');
+  w('    // The same range check, for the same reason. Without it the density bound was one-sided too,');
+  w('    // and the density is what pins x — so a one-sided density is a relocation attack with no cost.');
+  w('    component rpBits = Num2Bits(NB_P); rpBits.in <== pShift;');
   w('    component pOk = LessEqThan(NB_P); pOk.in[0] <== pShift; pOk.in[1] <== 2 * tolP; pOk.out === 1;');
   w('');
   w('    // ---- above the split, the bound ------------------------------------------------------');

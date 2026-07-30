@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-29T23:33:30.292Z",
+  "at": "2026-07-30T04:48:30.155Z",
   "passed": true,
   "params": {
     "S": 40,
@@ -7,11 +7,57 @@
     "groups": 12,
     "TOLC": 12,
     "TOLP": 10,
+    "bandUlpC": 6,
+    "bandUlpP": 5,
     "CDF_TAIL": 2,
     "PHI_TAIL": 8
   },
-  "envelopeAbsoluteN": 1.0913936421275139e-11,
-  "envelopeAbsolutePhi": 9.094947017729282e-12,
+  "envelope": {
+    "bandUlpN": 6,
+    "bandUlpP": 5,
+    "evaluatorUlpN": 2.11004638671875,
+    "evaluatorUlpP": 1.92999267578125,
+    "xGridUlpN": 0.19947114020071635,
+    "xGridUlpP": 0.12098536225957168,
+    "envelopeUlpN": 8.309517526919466,
+    "envelopeUlpP": 7.050978038040822,
+    "envelopeAbsoluteN": 7.55746216502254e-12,
+    "envelopeAbsolutePhi": 6.412827167915404e-12,
+    "envelopeTailAbsoluteN": 2.587719297983367e-12,
+    "honestWorstUlpC": 2.382369963500569,
+    "honestWorstUlpP": 2.328601437627572,
+    "honestFractionOfBandC": 0.3970616605834281,
+    "honestFractionOfBandP": 0.46572028752551436,
+    "priceEnvelopePerContract": {
+      "F1_K1": 1.511492433004508e-11,
+      "F3000_K3000": 4.534477299013524e-8,
+      "F100000_K100000": 0.000001511492433004508,
+      "F100000_K70000": 0.0000012847685680538318,
+      "F100000_K200000": 0.000002267238649506762
+    },
+    "asMispriceBpsOfForwardWorst": 0.00275387226066235,
+    "asMispriceBpsOfForwardMean": 0.000792544737142974,
+    "admittedBpsOfForward": 1.511492433004508e-7
+  },
+  "envelopeAbsoluteN": 7.55746216502254e-12,
+  "envelopeAbsolutePhi": 6.412827167915404e-12,
+  "oneSidedDefect": {
+    "trueDelta": 0.5596176923702425,
+    "claimedDelta": 1,
+    "enginePrice": 11923.53847404851,
+    "liedPrice": 55961.76923702426,
+    "oldAccepts": true,
+    "newRefuses": true
+  },
+  "acceptedBand": {
+    "nLo": -3,
+    "nHi": 8,
+    "nWidth": 12,
+    "pLo": -6,
+    "pHi": 3,
+    "pWidth": 10,
+    "searched": 48
+  },
   "sweep": {
     "samples": 6000,
     "kept": 6000,
@@ -21,8 +67,8 @@
     "badRange": 0,
     "badTail": 0,
     "violations": 0,
-    "worstUsedC": 0.18305315521823962,
-    "worstUsedP": 0.2141087251683551
+    "worstUsedC": 0.36610631043647923,
+    "worstUsedP": 0.4282174503367102
   },
   "tail": {
     "maxC": 7.687298944375103e-13,
@@ -58,7 +104,7 @@
           "missProb": 1.586519141521151e-20
         }
       ],
-      "worstUlpOverBound": 6385.091871519485
+      "worstUlpOverBound": 12770.18374303897
     },
     {
       "name": "logistic 1.702x",
@@ -87,22 +133,22 @@
           "missProb": 0
         }
       ],
-      "worstUlpOverBound": 869145137.284635
+      "worstUlpOverBound": 1738290274.56927
     }
   ],
   "relocationAttack": {
     "legs": 1492,
     "worstShift": 0.000916157065070422,
     "worstPdfUlp": 232127.87094449997,
-    "underPdf": 3,
-    "refusalRate": 0.9979892761394102
+    "underPdf": 1,
+    "refusalRate": 0.9993297587131368
   },
-  "plonkConstraints": 3740,
+  "plonkConstraints": 3812,
   "domainSize": 4096,
   "nPublic": 7,
-  "proveMs": 1678,
+  "proveMs": 1555,
   "evm": {
-    "acceptGas": "273504",
+    "acceptGas": "272990",
     "rejectGas": "573",
     "deployedSize": 7080,
     "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang"

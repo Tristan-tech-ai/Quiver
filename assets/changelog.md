@@ -12,6 +12,49 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — the `ncdf` verification key changed, because the circuit behind it did
+
+**What a caller sees change.** `/proof/vk/ncdf` serves a different verification key than it did earlier
+today, and any `event-vol` proof built before this change no longer verifies. Nothing else moves: no
+service response shape, no contentHash, no other circuit's key, and the engine build hash
+`q1-e1fa99d08887d6cc` is unchanged. If you are holding an `ncdf` proof from earlier today, ask for it
+again — the same request rebuilds it under the new key.
+
+**Why.** `ncdf.circom` bounded its CDF residual with `2·resid + tol <= 2·tol` and, alone among the
+twelve circuits in this repository, did **not** range-check the shifted residual first. The generated
+header argued that `LessEqThan`'s own bit decomposition would catch a field-wrapped negative shift. It
+does not: for `in[0] = p − v` the two wraps cancel mod p and the comparator sees an ordinary in-range
+number. So the bound held on **one side only** — the upper tail could be driven arbitrarily below the
+truth, which for `x > 0` is `N(x)` arbitrarily close to 1.
+
+**What that was worth.** `event-vol`'s straddle is `2·S·(2·N(x) − 1)`, affine and increasing in `N`, so
+the open direction was the direction that inflates. Measured on the service's own witness encoder: at a
+spot of 100,000, 60% vol, 30 days, the served figure is 13,707.88 and the old key admitted a claim of
+**200,000.00 — 1359% high**, against an `envelopeUsd` of 4.4e-6 published in the same response. The
+rebuilt key admits 6 ulp of 2^-40, which is the band the constraint states, and the claim rounds to the
+served figure at the last published digit. `zk/scripts/probe-ncdf-onesided-exposure.mjs` reproduces all
+of it; `zk/scripts/gateB7-5-ncdf.mjs` §0 shows the pre-fix constraint system satisfied by a claimed
+at-the-money call delta of 1.0, worth 369% on a single leg, against the circuit kept for that purpose at
+`zk/circuits/adv/ncdfonesided.circom`.
+
+**What is now true and was not.** The band is two-sided at `TOLC/2 = 6` ulp on the CDF and `TOLP/2 = 5`
+on the density, verified by walking the witness generator out to four times the band in both directions
+and requiring the accepted interval to be closed at both ends. The **envelope to the true CDF** — which
+is what a buyer gets, and is not the same number — is `6 + 2.1100 (the evaluator's own error, against a
+reference that is neither Hart nor Abramowitz–Stegun) + 0.1995 (half a grid step of x) = 8.3095` ulp
+**= 7.5575e-12**. In price terms that is **1.5e-6 quote units per contract on a 100,000 forward at the
+money**, against the 2.8 cents that Abramowitz–Stegun 7.1.26 would misprice the same leg by — a ratio of
+1.8e4, and every consistency identity in `greeksfp`, `greekssigned` and `parity` is satisfied to 3.3e-14
+by A-S and blind to all of it.
+
+**What it cost.** 3,740 → 3,812 Plonk constraints, still inside the 4,096 domain and the same public
+Hermez `hez_final_12` ceremony, because the two range checks were sized to the widest *accepted shift*
+rather than to the widest product, which shrank the two comparisons by more than the checks added.
+Accept gas 272,990 against 273,406 before — inside the measured 1.22% Plonk spread, so unchanged. Full
+detail in `docs/wire-options-risk.md`.
+
+---
+
 ## 30 July 2026 — `event-vol` can now hand you a succinct proof of its expected-move number
 
 **What a caller sees change.** Send `snark: true` to `/api/event-vol` (or the `event_vol` MCP tool) and

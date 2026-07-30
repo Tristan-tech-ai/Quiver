@@ -241,8 +241,9 @@ revert 4 unwires the free one and requires the gate to catch it.
 | `npm run gate:n-revert` | **7 mutations, all red where they should be** |
 | `npm run gate:v` (recipe reproduces + 24 pinned hashes + Appendix C) | see §9 |
 | `npm test` | **386 tests, 0 fail** |
-| `node tools/docs-consistency.mjs` | see §9 |
-| `node gates/preflight.mjs` | see §9 |
+| `node tools/docs-consistency.mjs` | **CONSISTENT — 244 documents** |
+| `node gates/preflight.mjs` | **PASSED** immediately after this change; **now red on three checks that are not this change** — see §9 |
+| `npm run gate:v` · `gate:l` · `gate:p2` · `gate:m` · `gate:a` · `gate:g` | 9 · 8 · 7 · 17 · 11 · 7, all 0 fail |
 
 **Gate N is the one that made the register mandatory.** It re-measures §5's symptom and fails in *either*
 direction — a defect the page hides, or a fix the page has not caught up with — so this change could not
@@ -262,6 +263,27 @@ that a live defect is fixed.
   representable `r > 0`. Disclosed in §5 of the register in those words.
 - **Not deployed.** Deploys are frozen; the live service still answers the old way. `preflight` compares
   against live and its "changelog is ahead of live" check is what keeps that honest.
+- **`preflight` and `gate:n` are red right now, on three and two checks that are not this change.**
+  Measured rather than assumed, because "a sibling did it" is the easiest excuse in a shared tree.
+  Immediately after this change preflight printed **PASSED** with a proof-emitting set of ten that did
+  **not** include lp-risk. A concurrent session then wired the `lpbracket` circuit into both lp-risk
+  handlers — `src/util/lpBracket.js`, `buildLpBracketInBackground`, around the `lpRiskEnvelope` seam this
+  change created — and lp-risk therefore became a proof-emitting handler that does not call
+  `gridSnapFields`, which their own handler comment argues for at length and preflight's pinned set and
+  exemption list have not caught up with. The three reds name `http:lp-risk, mcp:lp_risk` for exactly
+  that reason; `gate:n` §4 and §10 are red because `lpbracket` is now on the paid path and the register
+  does not say so. Neither is reachable from anything in this change: the handler it installed was
+  `run: (i) => lpRiskEnvelope(i, config.version)`, which contains no `env.proof`, no `obs.snark` and no
+  `build*InBackground`, so it could not match preflight's `EMITS_ZK` trigger. Both belong to that
+  session's entry and are left to it.
+- **The revert script's own fragility, found the same way.** `gateLB-revert.mjs` originally anchored its
+  fourth revert on `run: (a) => lpRiskEnvelope(a, config.version),` in `src/mcp.js`. The sibling's
+  wiring replaced that line within the hour and the harness **refused to run** rather than reporting a
+  green — which is the property it was built with, and it earned its keep on the first day. It is now
+  anchored on the call itself. A revert script that patches shared files also races the sessions editing
+  them: it snapshots at start and restores at exit, so a concurrent write inside that window would be
+  rolled back. Verified after each run that `src/mcp.js` still carries all seven of the sibling's
+  `lpbracket` references and no `SCRIPTED REVERT` line survives.
 - **§6 of `KNOWN_DEFECTS.md` is still open and cannot take this treatment.** Its defect *is* a served
   string inside the hash preimage of every divergence call, including the pinned `lp-risk#1` fixture.
   Rewriting it from outside the engine would move those hashes to correct a sentence. That is the line

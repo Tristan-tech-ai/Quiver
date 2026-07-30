@@ -148,7 +148,9 @@ of this service. Reporting 4.1% as though it were slack I chose would be the dis
 sentence.
 
 Confirmed separately over 200,000 legs across a deliberately wider box (spot 1–1.1266e8, vol 1–500%,
-horizon 1h–1000d): worst use **99.9943%**, zero exceedances.
+horizon 1h–1000d): worst use **99.9943%**, zero exceedances. That wider sweep was a **one-off probe, not
+a committed gate** — the number a reader can reproduce from this repository is the 20,000-leg 99.9915%
+above, and it is quoted first for that reason.
 
 ### The ceiling fires
 

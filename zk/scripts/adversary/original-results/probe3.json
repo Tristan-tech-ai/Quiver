@@ -1,0 +1,69 @@
+{
+  "at": "2026-07-30T00:21:31.781Z",
+  "out": {
+    "plonk4": {
+      "nVars": 5234,
+      "nPublic": 37,
+      "domainSize": 8192,
+      "nAdditions": 2522,
+      "nConstraints": 5295,
+      "ptauPower": 13,
+      "setupMs": 2146,
+      "zkeyBytes": 59753176,
+      "proveMs": [
+        4931,
+        3888,
+        3249
+      ],
+      "medianProveMs": 3888,
+      "verified": true
+    },
+    "pgb4": {
+      "nConstraints": 2604,
+      "budget": 2644,
+      "publicSignals": 40,
+      "proveMs": [
+        88,
+        87,
+        72
+      ],
+      "medianProveMs": 87,
+      "verified": true,
+      "perturbationsRefused": 40,
+      "bentAccepted": false,
+      "acceptGas": "455707",
+      "deployedBytes": 5066,
+      "distances": [
+        18.811881188387098,
+        9.547738693467188,
+        11.97183098590625,
+        24.089068870967743
+      ]
+    },
+    "pgb6": {
+      "nConstraints": 3906,
+      "budget": 3966,
+      "publicSignals": 60,
+      "proveMs": [
+        69,
+        70,
+        76
+      ],
+      "medianProveMs": 70,
+      "verified": true,
+      "perturbationsRefused": 60,
+      "bentAccepted": false,
+      "acceptGas": "588667",
+      "deployedBytes": 6963,
+      "distances": [
+        18.811881188387098,
+        9.547738693467188,
+        11.97183098590625,
+        24.089068870967743,
+        30.718954421768707,
+        15.994623656934307
+      ]
+    }
+  },
+  "passed": true
+}

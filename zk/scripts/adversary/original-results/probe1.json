@@ -1,0 +1,25 @@
+{
+  "at": "2026-07-30T00:14:20.750Z",
+  "ptauBytes": 4801688,
+  "ptauPower": 12,
+  "bytesDownloaded": 0,
+  "r1cs": {
+    "nConstraints": 2736,
+    "nPubInputs": 29,
+    "nOutputs": 8,
+    "nPrvInputs": 4
+  },
+  "groth16Power": 12,
+  "zkeyBytes": 1481592,
+  "proveMs": 91,
+  "publicSignals": 37,
+  "verified": true,
+  "nearest": 1,
+  "distances": [
+    18.811881188387098,
+    9.547738693467188,
+    11.97183098590625,
+    24.089068870967743
+  ],
+  "passed": true
+}

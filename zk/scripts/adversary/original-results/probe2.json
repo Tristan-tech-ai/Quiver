@@ -1,0 +1,105 @@
+{
+  "at": "2026-07-30T00:16:58.381Z",
+  "rows": [
+    {
+      "label": "portfoliogate  N=3",
+      "nConstraints": 2053,
+      "nPub": 22,
+      "nOut": 6,
+      "budget": 2081,
+      "power": 12,
+      "built": true,
+      "zkeyBytes": 1176980
+    },
+    {
+      "label": "portfoliogate4 N=4",
+      "nConstraints": 2736,
+      "nPub": 29,
+      "nOut": 8,
+      "budget": 2773,
+      "power": 12,
+      "built": true,
+      "zkeyBytes": 1481180
+    },
+    {
+      "label": "pg5            N=5",
+      "nConstraints": 3419,
+      "nPub": 36,
+      "nOut": 10,
+      "budget": 3465,
+      "power": 12,
+      "built": true,
+      "zkeyBytes": 1785380
+    },
+    {
+      "label": "pg6            N=6",
+      "nConstraints": 4102,
+      "nPub": 43,
+      "nOut": 12,
+      "budget": 4157,
+      "power": 13,
+      "built": false,
+      "zkeyBytes": 0
+    },
+    {
+      "label": "pg7            N=7",
+      "nConstraints": 4785,
+      "nPub": 50,
+      "nOut": 14,
+      "budget": 4849,
+      "power": 13,
+      "built": false,
+      "zkeyBytes": 0
+    }
+  ],
+  "measured": {
+    "4": {
+      "proveMs": [
+        92,
+        100,
+        118
+      ],
+      "medianProveMs": 100,
+      "verified": true,
+      "publicSignals": 37,
+      "nearest": 1,
+      "distances": [
+        18.811881188387098,
+        9.547738693467188,
+        11.97183098590625,
+        24.089068870967743
+      ],
+      "acceptGas": "435763",
+      "rejectGas": "7878919",
+      "accepted": true,
+      "bentAccepted": false,
+      "deployedSize": 4781,
+      "contract": "Groth16Verifier"
+    },
+    "5": {
+      "proveMs": [
+        79,
+        85,
+        92
+      ],
+      "medianProveMs": 85,
+      "verified": true,
+      "publicSignals": 46,
+      "nearest": 1,
+      "distances": [
+        18.811881188387098,
+        9.547738693467188,
+        11.97183098590625,
+        24.089068870967743,
+        30.718954421768707
+      ],
+      "acceptGas": "495595",
+      "rejectGas": "7879854",
+      "accepted": true,
+      "bentAccepted": false,
+      "deployedSize": 5634,
+      "contract": "Groth16Verifier"
+    }
+  },
+  "passed": true
+}

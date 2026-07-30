@@ -71,7 +71,9 @@
     "gate:n": "node --test gates/gateN-known-defects.mjs",
     "gate:n-revert": "node gates/gateN-revert.mjs",
     "docs:check": "node tools/docs-consistency.mjs",
-    "docs:revert": "node gates/docs-coverage-revert.mjs"
+    "docs:revert": "node gates/docs-coverage-revert.mjs",
+    "gate:z": "node gates/gateZ-adversary-repro.mjs",
+    "gate:z-revert": "node gates/gateZ-revert.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",

@@ -1,0 +1,29 @@
+{
+  "at": "2026-07-30T00:24:21.846Z",
+  "out": [
+    {
+      "N": 2,
+      "r1cs": 1302,
+      "built": true,
+      "plonk": 2530,
+      "domain": 4096,
+      "nPublic": 16
+    },
+    {
+      "N": 3,
+      "r1cs": 1953,
+      "built": true,
+      "plonk": 3795,
+      "domain": 4096,
+      "nPublic": 24
+    },
+    {
+      "N": 4,
+      "r1cs": 2604,
+      "built": false,
+      "plonk": null,
+      "domain": null,
+      "nPublic": null
+    }
+  ]
+}

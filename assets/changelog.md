@@ -12,6 +12,60 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — the harness that proves our gates can fail was corrupting the tree it tested
+
+**Nothing a caller sees changes.** No endpoint, no response shape, no contentHash, and the engine build
+hash is still `q1-e1fa99d08887d6cc`. This is about the tooling that backs up every "this gate can fail"
+claim we publish, and it is recorded here because the fault could have put a file into the repository
+that nobody wrote.
+
+**What was wrong.** A revert script proves a gate is load-bearing by writing a scripted defect into a
+real file, running the gate, requiring red, then restoring the file. The restore lived in a `finally`.
+On this platform a `finally` cannot run: measured with node v24.11.1 on win32, `child.kill('SIGTERM')`,
+`('SIGINT')` and `('SIGBREAK')` all report exit code `null` and run **no** handler, not the signal
+handler and not even the `process.on('exit')` hook, because Node maps them to `TerminateProcess`. And a
+full run is longer than the timeout that kills it: `gateAT-attest-no-snark.mjs` takes **45.6s** measured
+and the revert runs it seven times, so about **320s** against a 120s default. Being killed mid-patch was
+the normal outcome, not the exception.
+
+**What made it permanent rather than merely annoying.** The old code copied the target over its backup
+*before* checking anything. So an interrupted run left a patched file next to a pristine backup, and the
+next attempt overwrote that pristine backup with the patched file, after which the baseline check failed
+and the `finally` restored the defect. Both halves are now demonstrated in
+`zk/scripts/gateAT-guard-selftest.mjs` scenarios 6 and 7: the unguarded shape loses the file on SIGTERM,
+and its second run destroys the only pristine copy that remained. This had already happened twice, to
+`src/util/repair.js` and `src/util/routing.js` (recorded in `docs/elapsedms.md` 6.5) and to
+`gateAT-attest-no-snark.mjs`, and both times the committed mirror was the only surviving clean copy.
+
+**The scope was not one script.** Of 37 revert scripts, **31 write to a file on disk**, and **0 of 31**
+installed a signal handler, **0 of 31** guarded an existing backup at startup, and only 4 of 31 checked
+the target was green before snapshotting it. None of them writes under `src/engine/`, which was verified
+rather than assumed: the `engine/proof.js` paths in that harness are imports used to read the build id on
+both sides of the run, and `gateLB-revert.mjs`'s `src/engine/lpRisk.js` references are a comment and a
+line of injected patch text. The frozen engine hash was never exposed.
+
+**What changed.** `zk/scripts/lib/revert-guard.mjs` treats a backup on disk as evidence instead of
+garbage: it never overwrites one, it tells a live sibling from a dead one by pid so a concurrent run is
+refused rather than clobbered, it verifies the target against the mirror's `HEAD` *before* taking a
+snapshot, and it restores on every exit path that this platform actually offers.
+
+Because the interrupted run cannot clean up after itself here, the load-bearing defence is one that runs
+later: `zk/scripts/revert-heal.mjs` finds abandoned backups and files that both differ from `HEAD` and
+carry a scripted-defect marker, and repairs them. The marker condition is deliberate. This tree always
+holds real uncommitted work, so healing on "differs from `HEAD`" alone would destroy it. It refuses to
+act on anything a live revert script owns, and `gates/preflight.mjs` now runs it as check 30 and 31, so a
+tree holding a scripted defect cannot reach a deploy.
+
+**How we know it works, including that it can fail.** The guard selftest asserts the file really was
+patched before each kill, which is what caught two earlier versions of the selftest passing vacuously:
+once because a Windows ESM specifier killed the child before it patched anything, and once because
+`await new Promise(() => {})` is detected as an unsettled top level await on Node 24 and exits the
+process by itself, so the scenario was measuring Node's own exit path rather than SIGTERM. The healer was
+then given real wreckage to find: a defect injected into `gateAT-attest-no-snark.mjs` plus a backup and a
+dead pid lock. It detected all three, repaired the file to its exact prior hash `9ea53255…`, and left
+nothing behind. In the same run it **declined** to touch `src/util/snark.js`, correctly, because
+`gateMR-revert.mjs` was genuinely mid-flight and holding it.
+
 ## 30 July 2026 — `options-risk` can be asked for a proof, and it certifies all six greeks at once
 
 **What a caller sees change.** `POST /api/options-risk` (and the free MCP `options_risk`) now accept
@@ -61,6 +115,53 @@ engine build hash `q1-e1fa99d08887d6cc` does not move, nothing under `src/engine
 
 ---
 
+## 30 July 2026 — "prover busy — retry shortly" now means something when you retry
+
+**What a caller sees change.** No response *shape* moves and no contentHash moves. What changes is what a
+**second identical request** does after the first one was refused for a full queue. That refusal reads
+`unavailable — prover busy — 8 proofs already queued; retry shortly`, and until now retrying did nothing:
+the refusal was cached under the request's content hash, and the cached record satisfied the same guard that
+stops a finished proof being proved twice. Now a stored record that is neither `ready` nor `building` is
+re-attempted, so the retry the sentence asks for actually rebuilds. The engine build hash
+`q1-e1fa99d08887d6cc` does not move — nothing under `src/engine` was touched — and `npm test` is unchanged
+at 386.
+
+**Measured before anything was changed,** on the served `event-vol` handler: twelve distinct bodies with
+`snark: true` fill the 8-deep queue (8 admitted, 4 refused), a thirteenth is refused the same way, and after
+the prover goes **completely idle — 12.2 s** — the identical body leaves the record untouched, same status
+and the same `at` stamp. Nothing was in the prover and the request that would have been admitted was answered
+out of a cache holding a statement about a moment that had passed. After the fix, the same body at the same
+point returns `ready`.
+
+**Why it was wrong in the file's own terms.** `src/util/proofStore.js` already refused to *persist* a
+refusal, in writing, because "a refusal is a judgement made by one build of the code". The durable layer had
+the right policy and the in-memory guard in front of it contradicted it. The entry below records this exact
+gap as "NOT fixed, and recorded rather than folded in"; this is it closed. Seven builders share the guard —
+not six, as that entry says — and all seven are patched, on both the paid HTTP surface and the free MCP one.
+
+**What is deliberately still memoised.** A `ready` proof, because proving is 703 ms of a core and a repeat
+must keep costing nothing, and a `building` one, because that record is the only marker that a hash is in the
+prover. A **permanent** refusal — a position the 1e-9 grid cannot pin to the digit its answer is displayed
+at, an encoder's witness reason — is now re-derived on every request, so this was measured rather than
+assumed: over three runs of 50 to 200 identical re-attempts, three such refusals produced **one** sentence
+apiece and added **0.015–0.057, 0.019–0.049 and 0.687–1.406 ms** per call to re-derive, the last being the
+lp-risk bracket whose witness replays a 200-halving bisection — and even that is less than the 1.687 ms the
+same request costs with no proof asked for. None of them can reach the prover: every refusal in the file is
+written before the queue is consulted, which is also why a permanently refused request keeps its own sentence
+instead of being told to retry forever — asserted with 8 proofs in flight.
+
+**Verification.** `gates/gateMR-memoised-refusal.mjs` (`npm run gate:mr`): 10 checks, every one behavioural,
+driving `SERVICES[].run` and the MCP `TOOLS[].run` and reading the store through `getProof` — including two
+floors that assert the queue really filled, so "the retry rebuilt" cannot pass on a process where nothing was
+ever refused. `gates/gateMR-revert.mjs` puts a defect back five ways — the old guard in all seven places, an
+in-flight build no longer blocking, a finished proof no longer blocking, a refusal that leaks a queue slot,
+and the transient check moved ahead of the permanent ones — and requires the gate to go red on each, naming
+it, while a named companion check stays green: **5 of 5**. `gates/gateIF-inflight-eviction.mjs` stays green,
+Appendix C still reproduces at `8575ce5a…`, and no deterministic hash moved. Full write-up:
+`docs/fix-snark-memoised-refusal.md`.
+
+---
+
 ## 30 July 2026 — a proof that was being built could be reported `unavailable`, and now cannot be
 
 **What a caller sees change.** Nothing about any response *shape*, and no contentHash moves: this is a
@@ -89,7 +190,8 @@ before it asserts that the in-flight marker survived, so "never evict anything" 
 naming it, while the other check stays green. NOT fixed, and recorded rather than folded in: a record
 that legitimately reaches `unavailable` is still memoised in memory until it is evicted, even though the
 durable store deliberately refuses to persist a refusal for the same reason it would be wrong to reuse
-one.
+one. *(Closed later the same day — see the entry above. That paragraph is left as written, because what it
+disclosed was true when it was published.)*
 
 **Where it showed up.** `zk/scripts/gateB7-6-eventvol-straddle.mjs` — the gate for event-vol's ATM
 straddle proof — was red on exactly this, on the two checks that fetch the proof a served response points

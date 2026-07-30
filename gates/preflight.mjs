@@ -21,6 +21,7 @@ import { GENUINE, UNREACHABLE_BY_SHAPE, invalidFixtures, coverageSummary, noisyO
 import { handleRpc, TOOLS } from '../src/mcp.js';
 import { _internal, engineSourceFiles } from '../src/engine/proof.js';
 import { readFileSync, existsSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -512,6 +513,36 @@ check('the changelog has an entry this deploy has not yet published',
   changelog === liveChangelog
     ? 'the repo changelog is IDENTICAL to live — add the entry for this deploy before shipping'
     : 'the repo changelog is ahead of live, as it should be right before a deploy');
+
+// ── the working tree is not holding a scripted defect ────────────────────────────────────────────
+// The revert harness proves a gate can fail by writing a defect into a real file and putting it back.
+// The restore lives in a `finally`, and on win32 a `finally` cannot run: measured, child.kill('SIGTERM'),
+// ('SIGINT') and ('SIGBREAK') all run NO handler, not even the 'exit' hook. A full gateAT-revert run needs
+// ~320s (the gate alone is 45.6s, run seven times) against a 120s default tool timeout, so being killed
+// mid-patch is the normal outcome. It has already left a defect in the tree twice: once in
+// src/util/repair.js and src/util/routing.js (docs/elapsedms.md 6.5) and once in
+// gateAT-attest-no-snark.mjs.
+//
+// Deploying from a tree in that state would ship a file nobody wrote. So it is checked here, where a red
+// stops the deploy, rather than trusted to whoever remembers.
+const heal = spawnSync(process.execPath, [join(ROOT, '..', '..', 'zk', 'scripts', 'revert-heal.mjs')],
+  { encoding: 'utf8', maxBuffer: 1 << 26 });
+const healOut = `${heal.stdout || ''}${heal.stderr || ''}`;
+const healRan = heal.status === 0 || heal.status === 1;
+check('the revert healer could be run at all',
+  healRan, healRan ? undefined : `could not run revert-heal.mjs: ${healOut.trim().split('\n').slice(-2).join(' / ').slice(0, 160)}`);
+// A red here has two possible causes and they need different responses, so both are named rather than
+// leaving the reader to guess: either a revert script is mid-flight (wait for it, do not deploy through
+// it) or an interrupted run abandoned a defect (heal it).
+const healLive = healOut.match(/^\s+\d+ revert script\(s\) appear to be RUNNING: (.*)$/m)?.[1];
+check('no scripted-revert defect or abandoned backup is left in the working tree',
+  heal.status === 0,
+  heal.status === 0
+    ? 'tree is clean'
+    : `${healOut.match(/^REVERT HEAL: .*$/m)?.[0] || 'see zk/scripts/revert-heal.mjs'}`
+      + (healLive
+        ? ` — a revert script is RUNNING (${healLive}); this is in-flight, not wreckage. Wait for it to finish and re-run, do not deploy through it.`
+        : ' — nothing is running, so this is an abandoned defect: run `node zk/scripts/revert-heal.mjs --heal` and re-run preflight.'));
 
 // ── verdict ──────────────────────────────────────────────────────────────────────────────────────
 const failed = results.filter((r) => !r.pass);

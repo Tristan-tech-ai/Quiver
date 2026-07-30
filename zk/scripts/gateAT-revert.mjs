@@ -33,14 +33,16 @@
 // string on both sides of a script that rewrites files.
 //
 //   node zk/scripts/gateAT-revert.mjs
-import { readFileSync, writeFileSync, copyFileSync, rmSync, existsSync } from 'node:fs';
+import { writeFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { protect } from './lib/revert-guard.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const GATE = path.join(HERE, 'gateAT-attest-no-snark.mjs');
-const BACKUP = `${GATE}.revert-backup`;
+const DEV_ROOT = path.resolve(HERE, '..', '..');
+const MIRROR = path.join(DEV_ROOT, 'Quiver');
 
 const { load } = await import('./service-root.mjs');
 const { _internal } = await load(import.meta.url, 'engine/proof.js');
@@ -102,7 +104,15 @@ const redChecks = (out) => (out.match(/\[\*\*\* FAIL \*\*\*\] (.+)/g) || []).map
 console.log(`GATE AT REVERT — five defects, each must turn the gate red — ${new Date().toISOString()}`);
 console.log(`  engine build id before: ${buildIdBefore}\n`);
 
-copyFileSync(GATE, BACKUP);
+// The backup used to be taken here, before anything was checked. That is what made an interrupted run
+// permanent: the next attempt copied the still-patched gate over the pristine backup, the baseline check
+// then failed, and the `finally` restored the patched copy. protect() reverses the order — it verifies
+// the gate against its committed copy FIRST, treats an existing backup as evidence of an interrupted run
+// rather than as garbage, refuses to start if a live sibling owns the file, and restores on SIGTERM,
+// which a `finally` does not.
+const guard = protect([GATE], { repoRoot: MIRROR, devRoot: DEV_ROOT });
+const PRISTINE = guard.pristineOf(GATE);
+
 let allGood = true;
 const rows = [];
 try {
@@ -116,7 +126,9 @@ try {
   }
 
   for (const rv of REVERTS) {
-    const original = readFileSync(BACKUP, 'utf8');
+    // Read the pristine text from the guard's in-memory snapshot, not off disk. Reading it back from the
+    // backup file meant that anything which damaged the backup silently became the new "original".
+    const original = PRISTINE.toString('utf8');
     let patched = original;
     for (const p of [{ from: rv.from, to: rv.to }, ...(rv.alsoPatch ? [rv.alsoPatch] : [])]) {
       if (!patched.includes(p.from)) throw new Error(`revert ${rv.id}: the text to patch is not in the gate — the revert is stale, which is worse than absent`);
@@ -145,7 +157,7 @@ try {
   console.log(`\n  restored: exit ${after.code}, ${redChecks(after.out).length} red check(s) — ${afterGreen ? 'GREEN again' : 'STILL RED'}`);
   if (!afterGreen) allGood = false;
 } finally {
-  if (existsSync(BACKUP)) { copyFileSync(BACKUP, GATE); rmSync(BACKUP); }
+  guard.release();
 }
 
 const buildIdAfter = _internal.buildId();

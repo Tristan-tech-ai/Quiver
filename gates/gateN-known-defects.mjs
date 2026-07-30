@@ -4,9 +4,10 @@
 // morning of 30 July it held three entries while a four-service investigation and four adversarial
 // passes had produced ten more, four of them confirmed and one of them shipping in a live envelope.
 // Nothing could have caught that: no checker in this repository reads the register against the system
-// it describes. `docs-consistency.mjs` reads every `.md` and `.html` in the tree — 257 of them on 30 July,
-// a figure this comment deliberately does not pin because it moves whenever a document is added, and it
-// moved twice on 30 July alone (229 → 255 → 257, the last by the write-up of this very change) — and it
+// it describes. `docs-consistency.mjs` reads every `.md` and `.html` in the tree. This comment used to give
+// that count as 229 and NO LONGER GIVES ONE: over a few hours of 30 July it read 229, then 255, then 257,
+// then 259 — moved by this change's own write-up and by two sibling sessions' — so any figure written here
+// is stale before it is read. `docs-consistency` prints the live count on every run. It
 // asks whether each sentence agrees with the engine's
 // build hash, the service count and the paper's shape — it has no idea what a defect is,
 // so a defect that is simply ABSENT from this page is invisible to it. That is the hole this gate
@@ -179,6 +180,28 @@ assert.ok(COMMITTED.adv.length > 0,
   `git reports ${COMMITTED.all.length} tracked circuits and none under adv/ — if that is true the rescue was reverted, but it is far more likely this parse is wrong, and a zero here would make §13 pass on nothing`);
 /** Names tracked at HEAD under a directory, basename only. */
 const committedNames = (prefix) => COMMITTED.all.filter((p) => p.startsWith(prefix)).map((p) => p.slice(prefix.length));
+
+// ── EVERY ARTIFACT UNDER zk/build, AT ANY DEPTH ──────────────────────────────────────────────────
+// A flat `existsSync(join(BUILD, name))` is how this file first reported "0 of 38 adversary sources
+// compiled". It is 1: `ncdfonesided.r1cs` exists, at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`, three
+// directories down from where the flat check looked. The circuits were built into a nested directory and a
+// search that does not recurse read the absence as proof — the same mistake as a capped `head -5`.
+// So the build tree is indexed once, recursively, and asked by basename.
+const BUILD_INDEX = (() => {
+  const byName = new Map();
+  const walk = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (!byName.has(e.name)) byName.set(e.name, p);
+    }
+  };
+  walk(BUILD);
+  return byName;
+})();
+assert.ok(BUILD_INDEX.size > 0, 'zk/build indexed to nothing — every artifact question below would answer "absent"');
+/** Is there a file with this basename anywhere under `zk/build`? Returns its path, or undefined. */
+const artifact = (name) => BUILD_INDEX.get(name);
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
 
@@ -554,9 +577,12 @@ test('§13 the adversary artifacts are still absent, and their sources still unp
   if (existsSync(adv)) {
     const n = readdirSync(adv).length;
     assert.ok(SECTIONS.get(13).body.includes(`**${n} files**`), `zk/circuits/adv holds ${n} files; §13 does not say so`);
-    // Not one of them has a zkey, which is the claim that makes the refutations unreproducible.
-    const withKeys = readdirSync(adv).map((f) => f.replace(/\.circom$/, '')).filter((c) => existsSync(join(BUILD, `${c}_plonk.zkey`)));
-    assert.deepEqual(withKeys, [], `these adversary circuits now have zkeys: ${withKeys.join(', ')} — §13 must be updated`);
+    // Not one of them has a zkey, which is the claim that makes the refutations unreproducible. Asked at
+    // every depth for the same reason the compiled count is: the flat form of this question answered "no
+    // artifacts" about a directory that holds `adv/ncdfadv/ncdfonesided.r1cs`.
+    const withKeys = readdirSync(adv).map((f) => f.replace(/\.circom$/, ''))
+      .filter((c) => artifact(`${c}_plonk.zkey`) || artifact(`${c}.zkey`) || artifact(`${c}_final.zkey`));
+    assert.deepEqual(withKeys, [], `these adversary circuits now have zkeys: ${withKeys.map((c) => `${c} at ${artifact(`${c}_plonk.zkey`) || artifact(`${c}.zkey`) || artifact(`${c}_final.zkey`)}`).join(', ')} — §13 must be updated`);
   }
 });
 
@@ -607,9 +633,18 @@ test('§13 the published-repository row is git at HEAD, not a directory listing'
 
   // And the third quantity, so that "committed" is never read as "reproducible". Committed, compiled and
   // has-a-proving-key are three states and this section published one number for all three.
-  const compiled = onDisk.map((f) => f.replace(/\.circom$/, '')).filter((c) => existsSync(join(BUILD, `${c}.r1cs`)));
-  assert.ok(s.includes(`| **${compiled.length} of ${onDisk.length}** |`),
-    `${compiled.length} of the ${onDisk.length} adversary sources have a compiled .r1cs in zk/build; §13 must publish that separately from the committed count`);
+  //
+  // ASKED AT EVERY DEPTH. The flat form of this check answered 0 and the answer is 1: `ncdfonesided.r1cs`
+  // is at `zk/build/adv/ncdfadv/`, and every one it names must be named on the page, so the count cannot
+  // drift without the reader being told which circuit moved it.
+  const compiled = onDisk.map((f) => f.replace(/\.circom$/, '')).filter((c) => artifact(`${c}.r1cs`));
+  // Anchored to the start of a table cell but not to its end, because the row carries the reason the
+  // figure moved and a cell-terminating `|` would forbid explaining it.
+  assert.ok(s.includes(`| **${compiled.length} of ${onDisk.length}**`),
+    `${compiled.length} of the ${onDisk.length} adversary sources have a compiled .r1cs somewhere under zk/build (${compiled.join(', ') || 'none'}); §13 must publish that separately from the committed count`);
+  for (const c of compiled) {
+    assert.ok(s.includes(c), `${c} is compiled (at ${artifact(`${c}.r1cs`)}) and §13's compiled row does not name it`);
+  }
 });
 
 test('§8 the artifacts the clone is missing are missing from HEAD, not merely from a directory listing', () => {

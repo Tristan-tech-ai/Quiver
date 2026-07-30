@@ -46,6 +46,10 @@
 //                             the 29 July failure exactly — a file present to a directory listing and
 //                             present in no clone — and it is a file mutation rather than a text one, so
 //                             it is removed in the same `finally` and its absence is asserted at the end.
+//  11. AN ABSENCE NEVER        the compiled count goes back to `0 of 38`. It said that for the length of one
+//      MEASURED               work batch, because the check behind it was a flat `existsSync` in `zk/build`
+//                             and the one compiled adversary circuit sits at `adv/ncdfadv/`. The gate must
+//                             name the circuit, not merely disagree with the count.
 //
 // Both copies of the register are mutated together, because gate N also checks that they are
 // byte-identical: mutating one would produce a red for the wrong reason, which is a demonstration of
@@ -278,6 +282,18 @@ step("putting §10's index row back to its stale count makes gate N red", {
 step('an uncommitted artifact in the mirror makes gate N red rather than green', {
   ghost: true,
   expect: ['in no clone'],
+});
+
+// 11. THE ABSENCE THAT WAS NEVER MEASURED. This row said "0 of 38 compiled" for the length of one work
+// batch because the check behind it was a flat `existsSync` in `zk/build`, and the one compiled adversary
+// circuit is at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`. Putting the 0 back must be red, and the message
+// must NAME the circuit — a count alone would let the same error recur with a different file.
+step('putting the compiled count back to zero makes gate N red and names the circuit', {
+  line: {
+    prefix: '| of those, with a compiled `.r1cs`',
+    replacement: '| of those, with a compiled `.r1cs` in `zk/build` | **0 of 38** |',
+  },
+  expect: ['somewhere under zk/build', 'ncdfonesided'],
 });
 
 // Everything must be back, byte for byte. A revert that leaves the tree edited is worse than no revert.

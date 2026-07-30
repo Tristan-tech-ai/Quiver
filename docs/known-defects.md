@@ -35,7 +35,7 @@ produced more defects than it closed, which is the outcome to expect from an hon
 | 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 1 of 4** — `execadverse`, `lpbracket`, `ncdf` wired 30 Jul; `portfolioleg` left |
 | 11 | two shipped circuit headers claim more than the circuits prove | **open**, unpatched |
 | 12 | three constants inside the trust root contradict the code beneath them | **open**, unpatched |
-| 13 | the four refutations that redirected this round are not reproducible from this repository | **open** — sources now committed (38 of 38), **0 of 38 compiled**, ceremony question unanswered |
+| 13 | the four refutations that redirected this round are not reproducible from this repository | **open** — sources now committed (38 of 38), **1 of 38 compiled and that one uncommitted**, ceremony question unanswered |
 
 `gates/gateN-known-defects.mjs` (`npm run gate:n`) re-measures the symptom behind every open section above
 and fails if this page and the measurement disagree — in either direction, so closing a defect without
@@ -1013,16 +1013,17 @@ this checkout:
 | --- | --- |
 | adversary circuit sources rescued out of temp into `zk/circuits/adv/` | **38 files**, including `lpclosed2`, `xacommit`, `xamin`, `pg4`–`pg7`, `price40`, and `ncdfonesided` |
 | of those, **committed** to the published repository | **38 of 38** — `git ls-tree -r --name-only HEAD zk/circuits` returns **60** paths, **38** of them under `adv/`, and those 38 names are the same 38 that are on disk. |
-| of those, with a compiled `.r1cs` in `zk/build` | **0 of 38** |
-| Plonk zkeys for any of them | **0 of 38** |
+| of those, with a compiled `.r1cs` anywhere under `zk/build` | **1 of 38** — `ncdfonesided`, and its artifact is at `zk/build/adv/ncdfadv/ncdfonesided.r1cs`, three directories below where every other circuit's lands. **This row said 0 for the length of one work batch**, because the check behind it was a flat `existsSync` in `zk/build` and the file is not there. Absence read off a search that did not recurse is not absence. |
+| Plonk zkeys for any of them | **0 of 38** — now asked at every depth under `zk/build`, and for `_plonk.zkey`, `.zkey` and `_final.zkey` |
 | powers-of-tau files on disk | **2**, both power 12, 4,801,688 bytes each |
 | the locally generated 2^13 and 2^17 ceremonies those builds used | **absent** |
 
 **Three different quantities, because one number was wrong in every reading.** *Committed*, *compiled* and
 *has a proving key* are three different states and this row published one figure for all of them. The
-sources are in the repository. Not one of them has been compiled in this checkout, so not one of the
-refutations can be re-derived from what is committed — which is the defect, and it is not the same
-sentence as "the sources are lost".
+sources are in the repository. One of the 38 has been compiled and none has a proving key, so **no
+refutation can be re-derived from what is committed** — which is the defect, and it is not the same sentence
+as "the sources are lost". The one compiled `.r1cs` is not committed either, and it is the only artifact of
+any of these builds that still exists on this machine.
 
 **What this row said, twice, and why the second version was worse than the first.** It is kept because a
 register that deletes its corrections is not a register:

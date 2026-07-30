@@ -122,12 +122,35 @@ all three, and there is no single value of that number that is honest. The table
 | --- | --- |
 | sources rescued into `zk/circuits/adv/` | **38 files** |
 | of those, **committed** to the published repository | **38 of 38** — `git ls-tree -r --name-only HEAD zk/circuits` returns **60** paths, **38** under `adv/`, same names as on disk |
-| of those, with a compiled `.r1cs` in `zk/build` | **0 of 38** |
+| of those, with a compiled `.r1cs` anywhere under `zk/build` | **1 of 38** — `ncdfonesided`, at `zk/build/adv/ncdfadv/ncdfonesided.r1cs` |
 | Plonk zkeys for any of them | **0 of 38** |
 
-The distinction is the honest answer to the section's own question. **The sources are in the repository; not
-one of them has been compiled in this checkout**, so no reader can re-derive the four refutations from what
-is published — which is the defect §13 is about, and is *not* the same sentence as "the sources are lost".
+The distinction is the honest answer to the section's own question. **The sources are in the repository; one
+of the 38 has been compiled and none has a proving key**, so no reader can re-derive the four refutations
+from what is published — which is the defect §13 is about, and is *not* the same sentence as "the sources are
+lost". The single compiled `.r1cs` is itself uncommitted.
+
+### That "1" was a "0" in the first version of this fix, and the cause was mine
+
+The compiled row was first published as **0 of 38**, and the rule behind it was:
+
+```js
+… .filter((c) => existsSync(join(BUILD, `${c}.r1cs`)))     // flat. wrong.
+```
+
+`find zk/build -name '*.r1cs'` returns **22** paths, and one of them is
+`zk/build/adv/ncdfadv/ncdfonesided.r1cs` — three directories below where every other circuit's artifact
+lands. A flat `existsSync` cannot see it, so a search that did not recurse produced an absence and the
+absence was published as a fact. **This is the same error as the row it was fixing**, one level down: a
+measurement taken with the wrong instrument and reported as a property of the world. It was caught by
+searching properly before the batch closed, not by the gate.
+
+Two rules were repaired, not one. `zk/build` is now indexed **recursively, once**, and asked by basename;
+the pre-existing zkey check in the original §13 test had the identical flat hole and now asks at every depth
+for `_plonk.zkey`, `.zkey` and `_final.zkey`. Its answer is unchanged — `0 of 38`, now measured rather than
+assumed. The compiled rule additionally requires the page to **name** every circuit it counts, so the figure
+cannot drift without the reader being told which file moved it, and revert mutation 11 puts the `0` back and
+requires the gate to name `ncdfonesided` rather than merely disagree with the count.
 
 Both prior versions of the row are quoted on the page rather than deleted, with the `ea69ea3` diagnosis.
 
@@ -165,23 +188,31 @@ Counts are compared by **name as well as by number** because two counts can agre
 file committed and a different file added on disk in the same round nets to zero and hides both. That is
 close to what `ea69ea3` actually did.
 
-### `npm run gate:n-revert` — 10 mutations, verbatim
+### `npm run gate:n-revert` — 11 mutations, verbatim
 
-Four are new. Mutation 7 is the one the brief asked for: **the `0` goes back, and `gate:n` goes red naming
-it**, while `docs-consistency` stays silent — it cannot read git either.
+Five are new. Mutation 7 is the one the brief asked for: **the `0` goes back, and `gate:n` goes red naming
+it**, while `docs-consistency` stays silent — it cannot read git either. The run below is complete and
+unedited except that `docs-consistency`'s two long finding lines under mutation 6 are elided.
 
 ```
-GATE N REVERT — 2026-07-30T07:39:52.396Z
+GATE N REVERT — 2026-07-30T07:55:29.338Z
   register copies under test: hackathon/KNOWN_DEFECTS.md, Quiver/docs/known-defects.md
 
   baseline: gate N is green
   baseline: docs-consistency says nothing about the register
 
   [PASS] a deleted section makes gate N red, and docs-consistency does not notice
+           gate N went RED (expected red) and named it
+           docs-consistency about the register: nothing (expected silent)
   [PASS] a status line left OPEN over a defect that is now fixed makes gate N red
+           gate N went RED (expected red) and named it
   [PASS] editing the private-input count makes gate N red
+           gate N went RED (expected red) and named it
   [PASS] dropping the missing artifact from §8 makes gate N red
+           gate N went RED (expected red) and named it
   [PASS] removing a gas citation makes gate N red, and docs-consistency does not notice
+           gate N went RED (expected red) and named it
+           docs-consistency about the register: nothing (expected silent)
   [PASS] misdirecting a gas citation is caught by docs-consistency, which gate N leaves to it
            gate N stayed green (expected green)
   [PASS] putting the published-circuit count back to zero makes gate N red, and docs-consistency does not notice
@@ -193,11 +224,13 @@ GATE N REVERT — 2026-07-30T07:39:52.396Z
            gate N went RED (expected red) and named it
   [PASS] an uncommitted artifact in the mirror makes gate N red rather than green
            gate N went RED (expected red) and named it
+  [PASS] putting the compiled count back to zero makes gate N red and names the circuit
+           gate N went RED (expected red) and named it
 
   [PASS] every copy of the register is byte-identical to how it started
   [PASS] the ghost artifact is gone from Quiver/zk/build/liquidation.r1cs
 
-GATE N REVERT: PASSED — 12 mutations, each one red where it should be
+GATE N REVERT: PASSED — 13 mutations, each one red where it should be
 ```
 
 And the assertion mutation 7 produces, verbatim, with the `0` back in place:
@@ -268,26 +301,65 @@ rewriting disclosure prose to suit a checker.
 - **`isOpen(2)` silently reads §2 as not-open.** Its status line — *"the envelopes are honest; the summary
   copy is not. Copy fix pending."* — contains neither *open* nor *fixed*, so `/\bopen\b/` is false. There is
   no §2 test, so nothing currently depends on it; the next §2 test written will quietly not run.
-- **`gateN`'s own header quoted a stale figure, and correcting it demonstrated why.** It said
-  `docs-consistency.mjs` reads *229 documents*. The run before this document existed said **255**; the run
-  after it and its twin were added says **257**. A figure written into a report is stale by the time the
-  report is saved, which is what happened to the 229 and is the trap the brief warned about. The comment now
-  names the figure with its date and states explicitly that it is not pinned; the register's closing
-  paragraph carried the same 229 and now gives no count at all, which is the better fix of the two.
+- **`gateN`'s own header quoted a stale figure, and correcting it twice demonstrated why.** It said
+  `docs-consistency.mjs` reads *229 documents*. Within a few hours of 30 July the live count read **229**,
+  then **255**, then **257** once this document and its twin were added, then **259** when two sibling
+  sessions committed their own write-ups. Every figure written into that comment was stale before it could be
+  read, including both of the ones written during this fix. **So the comment now gives no count at all** — it
+  records the sequence, says why it is not pinned, and points at the tool that prints the live number. The
+  register's closing paragraph carried the same 229 and now also gives no count. A number that moves with
+  every commit does not belong in prose in a tree five sessions are writing to.
 - **The ceremony question in §13 is unchanged and still Tristan's.** Compiling the 38 adversary sources
   needs `2^13` and `2^17` ceremony files, which is decision 2 in `phase-b-verified.md` §8. `0 of 38
   compiled` is therefore the honest figure and not a task left undone.
 
 ---
 
-## 6. Gates, before committing
+## 6. A clone of HEAD, measured before and after
+
+The work has to be reachable from what a reviewer clones, so `git clone` from `github.com` (not from the
+local mirror) into a scratch directory, `node_modules` junctioned in, and `gate:n` run inside it.
+
+| | tests | pass | fail |
+| --- | --- | --- | --- |
+| clone of `db931a3`, the parent commit | 19 | 14 | 5 |
+| clone of `b4eb6b0`, this change | 23 | **19** | 4 |
+
+**All four new rules pass in the clone**, and §10 went from red to green there. The clone's own git answers
+`60` paths and `38` under `adv/`, and its `zk/circuits/adv` holds the same 38 files — so the git-based rule
+measures the clone rather than the working tree, which is the case it exists for.
+
+**The four that still fail in a clone are the §8 defect, and they are the same four before and after:**
+
+```
+20 circuits are compiled; §4's table does not say so          (§4 states 21 — the working tree's count)
+the prover serves liquidation and there is no liquidation.r1cs in this build to measure
+vk_plonk.json is gone — §12 describes it
+1 ceremony files are on disk; §13 says two
+```
+
+Every one traces to an artifact the published mirror does not carry. **Three of them are the artifacts §8
+already names. The fourth is not**: §8 lists five missing files and `pot12_final.ptau` is not among them, so
+its list is short by one — which is the shape of §8's *original* defect, a list too short to catch its own
+subject. Measured: `zk/build/*.ptau` is two files in the working tree (`hez_final_12.ptau`,
+`pot12_final.ptau`) and one in a clone.
+
+That is left open and disclosed rather than fixed here. Extending §8's list is a one-line edit, but the
+honest fix is deciding whether `gate:n` should be runnable from a clone at all — the gate's own header argues
+it should measure the working tree because *"the register describes the running system"*, and a reviewer who
+clones and runs `npm run gate:n` will get four reds that are all §8 and none of them theirs. That is a
+judgement about what the gate is for, and it is on the list rather than taken.
+
+---
+
+## 7. Gates, before committing
 
 | | |
 | --- | --- |
 | `npm test` | **386 tests, 0 fail**, 5 skipped — unchanged |
 | `npm run gate:n` | **23 pass, 0 fail** (was 17 pass / 2 fail) |
-| `npm run gate:n-revert` | **PASSED — 12 mutations**, each red where it should be |
-| `node tools/docs-consistency.mjs` | `CONSISTENT — 257 documents agree` (255 before this document and its twin were added) |
+| `npm run gate:n-revert` | **PASSED — 13 mutations**, each red where it should be |
+| `node tools/docs-consistency.mjs` | `CONSISTENT` — over 259 documents at the final run; the count moves with every sibling commit and is not quoted as a fixed figure anywhere |
 | `node gates/preflight.mjs` | `PREFLIGHT PASSED` |
 | `node gates/gateV-recipe-reproduces.mjs` | **9 pass, 0 fail** |
 | `src/engine/` | `git status` and `git diff HEAD` both empty over the whole directory; `buildId()` returns `q1-e1fa99d08887d6cc` |

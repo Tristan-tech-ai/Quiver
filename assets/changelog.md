@@ -12,6 +12,55 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 30 July 2026 — `options-risk` can be asked for a proof, and it certifies all six greeks at once
+
+**What a caller sees change.** `POST /api/options-risk` (and the free MCP `options_risk`) now accept
+`snark: true`. With it, the response carries a new top-level `snark` sibling — the same shape the six
+other proof-emitting endpoints use — naming the circuit, where to fetch the proof, the envelope on each
+greek, the envelope in **price terms**, and a `proves` / `doesNotProve` pair. Without `snark: true`
+nothing about the response changes and **no contentHash moves**: verified directly, a fixture book
+hashes to `2f233f76…` before and after. `snark` is attached outside `proof`, so
+`proof.excludedFromContentHash` names it automatically and the published recipe still reproduces.
+
+**One contentHash does move, and it is disclosed rather than buried.** A request that already sent
+`snark: true` to this endpoint previously had that flag hashed *as an input*, because the handler passed
+the whole body through. It is now stripped before the envelope is taken — `snark` is a transport flag,
+not a risk input — so such a request moves from `c3624b37…` to `2f233f76…` and now agrees with the
+same book asked without the flag. That is the behaviour every other proof-emitting handler has had since
+each was wired. No published artifact quoted the old value: there is no pinned `options-risk` hash
+anywhere in the repository, Appendix C still reproduces at `8575ce5a…`, and
+`gates/gateV-recipe-reproduces.mjs` confirms not one deterministic hash moved.
+
+**What is proven.** Six fields off **one** instance of a circuit that already existed — no new circuit,
+no new ceremony, no new verifier, the same `ncdf_plonk.zkey` and the same `/proof/vk/ncdf` that
+`event-vol` uses. At `r = 0` every greek is a rational function of exactly two transcendentals taken at
+the **same** point `d1`: `delta` is `N(d1)`, and `gamma`, `vega`, `vanna`, `volga` and `theta` are each
+`φ(d1)` times a coefficient in `F`, `K`, `T` and `σ` — `theta` included precisely because its `r·price`
+term vanishes at `r = 0`. The circuit evaluates both by Hart (1968) with a range-checked remainder on
+every multiply, so the prover cannot choose a rounding. **In price terms the envelope is ±1.11e-6 quote
+units of dollar delta per contract on a 100,000 forward** (1.11e-7 bps of the forward). A service running
+Abramowitz-Stegun 7.1.26 instead of Hart — which satisfies every greek *consistency* identity and is
+still wrong about the level — is refused on **99.478%** of legs, and misstates dollar delta by up to
+6.881e-3 on the same legs.
+
+**What is NOT proven, and is said so in the response.** That `x` is this leg's `d1`: the circuit takes
+the point as given, and binding it is one **exponential** a reader performs —
+`K·exp(σ√T·x − ½σ²T) = F`. `portfolioValue` is not proven, because the premium needs `N(d2)`, a second
+CDF point, and once `K ≠ F` no identity collapses the two. Neither is `spanMargin`, which is the worst of
+366 repricings. Scope is **one leg at `r = 0` below the 7.0711 tail split** — 98.60% of legs are below it
+— and a multi-leg book, a discounted book, a leg past the split, and any leg whose envelope would be
+wider than the digit a greek is displayed to each get a **named refusal** instead of a proof.
+
+**Verification.** `zk/scripts/gateB7-7-optionsrisk-greeks.mjs`: 44 checks, 0 failures, 3,812 Plonk
+constraints, 274,238 gas to accept and 573 to refuse in an EVM, 0 bound violations over 19,719 legs of
+the real engine with the worst honest leg using 99.9965% of the derived bound.
+`zk/scripts/revert-optionsrisk-greeks.mjs` breaks seven things and requires a named check to go red for
+each — including one that does **not** go red, published as a measurement rather than removed. The
+engine build hash `q1-e1fa99d08887d6cc` does not move, nothing under `src/engine` was touched, and
+`npm test` is unchanged at 386. Full write-up: `docs/wire-options-risk-greeks.md`.
+
+---
+
 ## 30 July 2026 — a proof that was being built could be reported `unavailable`, and now cannot be
 
 **What a caller sees change.** Nothing about any response *shape*, and no contentHash moves: this is a

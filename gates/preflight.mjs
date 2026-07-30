@@ -268,6 +268,14 @@ const OTHER_GRID = {
   'mcp:event_vol': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)), not caller fields',
   'http:lp-risk': 'lpbracket.circom, 1e-9 — every circuit input is DERIVED (a fee quotient and a searched bracket); no caller field reaches a term, and the fee quotient\'s own encoding is inside the derived bound because the bracket must straddle at both the engine\'s fee fraction and the encoded one',
   'mcp:lp_risk': 'lpbracket.circom, 1e-9 — every circuit input is DERIVED (a fee quotient and a searched bracket); no caller field reaches a term, and the fee quotient\'s own encoding is inside the derived bound because the bracket must straddle at both the engine\'s fee fraction and the encoded one',
+  // A SEVENTH ENTRY, AND IT IS event-vol's EXEMPTION RATHER THAN A THIRD KIND. Same circuit, same
+  // 2^-40 grid, same three engine-derived public signals — reached by a different collapse. `strike`,
+  // `iv` and `forward` ARE caller fields here where event-vol's were not, and they are still not
+  // snapped, because none of them is what the circuit is handed: the signals are (x, N(x), φ(x)), and x
+  // is a quotient of a logarithm that lands off any grid whether or not its ingredients are on one.
+  // Snapping them would move a content hash for every off-grid caller and change nothing.
+  'http:options-risk': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)); x is a quotient of ln(F/K) that lands off any grid whether or not strike, iv and forward are on one',
+  'mcp:options_risk': 'ncdf.circom, 2^-40 — public signals are the engine-derived (x, N(x), φ(x)); x is a quotient of ln(F/K) that lands off any grid whether or not strike, iv and forward are on one',
 };
 const unsnapped = handlers.filter((h) => EMITS_ZK.test(h.body) && !SNAPS.test(h.body)).map(id).sort();
 check('every handler that builds a zk proof snaps its inputs onto that grid first — on BOTH surfaces',
@@ -332,9 +340,32 @@ check('every grid exemption is still earned by the handler it names',
 //     first circuit here that certifies a TRANSCENDENTAL rather than an arithmetic rearrangement, and
 //     the first that serves a circuit built for another purpose with no new circuit and no new
 //     ceremony. It reaches only because the straddle is struck AT the forward: K = F kills ln(F/K),
-//     so d1 = σ√T/2 and the ATM straddle is 2S(2N(d1) − 1) — one CDF point. options-risk's d1 is not,
-//     which is why options-risk still has no proof and is not on this list.
+//     so d1 = σ√T/2 and the ATM straddle is 2S(2N(d1) − 1) — one CDF point.
 //     Covered: `expectedMove.straddleImpliedAbsMoveUsd`, one field of six.
+//
+//   http:options-risk / mcp:options_risk   the SAME normal CDF, at the SAME key, for the greeks block.
+//     Grid: NOTHING, for event-vol's reason and not a third one — see the OTHER_GRID block above.
+//     THIS ENTRY REPLACES A SENTENCE THAT USED TO SIT IN event-vol's, and that sentence was wrong. It
+//     read "options-risk's d1 is not [σ√T/2], which is why options-risk still has no proof and is not on
+//     this list" — true about the PRICE, false about the answer. options-risk's headline is the `greeks`
+//     block, and at r = 0 all six greeks are rational functions of exactly two transcendentals taken at
+//     the SAME point d1: N(d1) for delta, φ(d1) for the other five, theta included because its r·price
+//     term vanishes at r = 0. `ncdf.circom` publishes (x, N(x), φ(x)) and pins BOTH, so ONE instance of
+//     the circuit that already existed pins SIX published fields. No new circuit, no new ceremony, no new
+//     verifier, and no new grid decision.
+//     Covered: `greeks.delta`, `.gamma`, `.vega`, `.vanna`, `.volga`, `.theta` — one block of three.
+//     NOT covered, each refused or disclosed by name rather than implied away: `portfolioValue` is
+//     df·(F·N(d1) − K·N(d2)) and N(d2) is a SECOND point this instance does not carry — once K ≠ F
+//     nothing collapses the two, which is exactly what event-vol has and this does not. `spanMargin` is
+//     the worst of 366 repricings, a search over 732 further CDF evaluations per leg. The six
+//     finite-difference `checks` are agreement claims between two computations. And the SCOPE is one leg
+//     at r = 0 below the tail split: a multi-leg book, a discounted book and a leg past |d1| = 7.0711 are
+//     each refused with their own sentence, because an n-leg aggregate is a sum over n points and this
+//     store holds one proof per response.
+//     The residue, in the response's own `doesNotProve`: x is not pinned. Binding it is one EXPONENTIAL a
+//     reader performs — x is the leg's d1 iff K·exp(σ√T·x − ½σ²T) = F — which moves the trust off the
+//     function A-S and Hart disagree about by 82,000 grid steps and onto the one every libm agrees about
+//     to under an ulp. zk/scripts/gateB7-7-optionsrisk-greeks.mjs measures all of it.
 //
 //   http:lp-risk / mcp:lp_risk   the breakeven BRACKET, over `lpbracket_plonk.zkey`.
 //     Grid: NOTHING, and for a different reason from event-vol's — see the OTHER_GRID block. This is
@@ -353,7 +384,7 @@ check('every grid exemption is still earned by the handler it names',
 //
 // The list is written out rather than counted so that adding a service cannot pass by arithmetic.
 check('the proof-emitting set is the one that has been checked',
-  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'http:event-vol', 'http:lp-risk', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify', 'mcp:event_vol', 'mcp:lp_risk'].sort()),
+  JSON.stringify(emitting) === JSON.stringify(['http:perp-gate', 'http:size-gate', 'http:treasury-risk', 'http:exec-verify', 'http:event-vol', 'http:lp-risk', 'http:options-risk', 'mcp:perp_gate', 'mcp:size_gate', 'mcp:treasury_risk', 'mcp:exec_verify', 'mcp:event_vol', 'mcp:lp_risk', 'mcp:options_risk'].sort()),
   `[${emitting.join(', ')}] — a new entry needs its circuit's grid decided on purpose, not inherited`);
 
 // AND EACH CIRCUIT'S ARTIFACTS ARE ACTUALLY IN THIS BUILD. A handler that emits a proof against a key

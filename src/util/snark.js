@@ -46,6 +46,11 @@ import { ncdfWitnessFor } from './ncdfWitness.js';
 // witness generator here that has to run a SEARCH, so it carries a stopping rule, a refusal set and a
 // bound of its own, which is a different shape from the closed-form encoders in scale.cjs.
 import { bracketWitnessFor as lpBracketWitnessFor, lpDisplayRound, LP_DISPLAY_HALF_UNIT, _internalLp } from './lpBracket.js';
+// The seventh identity's encoder — the same circuit as the fifth, a different service and six fields
+// instead of one. Its own file for the fifth's reason (it calls into the engine for `black76`) plus one
+// more: it carries the scope conditions that MAKE the six-field collapse true, and those are the
+// mathematics rather than plumbing.
+import { optionsRiskNcdfWitnessFor } from './optionsRiskNcdfWitness.js';
 
 const require = createRequire(import.meta.url);
 const scale = require('./scale.cjs');
@@ -1557,6 +1562,92 @@ async function buildLpBracketOnce(contentHash, echoedInputs, result) {
     });
   })
     .catch((e2) => put(contentHash, { status: 'failed', error: String(e2 && e2.message || e2).slice(0, 200) }))
+    .finally(() => { queued--; });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE SEVENTH IDENTITY — the same normal CDF, for `options-risk`, and the first that pins SIX
+// published fields off ONE circuit instance rather than one.
+//
+// Every file on this host that touched the question said options-risk could not be wired: `ncdf.circom`
+// pins N(x) given x, and options-risk's x is d1 = [ln(F/K) + ½σ²T]/(σ√T), so pinning it needs a
+// logarithm. gates/preflight.mjs said it in those words. All of that is true, and none of it was the
+// whole question, because it was asked about the PRICE.
+//
+// The premium df·(F·N(d1) − K·N(d2)) does need two CDF points and is NOT proven here. But options-risk's
+// headline is the `greeks` block, and at r = 0 all six greeks are rational functions of exactly two
+// transcendentals taken at the SAME point d1 — N(d1) for delta, φ(d1) for the other five, with theta's
+// r·price term vanishing precisely because r = 0. `ncdf.circom` publishes (x, N(x), φ(x)) and pins both.
+// So one instance of the circuit that already exists pins the whole block.
+//
+// WHY THE GUARD LIVES ENTIRELY IN src/util/optionsRiskNcdfWitness.js. The scope conditions ARE the
+// mathematics — one leg, r = 0, below the tail split — and each of them is the reason a particular
+// greek would otherwise be a claim about a quantity this circuit does not carry. Splitting them between
+// a guard and a handler would put half the argument where nothing reads it.
+//
+// WHAT IS DELIBERATELY NOT PRE-CHECKED, for event-vol's reason and not a new one: the circuit's own
+// integer residuals. Verifying them needs Hart's 192-entry exponential table and both Horner
+// polynomials, and a copy shipped in the service would be a third statement of the same constants with
+// nothing comparing it to the circuit. zk/scripts/gateB7-7 parses the circom source and sweeps the real
+// engine against it instead. A witness that somehow fell outside surfaces as `failed`, not as a wrong
+// proof.
+
+/**
+ * Build the greeks-block CDF proof in the background and record it under the response's content hash.
+ * The seventh twin of `buildInBackground`, separate for the reason the other six are.
+ */
+export async function buildOptionsRiskNcdfInBackground(contentHash, echoedInputs, result) {
+  if (store.has(contentHash) || claimed.has(contentHash)) return;
+  claimed.add(contentHash);
+  try {
+    await buildOptionsRiskNcdfOnce(contentHash, echoedInputs, result);
+  } catch (e) {
+    put(contentHash, { status: 'failed', error: String((e && e.message) || e).slice(0, 200) });
+  } finally {
+    claimed.delete(contentHash);
+  }
+}
+
+async function buildOptionsRiskNcdfOnce(contentHash, echoedInputs, result) {
+  const cold = await proofStore.read(contentHash);
+  if (cold) { store.set(contentHash, cold); return; }
+
+  // ONE CALL, AND EVERY REFUSAL CARRIES ITS OWN SENTENCE. `optionsRiskNcdfWitnessFor` runs the scope
+  // conditions, the twelve published-field equalities, every range condition the circuit enforces, the
+  // per-greek display ceiling, the per-greek encoding agreement against the engine's own unrounded
+  // values, and the per-greek display equality — and returns `{ reason }` for whichever one broke.
+  const w = optionsRiskNcdfWitnessFor(echoedInputs, result);
+  if (w.reason) { put(contentHash, { status: 'unavailable', error: w.reason }); return; }
+
+  if (queued >= MAX_QUEUED) {
+    put(contentHash, { status: 'unavailable', error: `prover busy — ${queued} proofs already queued; retry shortly` });
+    return;
+  }
+  put(contentHash, { status: 'building' });
+  queued++;
+  queue = queue.then(async () => {
+    const { proof, publicSignals } = await prove('ncdf', w.witness);
+    await put(contentHash, {
+      status: 'ready', protocol: PROTOCOL,
+      circuit: 'ncdf',
+      proof, publicSignals,
+      signalsAttestation: attestSignals(publicSignals),
+      encoded: Object.fromEntries(Object.entries(w.encoded).map(([k, v]) => [k, String(v)])),
+      // All six reconstructions at FULL precision, because the served figures are rounded to six and
+      // eight decimals and the bounds below are orders of magnitude tighter than that rounding. A
+      // reader who only ever sees `1.082593` cannot tell a 1e-11 proof from a 1e-3 one.
+      greeksFromProof: w.reconstructed,
+      gapToEngine: w.gapToEngine,
+      encodingBound: w.encodingBound,
+      envelope: w.envelope,
+      priceTerms: w.priceTerms,
+      worstFractionOfEncodingBound: w.worstFractionOfEncodingBound,
+      pointProven: w.point,
+      reconstruct: 'With n = nHat/2^40 and p = pHat/2^40 the fifth and sixth public signals, and x = ±xMag/2^40 the third and fourth: delta = q·n (q·(n−1) for a put), gamma = q·p/(F·σ·√T), vega = q·F·p·√T/100, vanna = −q·p·d2/σ·0.01, volga = vega·d1·d2/σ·0.01, theta = −q·F·p·σ/(2·√T)/365, with d1 = x and d2 = x − σ·√T. Bind x to your own leg with ONE exponential: x is this leg\'s d1 iff K·exp(σ·√T·x − ½σ²T) = F.',
+      verify: 'snarkjs plonk verify ncdf_vk.json publicSignals proof — the verification key is published at /proof/vk/ncdf',
+    });
+  })
+    .catch((e) => put(contentHash, { status: 'failed', error: String(e && e.message || e).slice(0, 200) }))
     .finally(() => { queued--; });
 }
 

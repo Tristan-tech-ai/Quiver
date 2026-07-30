@@ -1,0 +1,81 @@
+{
+ "at": "2026-07-30T07:17:02.345Z",
+ "passed": true,
+ "failures": [],
+ "checks": 44,
+ "envelope": {
+  "epsN": 1.1095354366444295e-11,
+  "epsP": 9.20498256369644e-12,
+  "ulpN": 12.199471140200716,
+  "ulpP": 10.120985362259571,
+  "dollarDeltaPerContract": {
+   "F1": 1.1095354366444295e-11,
+   "F3000": 3.3286063099332885e-8,
+   "F100000": 0.0000011095354366444296
+  },
+  "envelopeBpsOfForward": 1.1095354366444295e-7
+ },
+ "sweep": {
+  "legs": 20000,
+  "proved": 19719,
+  "refusedSplit": 279,
+  "refusedOther": 2,
+  "violations": 0,
+  "worstFrac": 0.9999648039770357,
+  "worstPer": {
+   "delta": 0.9988538189768968,
+   "gamma": 0.999964803976953,
+   "vega": 0.9999648039769656,
+   "vanna": 0.9999648039770357,
+   "volga": 0.9999648039770213,
+   "theta": 0.9999648039768314
+  },
+  "worstLeg": {
+   "F": 1259.648261009879,
+   "K": 2359.0297321927546,
+   "T": 0.04711562250191882,
+   "sigma": 0.44067690553640804,
+   "isCall": false,
+   "qty": -9.488911728462629,
+   "greek": "vanna"
+  }
+ },
+ "attack": {
+  "tried": 19730,
+  "admitted": 103,
+  "refusalRate": 0.9947795235681703,
+  "worstUlp": 76622.29040527344,
+  "worstDollarDelta": 0.006881369258355787
+ },
+ "handler": {
+  "snarkStatus": "building",
+  "fieldsProven": [
+   "greeks.delta",
+   "greeks.gamma",
+   "greeks.vega",
+   "greeks.vanna",
+   "greeks.volga",
+   "greeks.theta"
+  ],
+  "contentHash": "2f233f7672a04ad19f9cbf53e08ef46a34027155a60a2d6d494f218100603add"
+ },
+ "publicSignals": [
+  "1",
+  "2",
+  "8",
+  "1",
+  "185428839242",
+  "476129582794",
+  "432447972079"
+ ],
+ "proveMs": 2493,
+ "plonkConstraints": 3812,
+ "domainSize": 4096,
+ "nPublic": 7,
+ "evm": {
+  "acceptGas": "274238",
+  "rejectGas": "573",
+  "deployedSize": 7080,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang"
+ }
+}

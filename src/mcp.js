@@ -33,7 +33,7 @@ import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 // every tool with a body a caller would actually send.
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground, buildOptionsRiskNcdfInBackground } from './util/snark.js';
 // Same encoder the paid surface uses, imported rather than restated so the two cannot drift into two
 // accounts of why one answer has no proof.
 import { ncdfWitnessFor } from './util/ncdfWitness.js';
@@ -48,6 +48,8 @@ import { sealContentHashRecipe } from './util/recipe.js';
 import { lpRiskEnvelope } from './util/lpBoundedness.js';
 // And the same `snark` block builder the paid surface uses, for the same reason: one claim, one file.
 import { lpBracketSnark } from './util/lpBracket.js';
+// And options-risk's, same arrangement: one claim, one file, both surfaces.
+import { optionsRiskSnark } from './util/optionsRiskNcdfWitness.js';
 
 // ── Capability metadata (MCP 2025-06-18: title / annotations / outputSchema) ────────────────────────────
 // outputSchema property sets mirror the REAL top-level keys each engine returns (captured by running the
@@ -458,7 +460,21 @@ const TOOLS = [
       positions: { description: 'per-leg pricing breakdown' },
       model: { description: 'Black-76 assumptions used' },
     }),
-    run: (a) => proofEnvelope('options-risk', a, optionsRisk(a), config.version),
+    run: (a) => {
+      // Same wiring as the paid HTTP handler, and the `proves` / `doesNotProve` pair is not restated
+      // here: `optionsRiskSnark` builds it once for both surfaces, which is lp-risk's arrangement
+      // rather than the five older handlers'. See src/services.js for why no field on this endpoint is
+      // grid-snapped — `ncdf.circom` works at 2^-40 and its public signals are engine-derived.
+      const { snark: wantSnark, ...raw } = a;
+      const r = optionsRisk(raw);
+      const env = proofEnvelope('options-risk', raw, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        const { why, snark } = optionsRiskSnark({ contentHash: env.proof.contentHash, inputs: env.proof.inputs, result: r });
+        if (!why) buildOptionsRiskNcdfInBackground(env.proof.contentHash, env.proof.inputs, r);
+        env.snark = snark;
+      }
+      return env;
+    },
   },
   {
     name: 'lp_risk',

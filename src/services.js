@@ -2,7 +2,7 @@
 // Each drives: the paid POST route, the gated /diag/scan tester, and the / index.
 import { config } from './config.js';
 import { gridSnapFields } from './util/grid.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground, buildOptionsRiskNcdfInBackground } from './util/snark.js';
 // lp-risk's published `snark` block, built in ONE place for BOTH surfaces rather than duplicated the
 // way the five older ones are — the MCP handler is a separate array and has been the forgotten site
 // four times on this project, so the two claims cannot be allowed to live in two files.
@@ -11,6 +11,10 @@ import { lpBracketSnark } from './util/lpBracket.js';
 // is unavailable in the same response rather than making the caller poll /proof/<hash> to find out.
 // The four older handlers each rebuild that reason inline; one call answers it for this one.
 import { ncdfWitnessFor } from './util/ncdfWitness.js';
+// options-risk's encoder — the same circuit as event-vol's, a different collapse, six fields instead
+// of one. Imported here for the same reason `ncdfWitnessFor` is: so the handler can publish WHY a proof
+// is unavailable in the same response rather than making the caller poll /proof/<hash> to find out.
+import { optionsRiskSnark } from './util/optionsRiskNcdfWitness.js';
 import { tokenScan } from './engine/tokenScan.js';
 import { walletAudit } from './engine/walletAudit.js';
 import { tapePulse } from './engine/tapePulse.js';
@@ -930,7 +934,32 @@ export const SERVICES = [
       },
     },
     validate: (b) => (Array.isArray(b?.positions) && b.positions.length ? b : { error: 'require positions: [{type, strike, iv, quantity, expiryDays|T}] and a forward (shared or per-position)' }),
-    run: (i) => proofEnvelope('options-risk', i, optionsRisk(i), config.version),
+    run: (i) => {
+      const { snark: wantSnark, ...raw } = i;
+      // NO `gridSnapFields`, FOR event-vol's REASON AND NOT A NEW ONE. `ncdf.circom` carries its
+      // quantities at 2^-40, not on the 1e-9 grid the first four circuits encode over, and its public
+      // signals are not caller fields at all: they are (x, N(x), φ(x)), all three DERIVED by the engine
+      // and rounded exactly once inside src/util/optionsRiskNcdfWitness.js. Snapping `strike`, `iv` or
+      // `forward` would move a content hash for every off-grid caller and change nothing about what the
+      // circuit is handed — size-gate's argument for leaving `bankroll` alone, arriving a fourth time.
+      // gates/preflight.mjs records the exemption by name.
+      const r = optionsRisk(raw);
+      const env = proofEnvelope('options-risk', raw, r, config.version);
+      if (wantSnark === true || wantSnark === 'true') {
+        // SIX FIELDS OF ONE BLOCK OF THREE, and both halves of that are the point. Six, because at
+        // r = 0 every greek is a rational function of N(d1) or φ(d1) — one circuit instance pins the
+        // whole `greeks` block, where event-vol got one field. One block of three, because
+        // `portfolioValue` needs N(d2) (a second CDF point, and K ≠ F means no identity collapses it)
+        // and `spanMargin` is a search over 366 repricings. Every refusal below names its own condition.
+        // ONE BUILDER FOR BOTH SURFACES, which is lp-risk's arrangement rather than the five older
+        // handlers' — the MCP array is a separate file and has been the forgotten site four times, so
+        // this pair of sentences cannot be allowed to live in two places and drift.
+        const { why, snark } = optionsRiskSnark({ contentHash: env.proof.contentHash, inputs: env.proof.inputs, result: r });
+        env.snark = snark;
+        if (!why) buildOptionsRiskNcdfInBackground(env.proof.contentHash, env.proof.inputs, r);
+      }
+      return env;
+    },
   },
   {
     name: 'lp-risk', path: '/api/lp-risk', price: config.prices.lpRisk, register: true,

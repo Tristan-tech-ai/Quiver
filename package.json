@@ -66,6 +66,10 @@
     "gate:k-revert": "node gates/gateK-revert.mjs",
     "gate:h": "node --test gates/gateH-concentration-snark.mjs",
     "gate:h-revert": "node gates/gateH-revert.mjs",
+    "gate:ex": "node --test gates/gateEX-execverify-snark.mjs",
+    "gate:ex-revert": "node gates/gateEX-revert.mjs",
+    "gate:n": "node --test gates/gateN-known-defects.mjs",
+    "gate:n-revert": "node gates/gateN-revert.mjs",
     "docs:check": "node tools/docs-consistency.mjs",
     "docs:revert": "node gates/docs-coverage-revert.mjs"
   },

@@ -1,22 +1,47 @@
 # Known defects — unfixed, disclosed, dated
 
-**As of 29 July 2026.** The engine build under test is `q1-e1fa99d08887d6cc`.
+**As of 30 July 2026.** The engine build under test is `q1-e1fa99d08887d6cc`.
 
-Every number on this page comes from a fresh measurement against the live service at
-`https://quiver-production-c3a8.up.railway.app` on that date, taken first and written down second.
-Nothing here is copied from a report: where a figure originated in an outside review it was
-reproduced independently, and where the reproduction disagreed with the review this page follows the
-measurement.
+Every number on this page comes from a fresh measurement taken first and written down second — §1–§3
+against the live service at `https://quiver-production-c3a8.up.railway.app` on 29 July, §4–§13 against the
+engine, the circuits and the gate artifacts in this checkout on 30 July, each named at the point of use.
+Nothing here is copied from a report: where a figure originated in an outside review it was reproduced
+independently, and where the reproduction disagreed with the review this page follows the measurement and
+says so.
 
 This page exists because the alternative is worse. A project whose thesis is *do not trust the seller,
 re-derive the number* cannot hold a defect back until after it is judged. What follows is the list of
 things a reviewer would be right to mark us down for, written by us, with the reproduction steps.
 
-Each section carries its own status line. **§2 is unfixed and disclosed; §1 and §3 were fixed outright
-on 29 July 2026** — §1 in two passes on the same day, first for a miscased value and then for a value
-matching no declared alternative at all. Their records are kept in place rather than deleted, because
-what a defect looked like before it was closed is the part a reader cannot reconstruct afterwards.
-`/changelog` is the dated index of what has moved.
+Each section carries its own status line, and the records of closed defects are kept in place rather than
+deleted, because what a defect looked like before it was closed is the part a reader cannot reconstruct
+afterwards. `/changelog` is the dated index of what has moved.
+
+**Ten sections were added on 30 July 2026**, after four services were investigated for whether their zk
+proofs can be wired and every one of those investigations was then handed to an adversary. That round
+produced more defects than it closed, which is the outcome to expect from an honest one. The index:
+
+| § | what | status |
+| --- | --- | --- |
+| 1 | `side` / option `type` matched as exact lowercase strings, failing open to the riskier default | **fixed** 29 Jul, both surfaces, hash unmoved |
+| 2 | 12 of 13 observation services ship `selfChecks: []` while the summary copy promises a proof on every answer | **open** — envelopes honest, copy overreaches |
+| 3 | `portfolio_gate` sealed an undisclosed live venue read inside a `deterministic: true` proof | **fixed** 29 Jul, both surfaces |
+| 4 | 18 of 21 circuits have no private input; on the paid path a proof costs 134× the same predicate in Solidity | **open**, not scheduled — needs a different circuit |
+| 5 | `lp-risk`'s boundedness self-check fails on a live call, and the paid path reports "input rejected by engine" | **open — NOT being fixed.** Needs `src/engine/`; Tristan's decision |
+| 6 | the served note calls the leading-order divergence a diverging approximation; it is that expectation's logarithm | **open**, same freeze as §5 |
+| 7 | `gateB6` passed "the contract picks the right leg" while ranking by liquidation price, against its own copy of that rule | **fixed** 30 Jul — the claim was deleted, not the ranking changed |
+| 8 | `gate-clone-portability` listed 14 of 21 circuits and missed `liquidation`, which the published mirror does not carry | **gate fixed** 30 Jul; **the 5 missing artifacts are still missing** |
+| 9 | every gas figure in the four Phase B reports disagreed with its artifact, and every disagreement was inside the noise | **fixed** 30 Jul, and the checker now reads gas |
+| 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 3 of 4** — `execadverse` wired 30 Jul |
+| 11 | two shipped circuit headers claim more than the circuits prove | **open**, unpatched |
+| 12 | three constants inside the trust root contradict the code beneath them | **open**, unpatched |
+| 13 | the four refutations that redirected this round are not reproducible from this repository | **open**, partly repaired |
+
+`gates/gateN-known-defects.mjs` (`npm run gate:n`) re-measures the symptom behind every open section above
+and fails if this page and the measurement disagree — in either direction, so closing a defect without
+updating this page is as red as inventing one. `npm run gate:n-revert` puts each disclosure back the way it
+was and shows the gate go red while `docs-consistency` stays green over the same edit — which is why an
+omission from this page was invisible to a checker that reads 229 documents.
 
 > **How to read this page, because it is half history.** Both §1 fixes and the §3 fix are **live** —
 > deployed, verified against the endpoint at 10:38 UTC on 29 July 2026, and none of them moved the
@@ -381,10 +406,536 @@ that gate go red while preflight stays green.
 
 ---
 
-## How to reproduce anything on this page
+## 4. Eighteen of the twenty-one compiled circuits have no private input, every circuit on the paid path among them, and a proof costs 134× what checking the same predicate costs
 
-Everything above is reachable free, unauthenticated, with no key and no payment, over the MCP
-endpoint:
+**Status: OPEN, disclosed, and not scheduled.** Nothing here is a repair — closing it means a different
+circuit, not a fix to this one. Measured 30 July 2026 with an `.r1cs` header parser written for this
+page, and with a Solidity checker built for it.
+
+**What is wrong.** Every `.r1cs` in `zk/build` was parsed from its section-1 header — `nWires`,
+`nPubOut`, `nPubIn`, `nPrvIn`, `nLabels`, `nConstraints`, with a guard that throws on a zero rather
+than reporting a row that passed green on nothing:
+
+| | circuits | `nPrvIn` |
+| --- | --- | --- |
+| compiled in this checkout | **21** | |
+| with no private input at all | **18** | `0` |
+| with any private input | 3 | `portfoliogate` 3, `portfoliogate4` 4, `lpexpectation` 246 |
+
+**Every circuit on the paid path is in the first group.** `src/util/proverWorker.mjs` carries a closed set
+of circuit names — `liquidation`, `kelly`, `concentration` and, since 30 July, `execadverse` — and each of
+the four measures `nPrvIn = 0`. `preflight.mjs` prints the proof-emitting handler set as
+`http:exec-verify, http:perp-gate, http:size-gate, http:treasury-risk` and the four matching MCP tools,
+with 23 of 31 handlers building no proof at all. The count of services a caller can obtain a proof from
+moved from three to four while this page was being written, and the private-input count did not move at
+all: `execadverse` has eight public signals, seven public outputs and nothing private.
+
+**The paper is honest about the count and does not draw the consequence.** It says, and this page is
+quoting it approvingly rather than retracting it:
+
+> "The word for it is *succinct*, not *zero-knowledge*: the circuit has **zero private inputs**, every
+> value it consumes is one the service already publishes, and it hides nothing. Reviewers who know the
+> field check that count first, so this document states it rather than letting the phrase do work the
+> circuit does not."
+
+That paragraph disposes of *privacy*. It leaves **succinctness** standing, and the same sentence sells
+it: a proof is what lets "a verifier that cannot run Node" check the arithmetic, because "what
+re-execution needs is a *runtime*, and a smart contract has none". **With every input public, that is
+not true of these three statements.** A contract does not need a runtime to check
+`M + s·q·(P_liq − P_0) = q·P_liq·mmr` on integers it already has in calldata. It needs eleven lines of
+Solidity.
+
+**Measured, both sides, in the same process, each in a fresh EVM.**
+`zk/scripts/probe-direct-vs-snark-gas.mjs` proves the identity for a real `perp-gate` answer (long 1.5
+BTC at 64,000, 10×, mmr 0.005 → `liquidationPrice` 57,889.45), then evaluates *every constraint
+`liquidation.circom` imposes* — five range bounds, `(s−1)(s+1) = 0`, `mmr < 1`, `q ≠ 0`, the residual and
+the derived bound `2|R| ≤ q̂(SCALE + m̂mr)` — directly in Solidity over the identical integers:
+
+| | accept gas | deployed bytes |
+| --- | --- | --- |
+| the Plonk pairing check (`PlonkVerifier.sol`, 8 public signals) | 273,693 <!--gas:probe-direct-vs-snark-gas#snark.acceptGas~2%--> | 7,270 <!--gas:probe-direct-vs-snark-gas#snark.deployedBytes--> |
+| the same predicate, in Solidity | 2,050 <!--gas:probe-direct-vs-snark-gas#direct.acceptGas--> | 790 <!--gas:probe-direct-vs-snark-gas#direct.deployedBytes--> |
+
+**133.5×**, and the two columns are not the same kind of number, which the probe measures rather than
+assumes: across twelve proofs of that identical statement the verify figure moves by
+3,022 gas <!--gas:probe-direct-vs-snark-gas#spread.gas--> (1.1%), while the direct check returns the
+identical gas on a second run because it touches no precompile and its control flow does not depend on a
+proof scalar. The left column is a sample; the right one is a value.
+
+The comparison is generous to the proof in two further ways, both left in deliberately. Execution gas
+excludes calldata, where the proof carries twenty-four extra words —
+13,532 gas <!--gas:gateB9-2-widening-evm#single.calldataGas~2%--> of calldata for a single-proof
+submission, from `gateB9-2`'s own artifact. And the direct checker is held to the same refusals as the
+circuit: it accepts the honest answer, **refuses the same single-grid-step perturbation of `pLiqHat` that
+the on-chain registry records as `ProofRejected`**, and refuses `side: 0`
+(592 gas <!--gas:probe-direct-vs-snark-gas#direct.guards.0.gas-->), `mmr ≥ 1`
+(598 <!--gas:probe-direct-vs-snark-gas#direct.guards.1.gas-->) and `size: 0`
+(621 <!--gas:probe-direct-vs-snark-gas#direct.guards.2.gas-->). A cheap checker that accepted everything
+would be worthless, so the probe fails if any of those six behaviours is missing.
+
+**What a caller sees.** Nothing wrong. Every number a proof carries is correct and every proof verifies.
+What a *reviewer* sees is a claim that overstates what the machinery buys: for these three identities the
+SNARK is not the thing that makes the answer checkable on chain, and it costs two orders of magnitude
+more than the thing that does. What it does buy is worth stating precisely, because it is not nothing —
+third-party certification that the arithmetic came from the published circuit, a constant-size artifact
+whatever the statement's size, and a public-signal surface that a commitment or an attestation can later
+be joined to. None of that is succinctness in the sense a reviewer will test.
+
+**Why it is not being fixed.** The circuit that would earn the word exists on paper and not in this
+repository: a Poseidon-committed variant measured at 1,764 R1CS with two public signals and every input
+private, on the ceremony file already on disk. It is a new statement, a new gate and a new wiring — not a
+defect repair — and `src/engine/` and the paper are both frozen, so neither the identity nor the
+sentence selling it can move this week. The honest interim is this entry.
+
+**One number that entered the record unmeasured, and is now measured.** The review that first drew this
+conclusion said the proof costs "about 55× the gas of just checking the predicate". Its direct-check figure
+was never run by anybody, and `phase-b-verified.md` §3.1 says so in as many words:
+
+> "I did not myself measure the ~5,011-gas direct Solidity check. That number is the adversary's."
+
+Measured here, the direct check is 2,050 <!--gas:probe-direct-vs-snark-gas#direct.acceptGas--> and the
+ratio is 133.5× rather than 55×. The borrowed figure was wrong in the direction that flattered the proof,
+and it was still being repeated as a reason to act on the conclusion.
+
+---
+
+## 5. `lp-risk`'s own boundedness self-check fails on an ordinary live call, and the paid path tells the buyer their input was rejected
+
+**Status: OPEN, and this one is NOT being fixed here.** The check is inside `src/engine/lpRisk.js`, the
+directory the build hash `q1-e1fa99d08887d6cc` is taken over, and that hash must not move while judging
+runs. Every other defect on this page was closed outside the hashed tree or is a document; this one
+cannot be. **It is Tristan's decision, not an agent's**, and it is disclosed here rather than deferred
+quietly.
+
+**What is wrong.** The check ranges over the **rounded display value** rather than the quantity:
+
+```js
+checks.push({ name: 'boundedness: reported expected divergence lies in (-100%, 0] ...',
+              residual: e, pass: e <= 0 && e > -100 });     // e = round(E[IL]*100, 4)
+```
+
+Once `E[IL] ≤ −0.9999995`, `round(E[IL]·100, 4)` is exactly `-100`, and `-100 > -100` is false. The
+value is not wrong: at σ = 0.62 per period over 365 periods the full-precision expectation is
+**−0.9999999758323288**, strictly inside `(−1, 0]` where the check says it must be. It is display
+rounding meeting a strict inequality — the same class as the `divergence-headroom.md` defect.
+
+**Measured, calling the service's own `lp-risk` handler** with
+`{volatility: 0.62, horizonPeriods: 365, feeAprPct: 20, capitalUsd: 100000}`:
+
+```
+ok                          true
+expectedIlPct               -100
+totalVariance               140.306
+proof.deterministic         true
+proof.allSelfChecksPass     false          <- one of four checks
+  [pass] IL identity: closed form 2√r/(1+r)−1 == explicit constant-product token value
+  [pass] E[IL] check: −σ²T/8 == numerical E[IL] at σ²T=0.01
+  [FAIL] boundedness: reported expected divergence lies in (-100%, 0] ...   residual = -100
+  [pass] breakeven: expected fees == expected divergence at breakevenVolatility
+isChargeable(result)        false
+```
+
+**The threshold, bisected today rather than recalled.** At T = 365 the first volatility whose call flips
+the check is **σ = 0.5639118274086009**, i.e. total variance **σ²T = 116.06874041832731**. Above it every
+high-volatility LP question ships this way.
+
+**What a caller sees, and it is worse on the paid surface than the free one.** `src/x402.js`
+`isChargeable()` returns `false` on any failed self-check, and `src/app.js` then answers with
+`PAYMENT-RESPONSE` carrying `status: "not_charged"` and `reason: "input rejected by engine — no
+settlement"`. So a buyer who asks a perfectly ordinary question — an LP position in a 62%-vol asset held
+for a year — is told **their input was rejected**, over an answer that is correct, complete, and
+delivered. The seller loses the fee; the buyer is told something false about their own request; and the
+envelope's `allSelfChecksPass: false` invites a reviewer to conclude the arithmetic is broken, which it
+is not.
+
+**The one-line shape of the fix, for whoever owns the next engine change.** Evaluate the check on the
+unrounded fraction rather than on the served percentage. It is one expression, it moves the build hash,
+and it needs the four documents that quote the hash re-published with it.
+
+**A prediction this page is not making.** The closed form of the expectation (see §6) puts the flip at
+`−8·ln(5e-7)` = **116.06926190819375**, which is **5.2e-4 away** from the measured 116.06874041832731 —
+consistent with the truncation floor of the engine's own `|z| ≤ 6` quadrature window, and *not* an
+agreement. A sibling report described that as an analytic prediction of the threshold. It is recorded
+here as an unconfirmed one.
+
+---
+
+## 6. The engine's served note calls the leading-order expected divergence a diverging approximation. It is that expectation's logarithm.
+
+**Status: OPEN, same freeze as §5, same decision.** A served-text defect, in the engine.
+
+**What is wrong.** `expectedDivergence.note` reads, on every call:
+
+> "Outside the small-variance regime (σ²T = 22.5): the leading-order −σ²T/8 diverges from the exact
+> expectation of impermanent loss, which is what this figure reports, so the exact value is the headline."
+
+Measured against the engine's own published fields over eight (σ, T) pairs spanning σ²T from 0.075 to
+259.2, the two numbers are not an approximation and a target. They determine each other exactly:
+
+| what was checked | worst over 8 cases |
+| --- | --- |
+| `expectedIlPct` against `round((exp(−σ²T/8) − 1)·100, 4)` | **3.96e-5 percentage points**, inside the 5e-5 half-step of the published 4-decimal rounding |
+| `approximationGapPct` against `round((e^x − 1 − x)·100, 4)` at `x = −σ²T/8` | **exact to the published digit in 8 of 8** |
+| `1 + expectedIlPct/100` against `exp(expectedIlLeadingOrderPct/100)` | **3.32e-7**, pure rounding |
+
+`E[IL](v) = exp(−v/8) − 1`. So `−v/8` is not a small-variance expansion that leaves its valid range; it
+is `ln(1 + E[IL])`, everywhere, and the "approximation gap" the service publishes beside it is exactly
+`e^x − 1 − x` — a quantity that says nothing about the accuracy of anything. The engine's own
+`E[IL] check: −σ²T/8 == numerical E[IL] at σ²T = 0.01` passes for that reason, and was read twice as
+evidence for the opposite conclusion.
+
+**What a caller sees.** A true statement about the two numbers' *difference* wrapped around a false
+suggestion about their *relationship*, and a field named `approximationGapPct` that is not a measure of
+approximation error. Nobody is given a wrong number. A quantitative buyer who takes the note at face
+value will mistrust the headline in exactly the regime where it is exact.
+
+**Why it is not being fixed.** `src/engine/lpRisk.js`. Same hash, same freeze, same decision as §5.
+
+---
+
+## 7. `gateB6` recorded "the contract picks the right leg" as PASS while ranking by liquidation price, against its own copy of that rule
+
+**Status: FIXED, 30 July 2026 — by deleting the claim rather than by changing the ranking, which is the
+part worth reading.** The record of what it published is kept below.
+
+**What was wrong, in two layers.** The on-chain router the gate deploys keeps the smallest
+`signals[i][PRICE_INDEX]` with `PRICE_INDEX = NPUB − 1`, which for `liquidation.circom` is `pLiqHat` —
+**the liquidation price.** `portfolio-gate` reports the leg nearest to liquidation, which
+`src/engine/portfolioGate.js:107` selects by `moveToLiqPct`, the adverse move from the mark, and whose own
+published self-check asserts *"nearestLiquidation is the true minimum distance-to-liq across the LIVE
+legs"*. Those are different answers. On the gate's own eleven-leg book, priced through the real engine:
+
+| ranking | leg | adverse distance | liquidation price |
+| --- | --- | --- | --- |
+| distance (`moveToLiqPct`, the engine's) | **10** | **6.103%** | $300.47 |
+| liquidation price (`gateB6`'s router) | 3 | 24.089% | $0.4706 |
+
+The router named a leg **3.95× further from liquidation** than the binding one, and this is what the gate
+wrote beside it:
+
+```
+[PASS] the contract picks the right leg
+         leg 3, price 0.470647773
+```
+
+The second layer is why it stayed green for a day. The expectation was built by
+`prepared.reduce((a, b) => (BigInt(b.sigs[NPUB - 1]) < BigInt(a.sigs[NPUB - 1]) ? b : a))` — a
+price-minimum in JavaScript, compared against a price-minimum in Solidity. **The check could not fail on
+the error it was about**, however wrong the ranking was, because both sides implemented the same wrong
+rule. A verifier that cannot fail, in the gate whose subject is the correctness of an answer.
+`portfoliogate.circom`'s own header had said so in writing since the circuit was built.
+
+**What fixed it, and why not the obvious thing.** Ranking correctly on chain is **not available**, and
+the reason is structural rather than lazy: `liquidation.circom` publishes eight signals — residual,
+tolerance, `mHat`, `qHat`, `p0Hat`, `s`, `mmrHat`, `pLiqHat` — and **none of them is the mark** the engine
+measures distance from. Substituting `p0Hat` looks free on this book, because no leg here carries a
+`markPrice` and the engine then falls back to entry; the gate now measures what that substitution does the
+moment one leg is marked, and the two rankings part company. A router that is right only for markless
+books, with nothing in the proof saying which kind of book it was handed, is a worse defect than the one
+being repaired.
+
+So the claim was deleted instead. `gateB6` now asserts what it actually measures — that the contract
+returns the smallest **certified liquidation price**, checked against the engine — plus, as checkable
+assertions rather than footnotes, that `liquidation.circom` publishes neither the mark nor the distance,
+that the price minimum is **not** the book's binding leg, and that the engine's own binding leg is the
+distance minimum. `B6_REVERT=binding` puts the deleted claim back verbatim and the gate goes red. The gate
+that answers the portfolio question is `gateB10-portfolio-perleg.mjs` over `portfolioleg.circom`, which
+publishes the distance numerator and the mark as signals of its own and ranks by cross-multiplication.
+
+**What a caller saw.** Nothing: no portfolio circuit is reachable from a served response (§10), so the
+router was never in front of anybody. What it cost was a green gate cited as evidence that the
+per-leg-plus-on-chain-minimum shape works. A router that verifies eleven real proofs and returns the wrong
+leg is the most expensive failure mode available to a service whose product is "the risk math was
+checked" — every proof valid, every signature recovering, and the answer wrong.
+
+---
+
+## 8. The gate that certifies the published clone is self-sufficient kept a list of fourteen circuits and missed `liquidation` — and the clone really is missing it
+
+**Status: the gate is FIXED, 30 July 2026. The missing artifacts it now names are still missing, so the
+half that matters to a reviewer is OPEN.**
+
+**What was wrong.** `zk/scripts/gate-clone-portability.mjs` checked six artifacts per circuit from a
+hardcoded `CIRCUITS` array. Measured against what is compiled:
+
+```
+listed  (14): kelly, concentration, divergence, constantproduct, padprobe, greeks, greeksfp,
+              greekssigned, parity, portfoliogate, kellybatch1..4
+compiled(21): the above, plus execadverse, liquidation, lpbracket, lpexpectation, ncdf,
+              portfoliogate4, portfolioleg
+```
+
+Seven circuits had no portability verdict, and one of the seven was `liquidation` — the flagship, the
+circuit a paying `perp-gate` caller's proof is built and checked against, the one the paper's Appendix C
+exhibit and both on-chain registry transactions are about. The gate's own comment says a list that is
+accidentally empty checks nothing and reports PASS. The same is true of a list that is accidentally short,
+and this one was short by exactly the entry that would have gone red.
+
+**What fixed the gate.** The circuit set is now **discovered from `circuits/` on disk** rather than listed,
+with a floor (22 `.circom`, 21 with a `component main`) so coverage cannot silently shrink, and every
+circuit is either fully checked or **named in an exclusions table whose reason is re-measured on each run**
+— `kellybatch` has no `component main`, `lpexpectation` cannot have a zkey on a 4,096-gate domain at 36,613
+constraints, `portfoliogate4` needs 2^13. Section 3 of the same gate had discovered its gates from disk all
+along and said so in its own comment; section 1 kept a list and regressed. It also now asserts the
+verification-key filename mapping the service actually serves, which is where the `vk_plonk.json` exception
+in §12 was found.
+
+**What is still open, and it is now measured from the clone rather than argued about.** Run from
+`Quiver/`, the repaired gate goes red and names what is absent:
+
+```
+[*** FAIL ***] every artifact a gate needs is present in this checkout
+         5 missing:
+         build/liquidation.r1cs
+         build/liquidation_plonk.zkey
+         build/vk_plonk.json
+         build/liquidation_js/liquidation.wasm
+         build/liquidation_js/witness_calculator.cjs
+```
+
+`zk/build` in the working tree holds 21 `.r1cs`; the published mirror holds 20, and the missing one is
+`liquidation`. `zk/scripts/gateB6-portfolio-routes.mjs` is the one gate that proves against
+`zk/build/liquidation_*`, so it is the one gate that cannot run from a clone at all — a harder failure than
+the seven `evmRehearsal` gates that stop for want of `solc`.
+
+**And the gate still cannot be run to completion.** It spawns every discovered `gate*.mjs` with a
+300-second cap and fully buffered output, so a full run is structurally hours. The flag meant to shrink the
+gates for it, `QUIVER_GATE_PORTABILITY_PROBE`, appears in **exactly one file in the tree — the gate
+itself.** It is dead, which is why nothing shrinks.
+
+**What a caller sees.** Nothing: the live service does not read `zk/build`. Its proving artifacts are
+`assets/zk/liquidation_plonk.zkey`, `assets/zk/liquidation_js/` and `assets/zk/vk_plonk.json`, all tracked
+in git and all checked at deploy time by `preflight.mjs`. **The live paid path is unaffected and is not in
+doubt.** What is affected is the claim a reviewer will actually test — clone the repository, run the gates,
+reproduce the numbers — and for the flagship circuit the artifacts to do that are not in the clone.
+
+---
+
+## 9. Every gas figure the four Phase B reports published disagreed with the artifact that measured it — and every disagreement was smaller than the noise
+
+**Status: FIXED on 30 July 2026, hours after it was found, and the fix is better than a correction.**
+The record of what was published is kept because the *shape* of this defect is the interesting part: not
+one wrong measurement, but a noisy quantity published to six significant figures and then subtracted from
+another sample of itself.
+
+**What was wrong.** Seven figures across the four Phase B reports — `verify-exec-verify.md`,
+`verify-lp-risk.md`, `verify-options-risk.md`, `verify-portfolio-gate.md`, and their `VERIFY_*.md` twins in
+the submission tree — each read against the JSON on disk that produced it. Every pair differed. These are
+the retracted figures, quoted rather than deleted:
+
+| quantity | the document said | the artifact held |
+| --- | --- | --- |
+| `constantproduct` accept, gate B5-2 | "276,892" | 273,564 |
+| `execadverse` accept, gate B5-5 | "279,280" | 281,984 |
+| `execadverse` marginal over the benchmark | "**+2,388 gas (+0.9%)**" | 6,340 |
+| `lpbracket` accept, gate LP0 | "277,953" | 278,051 |
+| `ncdf` accept, gate B7-5 | "272,672" | 273,406 |
+| the 11-leg per-leg route, gate B10 | "2,968,446" | 2,969,816 |
+| the wide 3-leg verifier, gate B8-2 | "291,708" | 292,124 |
+
+**The mechanism was visible in the timestamps.** Gate B5-5 wrote its artifact four seconds before gate
+B5-2 wrote its own, and B5-5 computes the marginal by reading B5-2's file off disk — so the two terms of
+one published difference came from two different runs. That single quantity has now been published as
+**"2,388"**, **"3,318"**, **"6,340"** and **"8,420"** with nothing in the circuits having changed between
+them.
+
+**And the deeper half, measured today.** Plonk verify gas is not deterministic. Across twelve proofs of one
+identical `liquidation` statement the spread is
+3,022 gas <!--gas:probe-direct-vs-snark-gas#spread.gas--> — 1.1% of the mean — and the first call in an EVM
+instance costs **7,500 gas** more than every later one (EIP-2929: three cold precompile accesses at 2,500
+apiece). `probe-plonk-gas-variance.mjs`, re-run for this page against `kelly`, prints the same shape at
+1.34%. A sibling's
+`probe-execadverse-marginal.mjs` puts 25 proofs through each of two circuits in a fresh EVM per sample and
+measures spreads of 3,438 <!--gas:probe-execadverse-marginal#constantproduct.spread--> and
+4,466 gas <!--gas:probe-execadverse-marginal#execadverse.spread-->. **Every one of the six single-verifier
+disagreements above is inside that band** — the largest, 276,892 against 273,564, is 1.22% out, and the
+smallest is 98 gas. So none of them was a wrong measurement. All of them were legitimate samples published
+as though the digits meant something. The seventh row is the marginal, and it is worse than stale: its
+3,952-gas disagreement sits inside the measured
+7,904-gas <!--gas:probe-execadverse-marginal#marginal.oneShotWindow--> window that a one-shot marginal can
+land anywhere in — a window **twice the width of the quantity being measured**.
+
+The honest marginal, as a difference of means over 25 proofs each, is
+**+3,815 gas** <!--gas:probe-execadverse-marginal#marginal.meanMinusMean--> with a standard error of 288
+and a 95% interval of 3,251 <!--gas:probe-execadverse-marginal#marginal.ci95Low--> to
+4,379 <!--gas:probe-execadverse-marginal#marginal.ci95High--> — about
+763 gas <!--gas:probe-execadverse-marginal#marginal.gasPerExtraPublicSignal--> per extra public signal.
+
+**What a caller sees.** Nothing. No served field carries any of these numbers; they are figures in
+verification reports, and the reports' conclusions do not turn on them. What a reviewer sees is the
+project's own discipline failing in its own reports, in the exact class of defect `circuit-facts.mjs` was
+written to kill for constraint counts.
+
+**What closed it, and why it is more than a correction.** `tools/docs-consistency.mjs` — which on the
+morning of 30 July passed over the whole corpus without ever looking at a gas number — now reads every
+`<!--gas:ARTIFACT#FIELD-->` citation against the artifact it names, and requires one on every verify-scale
+gas figure in a gate report. Deterministic quantities are held exactly; a single verify-gas sample may
+carry a stated tolerance up to 5%, past which the citation "cannot fail" and is itself the finding. The
+figures in this section carry those citations, which is why they can go stale loudly. The remaining hole
+is stated by the rule's own author: 39 documents in this corpus publish a verify-scale gas figure and only
+the report class is held to citing one — `assets/whitepaper.*` among them, and frozen.
+
+**One figure this section will not restate.** `zk/scripts/lib/gas-facts.mjs` describes the spread as
+"3,328-gas, 1.26%". Today's four runs measured 1.10%, 1.24%, 1.34% and 1.59% of their means, on three
+different circuits. The noise floor is itself a sample, and a six-figure literal for it in a comment is
+the same defect one layer up.
+
+---
+
+## 10. Three of the four circuits built this round are still unreachable from a served answer
+
+**Status: OPEN for three of four.** `execadverse` was wired on 30 July, hours after this entry was
+written, and the entry is kept and corrected rather than replaced — the interesting part is that the gap
+existed at all and closed in one afternoon once someone owned it.
+
+**What is wrong.** `portfolioleg`, `execadverse`, `lpbracket` and `ncdf` are compiled, have Plonk zkeys,
+have exported Solidity verifiers, and have gates that pass. `src/util/proverWorker.mjs` names a closed set
+of circuits and refuses anything else rather than joining a caller's string onto a filesystem path, and
+that set decides what a response can carry:
+
+| circuit | built and gated | reachable from a served answer |
+| --- | --- | --- |
+| `execadverse` (exec-verify) | yes | **yes, since 30 July** — `snark: true`, both surfaces, `/proof/vk/execadverse` |
+| `portfolioleg` (portfolio-gate) | yes | no |
+| `lpbracket` (lp-risk) | yes | no |
+| `ncdf` (options-risk) | yes | no |
+
+**What this entry said before `execadverse` landed**, kept because the sentence was true when it was
+written and is the reason the entry exists:
+
+> "A caller who asks `exec-verify` for a proof of the basis-point number it sells does not get one, and
+> cannot: there is no `snark` option on that service."
+
+There is now. `preflight.mjs` prints four proof-emitting services against 23 of 31 handlers that build no
+proof, and `src/services.js` publishes a `proves` string for the new one naming all three nested
+statements and the tolerances each carries.
+
+**What a caller sees.** For the other three, nothing: `portfolio-gate`, `lp-risk` and `options-risk` answer
+with no proof and no `snark` option. The four Phase B reports each open with `buildable-and-built`, which
+is true and is not the same sentence as "wired" — and a reader who moves from `verify-lp-risk.md` to the
+live endpoint will find that gap themselves. Better that they find it here first.
+
+**Why the remaining three are not fixed.** Wiring is not a document change: each circuit needs a witness
+builder on the request path, a refusal by name for inputs outside its domain, a grid decision made on
+purpose rather than inherited, and its own gate — which is what the `execadverse` wiring took. Two of the
+three also carry a residue that wiring would publish: `lpbracket` certifies a bracket around two
+quadrature values it takes as public inputs and certifies neither, and `ncdf` pins a CDF at a point the
+caller supplies rather than at a `d1` derived from `(F, K, T, σ)`. Each would have to say so in its own
+`doesNotProve`.
+
+---
+
+## 11. Two shipped circuit headers claim more than the circuits prove, and both over-claims were demonstrated with accepted proofs
+
+**Status: OPEN, unpatched, and each is a change with its own gate.**
+
+**What is wrong.** `zk/circuits/parity.circom`'s header says:
+
+> "Parity is not: it ties a call to a put at the same strike, so a price that drifts on one side and not
+> the other fails here."
+
+It cannot. In Black-76 the put is not an independent quotation, and for **any** `N` with
+`N(−x) = 1 − N(x)` — which every tail-plus-branch implementation has, and the engine's `ncdf` has by
+construction, returning `x <= 0 ? c : 1 - c` — the CDF cancels out of `C − P = df·(F − K)` algebraically.
+A whole book repriced with Abramowitz-Stegun 7.1.26, wrong by $0.004763 on a $2,688 call, produces a
+`parity` witness that verifies. Parity is not a weak check on the price level; it is not a check on the
+price level at all. The same header carries a second sentence that has been false since 30 July —
+*"That residue is unchanged and stays until erf is provable"* — because `ncdf.circom` now computes the
+CDF, and the engine never computed `erf` in the first place.
+
+`zk/circuits/greekssigned.circom:26` says identity A, `d1 − d2 = σ√T`, is *"proven here as a by-product
+rather than as a separate statement"*. `dDiff` appears in exactly one constraint and nothing ties it to
+σ or T, so a compensating power of ten in two alignment exponents leaves every mantissa identical:
+moving `vannaE` 11→10 and `dDiffE` 9→10 yields an accepted proof asserting a `vanna` ten times the
+engine's and a `d1 − d2` one tenth of `σ√T`.
+
+**Provenance, stated.** Both over-claims were demonstrated with real accepted Plonk proofs by the
+`options-risk` investigation; **this session re-measured that the two sentences are still in the two
+files, and did not re-forge the proofs.** The algebra behind the parity claim is checkable by hand in two
+lines and was.
+
+**What a caller sees.** Nothing yet — neither circuit is wired (§10). What a reader sees is a false
+sentence in the file that is supposed to be the trust root, in a project whose `perp-gate` precedent is a
+published `proves` / `doesNotProve` pair. Shipping that pair with these headers would put a false claim in
+front of a buyer, which is the reason both circuits are named here before either is wired.
+
+---
+
+## 12. Three constants inside the trust root contradict the code beneath them
+
+**Status: OPEN, unpatched. Each is a comment, and each is the kind of comment a reader would act on.**
+
+- **`zk/circuits/portfoliogate4.circom:220`** reads
+  `// Result: 1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 — 126 gates of slack.` Those
+  are the **N = 3** figures. The circuit is N = 4 and its own `.r1cs` header measures **2,736**
+  constraints, needing domain 8,192 under Plonk. `diff` against `portfoliogate.circom` shows the only
+  differing line is the parameter. A reader sizing a 4-leg build from that comment fetches the wrong
+  ceremony file.
+- **`zk/scripts/gen-ncdf-circom.mjs:3`** says the circuit needs "208 exponential constants and 15
+  polynomial coefficients". Counted in the emitted circuit: **192** exponential constants — 12 `Mux4`
+  groups × 16, and 192 `.c[i] <==` assignments — plus 15 coefficients plus `SQRT2PI` is 208 *in total*.
+  The circuit's own line 130 says 192 and the generator's `console.log` prints 192, so line 3 contradicts
+  the code beneath it in the file the review calls the trust root.
+- **`vk_plonk.json`** is the `liquidation` verification key. Every other circuit here uses
+  `<name>_vk.json`, and there is no `liquidation_vk.json`, so a reader following the convention finds
+  nothing and a script following it throws. `preflight.mjs` carries the exception explicitly in its
+  artifact list, which is where it was found. **This one is now held rather than merely irregular**: the
+  repaired `gate-clone-portability` (§8) asserts the filename mapping the service actually serves, so the
+  name cannot drift from `/proof/vk` without a gate going red. The irregularity stands; the trap is closed.
+
+**What a caller sees.** Nothing. These are read by the next person to build on the circuits, which is
+precisely who this project asks to check its work.
+
+---
+
+## 13. The four refutations that redirected this round's work are not reproducible from this repository
+
+**Status: OPEN, partly repaired while this page was being written.**
+
+**What is wrong.** Four adversarial passes overturned four "cannot" verdicts, and their conclusions now
+steer decisions: that a 4-leg portfolio circuit fits the ceremony file on disk under Groth16, that
+`E[IL] = exp(−σ²T/8) − 1` in closed form, that the exec-verify statement has a Poseidon-committed variant
+where every input is private, that a leg price needs two proofs rather than a bigger circuit. Measured in
+this checkout:
+
+| | |
+| --- | --- |
+| adversary circuit sources rescued out of temp into `zk/circuits/adv/` | **37 files**, including `lpclosed2`, `xacommit`, `xamin`, `pg4`–`pg7`, `price40` |
+| of those, present in the published repository | **0** — `git ls-files zk/circuits` returns 22 paths and none is under `adv/` |
+| Plonk zkeys for any of them | **0** |
+| powers-of-tau files on disk | **2**, both power 12, 4,801,688 bytes each |
+| the locally generated 2^13 and 2^17 ceremonies those builds used | **absent** |
+
+So the sources survived the session that produced them and are still not in a repository. They sit in a
+working tree that is **not under version control at all** — the git checkout is the published mirror, and
+`zk/circuits/adv/` is not in it — which is the same exposure that left an entire circuit surviving only in
+an index last night, one directory over. Every gas figure, prove time and constraint count attributed to
+those builds rests on a single run by the party that benefits from it, against artifacts that are gone.
+
+**And nobody has attacked the new claims.** Four investigations were adversaried; the four adversaries
+were not. Two of their own results are known to be shaky and were left that way: a breakeven probe that
+refused 2 of 8 cases on a tolerance its author did not fix, and a Monte Carlo third confirmation
+discounted at 16 standard errors — so the closed form has two independent confirmations rather than three.
+
+**What a caller sees.** Nothing. This is a claim-quality defect, and it is the one that most directly
+contradicts what this project sells: re-derive it yourself. For these four results, today, you cannot —
+not without regenerating a ceremony file, which takes 55 seconds offline for 2^13 and about eleven
+minutes for 2^17, and which is a decision about what counts as a valid ceremony rather than a build step.
+
+**Why it is not fixed here.** Rescuing the artifacts means running the builds, which means generating
+ceremony files, which is decision 2 on the list in `phase-b-verified.md` §8 and is Tristan's to make.
+Copying the probe scripts is minutes of work and the sources are already in; the ceremony question is not
+an agent's to answer.
+
+---
+
+## How to reproduce §1 and §3, and what the live service answers today
+
+**This section is about the two input-handling defects only**, and it was titled *"How to reproduce
+anything on this page"* until 30 July, when ten sections were added that it does not cover. Each of
+§4–§13 carries its own reproduction inline, and `npm run gate:n` re-measures all of them at once.
+
+§1 and §3 are reachable free, unauthenticated, with no key and no payment, over the MCP endpoint:
 
 ```
 curl -s https://quiver-production-c3a8.up.railway.app/mcp \

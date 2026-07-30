@@ -1,0 +1,60 @@
+{
+  "at": "2026-07-30T02:07:42.578Z",
+  "passed": true,
+  "position": {
+    "side": "long",
+    "entryPrice": 64000,
+    "size": 1.5,
+    "leverage": 10,
+    "maintMarginRate": 0.005
+  },
+  "servedLiquidationPrice": 57889.45,
+  "publicSignals": 8,
+  "privateInputs": 0,
+  "proveMs": 989,
+  "snark": {
+    "verifier": "PlonkVerifier",
+    "acceptGas": 273693,
+    "refuseGasOneGridStep": 275149,
+    "deployedBytes": 7270,
+    "acceptedHonest": true,
+    "refusedOneGridStep": true
+  },
+  "direct": {
+    "acceptGas": 2050,
+    "refuseGasOneGridStep": 2050,
+    "deployedBytes": 790,
+    "acceptedHonest": true,
+    "refusedOneGridStep": true,
+    "deterministicAcrossTwoRuns": true,
+    "guards": [
+      {
+        "name": "side 0",
+        "refused": true,
+        "gas": 592
+      },
+      {
+        "name": "mmr >= 1",
+        "refused": true,
+        "gas": 598
+      },
+      {
+        "name": "size 0",
+        "refused": true,
+        "gas": 621
+      }
+    ]
+  },
+  "spread": {
+    "samples": 12,
+    "min": 273693,
+    "median": 274427,
+    "max": 276715,
+    "mean": 274623.8,
+    "gas": 3022,
+    "pct": 1.1
+  },
+  "ratio": 133.50878048780487,
+  "solc": "0.8.26+commit.8a97fa7a.Emscripten.clang",
+  "note": "Both figures are one sample each, in a fresh EVM. probe-plonk-gas-variance.mjs measures the run-to-run spread of a Plonk verify over proofs of an identical statement; a difference smaller than that spread is noise. The direct check is deterministic — same calldata, same gas — because it touches no precompile and its control flow does not depend on proof scalars."
+}

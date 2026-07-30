@@ -191,6 +191,13 @@ the reduced set for 3 named exclusions**.
            120 artifacts found
 ```
 
+Section 3 — the sweep that spawns all 45 `gate*.mjs` scripts — is unchanged by this work, and it is
+slow: it reached 7 of 45 in about 40 minutes, all PASS, before it was stopped. **It was not run to
+completion here** and its verdict for this change is therefore unmeasured. Two reasons for stopping:
+the runtime, and the fact that four concurrent sessions were editing gate scripts underneath it
+(`gateB6-portfolio-routes.mjs` grew a `--revert-binding` mode mid-run), so a section-3 result taken
+now could not be attributed to anything.
+
 ### In the actual clone: red, on the circuit that serves paying callers
 
 The author's tree cannot detect this defect, because in the author's tree the artifacts are all there.
@@ -307,6 +314,14 @@ either of them changed nothing at all.
 - mirrored to `Quiver/zk/scripts/`, `Quiver/zk/package.json`, `Quiver/docs/fix-clone-portability.md`
 
 Untouched: `src/engine/`, `assets/whitepaper*`, `test/`.
+
+`npm test` after the change: **tests 386**, pass 380, fail 1, skipped 5. The one failure is
+`docsAgreeWithTheSystem` reporting 41 gas-citation contradictions across `Quiver/docs/verify-*.md` and
+`hackathon/VERIFY_*.md` — documents written by concurrent sessions minutes earlier (their cited probe
+artifact is stamped `2026-07-30T01:35`). The count is moving as those sessions fix their own: 41 at the
+time of the `npm test` run, 21 on a re-run twenty minutes later, across 229 documents both times.
+Neither `FIX_CLONE_PORTABILITY.md` nor `fix-clone-portability.md` appears in that list on any run —
+`docs-consistency.mjs | grep -ci clone-portability` → 0.
 
 ## Still open
 

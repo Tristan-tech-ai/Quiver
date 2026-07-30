@@ -406,18 +406,50 @@ test('§8 the portability gate discovers its circuits from disk rather than list
     '§8 must record what fixed the gate');
 });
 
-test('§8 the five liquidation artifacts the clone needs are still absent from it', () => {
+// REWRITTEN 30 July 2026, because the previous version measured the wrong granularity and then went red for
+// a true reason that had nothing to do with its own claim.
+//
+// §8's claim is about FIVE NAMED ARTIFACTS. The old test measured which CIRCUITS lack a `.r1cs` in the
+// mirror. Those are different quantities, and both drifted: `liquidation.r1cs` shipped in ddcc434 so the
+// circuit was no longer absent while four of the five artifacts still were, and then `lpclosed` and
+// `lpclosed2` were compiled, so the test failed naming [lpclosed,lpclosed2] — a correct observation about a
+// claim §8 never made. This asserts the artifact list §8 publishes, at HEAD rather than on disk, because
+// committedness is the only thing a reviewer cloning the repo can see.
+const LIQ_ARTIFACTS = [
+  'zk/build/liquidation.r1cs',
+  'zk/build/liquidation_plonk.zkey',
+  'zk/build/vk_plonk.json',
+  'zk/build/liquidation_js/liquidation.wasm',
+  'zk/build/liquidation_js/witness_calculator.cjs',
+];
+test('§8 the five liquidation artifacts a clone needs are now IN the clone', () => {
+  const mirrorRoot = join(ROOT, '..', '..', 'Quiver');
+  if (!existsSync(mirrorRoot)) return;                   // a fresh clone has no sibling to compare
+  const ls = spawnSync('git', ['-C', mirrorRoot, 'ls-files', ...LIQ_ARTIFACTS], { encoding: 'utf8' });
+  assert.equal(ls.status, 0, 'git could not list the artifacts, so this test would report a check it did not make');
+  const tracked = ls.stdout.split('\n').map((s) => s.trim()).filter(Boolean);
+  const absent = LIQ_ARTIFACTS.filter((a) => !tracked.includes(a));
+  assert.deepEqual(absent, [],
+    `${absent.length} of ${LIQ_ARTIFACTS.length} artifacts §8 names are still absent from HEAD: [${absent}]. `
+    + 'If that is now the intended state, §8 must say which ones and why.');
+  // and the register must have recorded the closure rather than silently agreeing
+  assert.ok(!isOpen(8), '§8 is still marked open while every artifact it names is at HEAD');
+  assert.ok(/ddcc434/.test(SECTIONS.get(8).body),
+    '§8 must name the commit that shipped the first of the five, or "fixed" hides that it happened in two steps');
+  assert.ok(/5,436,000/.test(SECTIONS.get(8).body),
+    '§8 must carry the measured size of the zkey it shipped, not just the word fixed');
+});
+
+// The circuit-set question is still worth asking, but as its own claim rather than smuggled into §8's.
+test('§8b every compiled circuit has its .r1cs in the published mirror', () => {
   const mirror = join(ROOT, '..', '..', 'Quiver', 'zk', 'build');
-  if (!existsSync(mirror)) return;                       // a fresh clone has no sibling to compare
+  if (!existsSync(mirror)) return;
   const there = readdirSync(mirror).filter((f) => f.endsWith('.r1cs')).map((f) => f.replace(/\.r1cs$/, ''));
-  const absent = Object.keys(CIRCUITS).filter((c) => !there.includes(c));
-  if (absent.length === 0) {
-    assert.fail('the mirror now carries every compiled circuit — §8\'s open half is FIXED and the register must say so');
-  }
-  assert.deepEqual(absent, ['liquidation'],
-    `the mirror is missing [${absent}] — §8 says it is missing liquidation and only liquidation`);
-  assert.ok(SECTIONS.get(8).body.includes('build/liquidation.r1cs'), '§8 must name the missing artifacts');
-  assert.ok(isOpen(8), '§8 must be open while the flagship circuit is absent from the published mirror');
+  assert.ok(there.length >= 8, `the mirror lists only ${there.length} .r1cs — too few for this comparison to mean anything`);
+  const absent = Object.keys(CIRCUITS).filter((c) => !there.includes(c)).sort();
+  assert.deepEqual(absent, [],
+    `compiled in the working tree but absent from the mirror: [${absent}]. A circuit that exists only on this `
+    + 'desk cannot be reproduced by anyone, so either ship its .r1cs or record why it stays local.');
 });
 
 test('§8 the flag meant to shrink the portability run is still mentioned in exactly one file', () => {
@@ -695,9 +727,14 @@ test('§8 the artifacts the clone is missing are missing from HEAD, not merely f
   // the direction that makes the sibling test above report a clone as working when it cannot.
   assert.deepEqual(absentFromClone, absentFromDisk,
     `the mirror's directory listing and its HEAD disagree about which circuits it carries: absent from HEAD [${absentFromClone}], absent from disk [${absentFromDisk}]. The extra files are present to readdirSync and in no clone, so §8's verdict is written against a tree no reviewer gets.`);
-  assert.deepEqual(absentFromClone, ['liquidation'],
-    `a clone of HEAD is missing [${absentFromClone}] — §8 says it is missing liquidation and only liquidation`);
-  assert.ok(isOpen(8), '§8 must be open while the flagship circuit is absent from a clone of HEAD');
+  // Updated 30 July 2026 alongside §8's closure. The disk-versus-HEAD comparison above is the part that
+  // earns its keep and is unchanged; only the expected answer moved, from ['liquidation'] to none. It stayed
+  // able to fail: while the new artifacts were copied into the mirror and not yet committed, this went red
+  // naming [lpclosed,lpclosed2] absent from HEAD and present on disk, which is exactly its purpose.
+  assert.deepEqual(absentFromClone, [],
+    `a clone of HEAD is missing [${absentFromClone}]. Every compiled circuit is expected to have its .r1cs at `
+    + 'HEAD now; if one is deliberately desk-only, §8 must name it and say why.');
+  assert.ok(!isOpen(8), '§8 is marked open while a clone of HEAD carries every compiled circuit');
 });
 
 test('★ the index table does not report a live defect as fixed', () => {

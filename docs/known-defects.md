@@ -30,7 +30,7 @@ produced more defects than it closed, which is the outcome to expect from an hon
 | 5 | `lp-risk`'s boundedness self-check fails on a live call, and the paid path reports "input rejected by engine" | **fixed** 30 Jul **outside `src/engine/`** — hash unmoved, not yet deployed; one residual band 5.2149e-4 wide disclosed |
 | 6 | the served note calls the leading-order divergence a diverging approximation; it is that expectation's logarithm | **open** — and unlike §5 it cannot be fixed outside the hashed tree |
 | 7 | `gateB6` passed "the contract picks the right leg" while ranking by liquidation price, against its own copy of that rule | **fixed** 30 Jul — the claim was deleted, not the ranking changed |
-| 8 | `gate-clone-portability` listed 14 of 21 circuits and missed `liquidation`, which the published mirror does not carry | **gate fixed** 30 Jul; **the 5 missing artifacts are still missing** |
+| 8 | `gate-clone-portability` listed 14 of 21 circuits and missed `liquidation`, which the published mirror did not carry | **fixed** 30 Jul, both halves: gate discovers from disk, and all 5 artifacts are now at HEAD (`ddcc434` shipped 1, this change shipped 4) |
 | 9 | every gas figure in the four Phase B reports disagreed with its artifact, and every disagreement was inside the noise | **fixed** 30 Jul, and the checker now reads gas |
 | 10 | of the four circuits built, proved, gated and swept this round, three are still unreachable from a served answer | **open for 1 of 4** — `execadverse`, `lpbracket`, `ncdf` wired 30 Jul; `portfolioleg` left |
 | 11 | two shipped circuit headers claim more than the circuits prove | **open**, unpatched |
@@ -742,8 +742,8 @@ checked" — every proof valid, every signature recovering, and the answer wrong
 
 ## 8. The gate that certifies the published clone is self-sufficient kept a list of fourteen circuits and missed `liquidation` — and the clone really is missing it
 
-**Status: the gate is FIXED, 30 July 2026. The missing artifacts it now names are still missing, so the
-half that matters to a reviewer is OPEN.**
+**Status: FIXED, both halves, 30 July 2026. The gate was repaired first and the artifacts it named were
+shipped afterwards; see "What closed the open half" below for the file-by-file measurement.**
 
 **What was wrong.** `zk/scripts/gate-clone-portability.mjs` checked six artifacts per circuit from a
 hardcoded `CIRCUITS` array. Measured against what is compiled:
@@ -783,10 +783,31 @@ in §12 was found.
          build/liquidation_js/witness_calculator.cjs
 ```
 
-`zk/build` in the working tree holds 21 `.r1cs`; the published mirror holds 20, and the missing one is
-`liquidation`. `zk/scripts/gateB6-portfolio-routes.mjs` is the one gate that proves against
-`zk/build/liquidation_*`, so it is the one gate that cannot run from a clone at all — a harder failure than
-the seven `evmRehearsal` gates that stop for want of `solc`.
+`zk/scripts/gateB6-portfolio-routes.mjs` is the one gate that proves against `zk/build/liquidation_*`, so it
+was the one gate that could not run from a clone at all — a harder failure than the seven `evmRehearsal`
+gates that stop for want of `solc`.
+
+**What closed the open half, 30 July 2026, measured one artifact at a time rather than as a group.** The
+five were not all shipped at once and saying "fixed" without the breakdown would have hidden that. Asked of
+`git ls-files` at HEAD, not of a directory listing:
+
+| artifact | shipped by | bytes |
+|---|---|---|
+| `build/liquidation.r1cs` | `ddcc434`, the commit that repaired the gate | 107,920 |
+| `build/liquidation_plonk.zkey` | this change | 5,436,000 |
+| `build/vk_plonk.json` | this change | 2,043 |
+| `build/liquidation_js/liquidation.wasm` | this change | 47,368 |
+| `build/liquidation_js/witness_calculator.cjs` | this change | 10,356 |
+
+So `ddcc434` closed **one of five**, and the register said "the 5 missing artifacts are still missing" while
+one of them was already in the clone. `gate:n` is the gate that caught that, by going red on a stale
+disclosure, which is what it is for. 5.5 MB is well inside the convention this repository already keeps:
+four zkeys it tracks are larger, the largest being `greekssigned_plonk.zkey` at 24,672,856 bytes.
+
+**A second circuit set arrived in the same window.** `lpclosed` and `lpclosed2` were compiled on 30 July,
+which briefly made this gate red on `[lpclosed,lpclosed2]` rather than on `liquidation` — a true report of a
+different fact. Both `.r1cs` are now in the mirror, along with `hez_final_13.ptau` (9,520,280 bytes), which
+`lpclosed` needs because it is 7,471 Plonk constraints and `hez_final_12` refuses it outright.
 
 **And the gate still cannot be run to completion.** It spawns every discovered `gate*.mjs` with a
 300-second cap and fully buffered output, so a full run is structurally hours. The flag meant to shrink the

@@ -25,7 +25,21 @@ include "../../node_modules/circomlib/circuits/comparators.circom";
 // So there is nothing to reduce. The 36,613-constraint 81-node restatement, the 932-constraint
 // bracket certificate for a 200-step bisection, and the 2^16..2^17 powers-of-tau they need are all
 // certifying a numerical method for a quantity with an exact answer. This template certifies the
-// answer, in ~2k constraints, under the hez_final_12 already on disk.
+// answer instead.
+//
+// CORRECTED 30 July 2026. This used to end "in ~2k constraints, under the hez_final_12 already on
+// disk". Both halves were wrong, and wrong the same way probe-lpclosed-cost.json was: an R1CS count
+// read as though it were a Plonk domain. Compiled and measured, not estimated:
+//
+//     3,854 R1CS  ->  7,471 Plonk  ->  domain 8,192
+//
+// and snarkjs refuses the smaller ceremony in as many words: "circuit too big for this power of tau
+// ceremony. 7471 > 2**12". So this template needs hez_final_13, a public download that moves no hash.
+// lpclosed2.circom is the variant that genuinely fits 2^12, at 1,847 R1CS and 3,554 Plonk, and it pays
+// for that with a power-of-two working scale and a v cap of 256. R1CS to Plonk inflation measured over
+// four of this repo's own zkeys is 1.86x to 1.95x; this circuit came out at 1.9385x.
+//
+// Gated by zk/scripts/gateLPC-closed-form.mjs, which ASSERTS the 2^12 refusal rather than restating it.
 //
 // SHAPE. Horner-evaluate exp(-x) for x = v/(8 * 2^K) -- small, so the series is short and every
 // intermediate sits in [0.98, 1] where fixed point behaves -- then K squarings to reach exp(-v/8).

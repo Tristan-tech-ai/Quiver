@@ -93,7 +93,7 @@ step needs a download, write the fetch with a checksum assertion.**
 
 | artifact class | decision | reason |
 |---|---|---|
-| 37 `.circom` | **commit** — 245,992 B | text, and the only irreducible input. Six of them are generator output and are checked against a regeneration |
+| 37 `.circom` | **commit** — 246,888 B | text, and the only irreducible input. Six of them are generator output and are checked against a regeneration |
 | 47 probe/gate `.mjs` | **commit** — 316,228 B | text. These *are* the refutations. Two of them, `figures.mjs` and `gateZ2-repro-figures.mjs`, check this document rather than a circuit |
 | 5 `probe*.json` from the original run | **commit** — 5,701 B | the original verdicts, for comparison against a re-run |
 | `MANIFEST.json`, `README.md` | **commit** — 16,196 B | the pins and the map |
@@ -105,7 +105,7 @@ step needs a download, write the fetch with a checksum assertion.**
 | every other `.ptau` | **script** | see §5. 270 MiB more, and not byte-reproducible when generated |
 | `build/pot12_final.ptau` | **neither** | it is `hez_final_12.ptau` with a different name and the same sha256. Committing a byte-identical duplicate would be 4.58 MiB spent on nothing |
 
-**Total committed: 5,385,805 bytes (5.14 MiB) across 92 files**, read out of `git ls-tree` at HEAD —
+**Total committed: 5,386,701 bytes (5.14 MiB) across 92 files**, read out of `git ls-tree` at HEAD —
 584,117 bytes (570.4 KiB) of text in 91 files, plus the 4,801,688-byte ceremony file, plus 12 lines of
 `.gitattributes`. Every figure in this section is asserted by `npm run gate:z2`, which recomputes it
 from `git ls-tree` and goes red on a disagreement; the five ways it can go red are in `gate:z2-revert`.
@@ -121,11 +121,11 @@ and why the two other honest resolutions are worse. Its size, if you want it:
 <!--figures:size-table-->
 | where | bytes | files |
 |---|---|---|
-| `zk/circuits/adv/` — the `.circom` pinned in `MANIFEST.json` | 245,992 | 37 |
+| `zk/circuits/adv/` — the `.circom` pinned in `MANIFEST.json` | 246,888 | 37 |
 | `zk/scripts/adversary/` | 319,864 | 50 |
 | `gates/gateZ*.mjs` — the two gates and their two reverts | 18,261 | 4 |
 | `zk/build/hez_final_12.ptau` | **4,801,688** | 1 |
-| **total** | **5,385,805** | **92** |
+| **total** | **5,386,701** | **92** |
 
 Two growth statements, each naming its own denominator, because the first version of this paragraph
 did not and was read as the other one.

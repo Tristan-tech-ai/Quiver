@@ -305,9 +305,21 @@ app.get('/proof/vk/:circuit', (req, res) => {
 // answer 200 with an empty body — which is why gate A asserts on this route's JSON rather than on the
 // store's return value.
 app.get('/proof/:contentHash', async (req, res) => {
-  const h = String(req.params.contentHash || '').toLowerCase();
-  if (!/^[0-9a-f]{64}$/.test(h)) {
-    return res.status(400).json({ error: 'bad_content_hash', note: 'Pass the 64-character proof.contentHash from a perp-gate or size-gate response.' });
+  // A SECOND PROOF FOR ONE ANSWER NEEDS A SECOND KEY, and this route used to refuse it.
+  //
+  // `lp-risk` serves two: `lpbracket` certifies the breakeven and `lpclosed` certifies the headline. They
+  // are proofs of different sentences about the SAME response, so they share a contentHash and are stored
+  // as `<hash>` and `<hash>:lpclosed`. The validator below accepted only 64 hex characters, so the second
+  // was built, stored, and unreachable — answering `bad_content_hash` to the very URL the response told
+  // the caller to fetch. Found by retrieving it from the deployed container rather than from the store.
+  //
+  // The suffix is matched against the known circuit names rather than accepted as free text, so this stays
+  // a lookup key and does not become a path a caller can steer.
+  const raw = String(req.params.contentHash || '').toLowerCase();
+  const m = raw.match(/^([0-9a-f]{64})(?::([a-z0-9]+))?$/);
+  const h = m ? (m[2] ? `${m[1]}:${m[2]}` : m[1]) : raw;
+  if (!m || (m[2] && !CIRCUITS.includes(m[2]))) {
+    return res.status(400).json({ error: 'bad_content_hash', note: `Pass the 64-character proof.contentHash from a proof-emitting response, optionally suffixed with ":<circuit>" for a second proof of the same answer. Known circuits: ${CIRCUITS.join(', ')}.` });
   }
   const rec = await getProof(h);
   if (!rec) {

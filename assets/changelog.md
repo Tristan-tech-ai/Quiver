@@ -48,6 +48,14 @@ Appendix C still reproduces byte-for-byte.
 Measured end to end through the production worker before shipping: witness built, **proved in about 2.7
 seconds**, four public signals, verifies against the published key, and a tampered signal is rejected.
 
+**And the first deploy of it shipped the proof unreachable, which is worth writing down.** A second proof
+for one answer needs a second key, so it is stored as `<hash>:lpclosed` beside the first. The
+`/proof/:contentHash` route validated 64 hex characters and nothing else, so it answered
+`bad_content_hash` to the exact URL the response had just told the caller to fetch. The proof was built,
+stored, and unreachable. It was found by retrieving it from the deployed container rather than from the
+store, which is the only place the difference shows. The route now accepts an optional `:<circuit>`
+suffix, matched against the known circuit names rather than taken as free text.
+
 **One mistake on the way, recorded because nothing shipped from it.** The first wiring used a string
 `replace` on `env.snark = snark;`, which takes the first match — and both served files carry two, the
 earlier belonging to `options-risk`. The proof was attached to the wrong service. The test caught it, both

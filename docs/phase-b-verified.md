@@ -711,13 +711,20 @@ Recorded because the disease, not the instance, is the thing.
     0.05%`, and `lpDesk REFUSES rather than reporting noise when there are too few swaps`. The suite
     total of 386 counts them; 381 is what runs without an RPC.
 37. **The three LP1 encoder refusals** were characterised from their reason string, not individually
-    verified. **Still true, and the artifact is why.** Checked 31 July 2026:
-    `build/gateLP1-bracket-sweep.json` records `certified: 562` of `samples: 600`,
-    `refusedByEncoder: 3`, and `refusalReasons: {"g(lo) > 0 does not survive the grid": 3}` — a count
-    against a single string. **The artifact does not record WHICH three samples were refused**, so there
-    is nothing to re-derive them from without re-running the sweep with per-case output the gate does not
-    currently emit. Verifying them individually is a change to the gate, not a reading of its output, and
-    it is left open rather than closed by restating the same string a second time.
+    verified. **CLOSED 31 July 2026, by fixing the gate first.** The artifact recorded a count against one
+    string and nothing identifying which draws produced it, so the gate now records each case with the
+    inputs that caused it (`refusedCases` in `gateLP1-bracket-sweep.json`). Re-run: still 562 certified
+    of 600, still 3 refused, and the three are now named — fee APRs of **0.030%**, **0.017%** and
+    **0.824%** at horizons of 77, 7 and 332 periods.
+    Each was then re-derived independently against the encoder’s own arithmetic rather than its message:
+    `eLoHat + feeHat` comes to **exactly 1,000,000,000** in all three, which is not *greater than*
+    `SCALE`. **3 of 3 confirmed**, and they are one edge rather than three coincidences: the straddle
+    margin sits under half a grid step, so rounding puts it precisely on the boundary and the encoder
+    refuses instead of certifying a straddle it cannot see.
+    A first attempt at this check disagreed on 2 of the 3, and it was the check that was wrong: it read
+    `bracket.lo` as a volatility and squared it, where the encoder passes it to `expectedIlNumerical`
+    as the variance directly, and it added raw doubles where the encoder compares scaled integers.
+
 38. **Groth16's operational cost is unmeasured.** It needs a per-circuit phase-2 ceremony where Plonk's
     setup is universal; the contributions made this session are single-contributor and worthless as
     trust. Every Groth16 gas advantage above carries that unpriced.

@@ -1,10 +1,48 @@
 {
-  "at": "2026-07-30T02:05:07.125Z",
+  "at": "2026-07-31T04:50:44.145Z",
   "passed": true,
   "samples": 600,
   "certified": 562,
   "refusedByEncoder": 3,
   "strayedFromServed": 0,
+  "refusedCases": [
+    {
+      "volatility": 0.39556605595423194,
+      "horizonPeriods": 77,
+      "feeAprPct": 0.02983551448353345,
+      "servedSigma": 0.00256,
+      "feeFrac": 0.00006294067438991989,
+      "bracket": {
+        "lo": 0.0005035400390625,
+        "hi": 0.0005054473876953125
+      },
+      "reason": "g(lo) > 0 does not survive the grid"
+    },
+    {
+      "volatility": 0.29618089681779075,
+      "horizonPeriods": 7,
+      "feeAprPct": 0.01729275064010316,
+      "servedSigma": 0.00195,
+      "feeFrac": 0.0000033164179309786887,
+      "bracket": {
+        "lo": 0.000026524066925048828,
+        "hi": 0.00002658367156982422
+      },
+      "reason": "g(lo) > 0 does not survive the grid"
+    },
+    {
+      "volatility": 0.23008574019190192,
+      "horizonPeriods": 332,
+      "feeAprPct": 0.8241052417087344,
+      "servedSigma": 0.01346,
+      "feeFrac": 0.007495970965679448,
+      "bracket": {
+        "lo": 0.060193657875061035,
+        "hi": 0.06019366532564163
+      },
+      "reason": "g(lo) > 0 does not survive the grid"
+    }
+  ],
   "engineReturnedNull": 35,
   "noBracket": 0,
   "refusalReasons": {

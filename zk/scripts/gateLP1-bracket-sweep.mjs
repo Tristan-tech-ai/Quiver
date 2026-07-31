@@ -74,6 +74,7 @@ let kept = 0, refused = 0, nullBreakeven = 0, noBracket = 0;
 let strayed = 0, midViolations = 0, straddleViolations = 0, rootViolations = 0;
 let worstRoot = null, worstHalvings = 0, minHalvings = Infinity, worstWidthSlack = null;
 const refusalReasons = new Map();
+const refusedCases = [];   // every encoder refusal, with the inputs that produced it (see §37)
 
 for (let i = 0; i < RUNS; i++) {
   // Fee APRs from a dust pool to a degenerate one, horizons from a day to a year.
@@ -93,6 +94,19 @@ for (let i = 0; i < RUNS; i++) {
   if (enc.refused) {
     refused++;
     refusalReasons.set(enc.refused, (refusalReasons.get(enc.refused) || 0) + 1);
+    // AND THE CASE ITSELF, not only a tally against its reason string.
+    //
+    // §37 of the defect register says these refusals "were characterised from their reason string, not
+    // individually verified" — and they could not be, because the artifact recorded a COUNT against one
+    // string and nothing that identifies which draws produced it. Three refusals all reading
+    // "g(lo) > 0 does not survive the grid" could be three instances of one edge or three unrelated
+    // things that happen to print alike, and no reader could tell from the output. The inputs are
+    // recorded here so each is reproducible on its own.
+    refusedCases.push({
+      volatility, horizonPeriods, feeAprPct, servedSigma: served, feeFrac,
+      bracket: { lo: br.lo, hi: br.hi },
+      reason: enc.refused,
+    });
     continue;
   }
   // The guard: certify only when the certified figure IS the figure the service published.
@@ -165,6 +179,8 @@ console.log(`GATE LP1: ${gate ? 'PASSED' : `FAILED — ${bad.map((x) => x.name).
 writeFileSync(path.join(BUILD, 'gateLP1-bracket-sweep.json'), JSON.stringify({
   at: new Date().toISOString(), passed: gate, samples: RUNS,
   certified: kept, refusedByEncoder: refused, strayedFromServed: strayed,
+  // Named cases, not just a tally: §37 could not be closed from a count against one string.
+  refusedCases,
   engineReturnedNull: nullBreakeven, noBracket,
   refusalReasons: Object.fromEntries(refusalReasons),
   monotonicity: { samples, nonDecreasingSteps: mono, range: [1e-8, 1e4] },

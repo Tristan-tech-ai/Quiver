@@ -140,16 +140,63 @@ the fill, the exact shortfall and the headline.
 
 Read from the artifacts by `zk/scripts/circuit-facts.mjs`, not written down:
 
-| circuit | R1CS | Plonk | public | domain | EVM accept | verifier bytes |
+| circuit | R1CS | Plonk | public | domain | EVM accept (one sample) | verifier bytes |
 |---|---|---|---|---|---|---|
-| `constantproduct` (benchmark only) | 671 | 1,293 | 10 | 2048 | 276,892 gas | 7,694 |
-| `execadverse` (benchmark + headline) | 932 | 1,797 | 15 | 2048 | 279,280 gas | 8,754 |
-| delta | +261 | +504 | +5 | **unchanged** | **+2,388 gas (+0.9%)** | +1,060 |
+| `constantproduct` (benchmark only) | 671 | 1,293 | 10 | 2048 | 273,564 <!--gas:gateB5-2-constantproduct-evm#acceptGas~2%--> | 7,694 |
+| `execadverse` (benchmark + headline) | 932 | 1,797 | 15 | 2048 | 281,984 <!--gas:gateB5-5-execadverse-evm#acceptGas~2%--> | 8,754 |
+| delta | +261 | +504 | +5 | **unchanged** | *see below — a subtraction of two samples measures nothing* | +1,060 |
 
-The domain not moving is the whole economics of this. Plonk's cost is set by the power-of-two domain,
-and 1,797 gates still fit the 2048 the benchmark alone already needed — so the headline needs no new
-ceremony file, no larger `hez_final_12`, and the proof stays constant-size. On chain it costs 2,388
-extra gas, which is the marginal cost of five more public inputs and nothing else.
+The R1CS, Plonk, public and byte columns are exact: they are properties of the compiled circuit and of
+deterministic bytecode, and they reproduce to the digit. **The gas column is not, and the delta column
+has been removed rather than corrected.**
+
+### The delta this table used to publish was noise
+
+This table shipped `**+2,388 gas (+0.9%)**`, obtained by subtracting one accept-gas sample from
+another. That is not a small error bar on the marginal; it is a draw from a window wider than the
+marginal itself, and the same quantity has since been published as **2,388**, **3,318**, **6,340** and
+**8,420** depending on which pair of runs was subtracted. Nothing changed in the circuits between those
+four numbers.
+
+Measured directly by `zk/scripts/probe-execadverse-marginal.mjs` — 25 proofs of each circuit, every one
+verified in a **fresh EVM** so it pays the EIP-2929 cold-access price a standalone transaction pays:
+
+| | `constantproduct` | `execadverse` |
+|---|---|---|
+| public signals | 10 | 15 |
+| median accept | 276,476 <!--gas:probe-execadverse-marginal#constantproduct.median--> | 280,210 <!--gas:probe-execadverse-marginal#execadverse.median--> |
+| min | 274,604 <!--gas:probe-execadverse-marginal#constantproduct.min--> | 278,240 <!--gas:probe-execadverse-marginal#execadverse.min--> |
+| max | 278,042 <!--gas:probe-execadverse-marginal#constantproduct.max--> | 282,706 <!--gas:probe-execadverse-marginal#execadverse.max--> |
+| spread across 25 proofs of an IDENTICAL statement | 3,438 gas <!--gas:probe-execadverse-marginal#constantproduct.spread--> = 1.24% | 4,466 gas <!--gas:probe-execadverse-marginal#execadverse.spread--> = 1.59% |
+
+So the marginal has two honest readings, and they answer different questions:
+
+- **As a one-shot subtraction — which is what was published — it is meaningless.** One proof of each,
+  subtracted, can land anywhere from 198 <!--gas:probe-execadverse-marginal#marginal.oneShotSmallest-->
+  to 8,102 gas <!--gas:probe-execadverse-marginal#marginal.oneShotLargest-->. That window is
+  7,904 gas <!--gas:probe-execadverse-marginal#marginal.oneShotWindow--> wide, **2.1× the size of the
+  quantity being measured**, and it contains every one of the four figures this document and its
+  siblings have published. `2,388` was never wrong as a *measurement*; it was wrong as a *claim*,
+  because a single subtraction cannot resolve a difference this small.
+- **As a difference of means over 25 proofs each, it is measurable**:
+  **+3,815 gas** <!--gas:probe-execadverse-marginal#marginal.meanMinusMean-->, standard error 288, 95%
+  interval 3,251 <!--gas:probe-execadverse-marginal#marginal.ci95Low--> to
+  4,379 gas <!--gas:probe-execadverse-marginal#marginal.ci95High-->. That is
+  763 gas <!--gas:probe-execadverse-marginal#marginal.gasPerExtraPublicSignal--> per extra public
+  signal across five signals, against the ~822-per-signal figure `zk/scripts/lib/gas-facts.mjs`
+  derives independently — consistent with nothing but the public-input count having changed.
+
+**The rule this puts on every marginal in this repository: a gas difference of a few thousand cannot be
+published as a single number.** The per-circuit spread alone is
+3,438 <!--gas:probe-execadverse-marginal#constantproduct.spread--> and
+4,466 <!--gas:probe-execadverse-marginal#execadverse.spread--> gas, and a difference inherits both. State
+it as a mean over many proofs with an interval, or do not state it.
+
+The domain not moving is still the whole economics of this. Plonk's cost is set by the power-of-two
+domain, and 1,797 gates still fit the 2048 the benchmark alone already needed — so the headline needs no
+new ceremony file, no larger `hez_final_12`, and the proof stays constant-size. The on-chain price of
+that is the mean marginal measured above — a little under four thousand gas, for five more public inputs
+and nothing else.
 
 This is the same shape as the fixed-point lesson the greeks work already learned: `greeksfp.circom`
 came out at 1,919 Plonk against `greeks.circom`'s 2,152 — the more honest encoding was the cheaper one.
@@ -170,8 +217,11 @@ are refused before a proof exists.
 the 2^62 width, 0 divergences, 0 bound violations. Tightest invariant `2|R|/TOL = 7.997e-1`; tightest
 fee `2|Rf|/S = 1.000e+0`; **the worst honest case uses 77.7% of the derived agreement allowance.**
 
-**B5-2** `constantproduct` in an EVM — PASSED. Accept 276,892 gas, cheapest refusal 573 gas, 11 of 11
-tampered submissions refused, solc 0.8.26.
+**B5-2** `constantproduct` in an EVM — PASSED. Accept 273,564 gas <!--gas:gateB5-2-constantproduct-evm#acceptGas~2%-->
+(one sample, `gateB5-2-constantproduct-evm.json` at 2026-07-30T00:34:52.291Z; 25 proofs of the same
+statement span 274,604 to 278,042, so this sample sits below its own distribution), cheapest refusal
+573 gas <!--gas:gateB5-2-constantproduct-evm#rejectGas-->, 11 of 11 tampered submissions refused,
+solc 0.8.26.
 
 **B5-3** `execadverse`, prove / verify / refuse — PASSED (new). 1,797 Plonk, 15 public, domain 2048,
 proved in 1,036 ms. All 15 public signals refuse a `+1` perturbation. **13 of 13** dishonest witnesses
@@ -183,8 +233,17 @@ circuit certifies −130.090270812.
 **B5-4** `execadverse` against the live engine — PASSED (new). 3,596 trades kept, 404 outside the 2^62
 width, 0 outside the 2^50 bps width, 0 divergences, 0 violations of any of the three bounds.
 
-**B5-5** `execadverse` in an EVM — PASSED (new). Accept 279,280 gas, cheapest refusal 573 gas, 16 of 16
-tampered submissions refused, verifier 8,754 bytes.
+**B5-5** `execadverse` in an EVM — PASSED (new). Accept 281,984 gas <!--gas:gateB5-5-execadverse-evm#acceptGas~2%-->
+(one sample, `gateB5-5-execadverse-evm.json` at 2026-07-30T00:34:48.160Z), cheapest refusal
+573 gas <!--gas:gateB5-5-execadverse-evm#rejectGas-->, 16 of 16 tampered submissions refused, verifier
+8,754 bytes.
+
+That artifact also stores a `marginalOverBenchmark` block, and **it must not be quoted.** As written on
+30 July it recorded a `benchmarkAcceptGas` of 275,644 and a marginal of 6,340 — but B5-5 wrote at
+00:34:48 and B5-2 wrote at **00:34:52, four seconds later**, so the two terms of that subtraction came
+from different runs of the benchmark, and the 275,644 it named was no longer what
+`gateB5-2-constantproduct-evm.json` held. Both figures move on any re-run and neither is cited here for
+that reason. The honest marginal is the interval measured above.
 
 ### The divergence bound, derived rather than inherited
 
@@ -299,7 +358,9 @@ disclaimer.
 The benchmark is the one number in the response the buyer cannot compute for themselves. Given reserves
 they can see, they still have to trust that `y·dx(1−f)/(x + dx(1−f))` was evaluated correctly for their
 size, and this repo has now found the same class of arithmetic defect three separate times in its own
-encoders. A succinct proof replaces "re-run it and see" with "check 279,280 gas of pairing".
+encoders. A succinct proof replaces "re-run it and see" with a single pairing check, measured at
+281,984 gas <!--gas:gateB5-5-execadverse-evm#acceptGas~2%--> on the sample this document cites and ~280k on
+the median of 25.
 
 The shortfall is the number a dispute is about. An insurance claim, a DAO reimbursement vote, or a
 relayer's SLA argument is denominated in output tokens lost, not in basis points, and that figure is

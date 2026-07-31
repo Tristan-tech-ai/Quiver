@@ -18,8 +18,17 @@
 // anywhere in the path — which is not fastidiousness but the direct lesson of defect 3, whose entire
 // cause was backticks inside a double-quoted `node -e` argument being command substitution.
 //
+// DO NOT RUN TWO COPIES OF THIS AT ONCE — not from two trees, not from two sessions.
+// Measured on 30 July: this script mutates a real document and then asks the checker whether the tree is
+// consistent, and the checker's corpus spans BOTH the service tree and the published mirror. So a run
+// started from `Quiver` sees the file a run started from `hackathon/veritape` has mid-flight, one of them
+// aborts on a baseline that is red through no fault of its own, and the aborting one exits through a path
+// that has already written the defect and not yet restored it. That left `VERIFY_EXEC_VERIFY.md`
+// published with a marginal of 3,318 — one of the exact wrong values this whole exercise is about,
+// reintroduced by the tool built to catch it. Run them one after the other.
+//
 //   node gates/docs-coverage-revert.mjs        (npm run docs:revert)
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
@@ -137,6 +146,68 @@ const DEFECTS = [
       'sentence ends "in ."',
     ],
   },
+  // ── the gas figures ────────────────────────────────────────────────────────────────────────────
+  // On 30 July every gas figure in the four `VERIFY_*.md` gate reports disagreed with the JSON that
+  // produced it, and this tool reported CONSISTENT over all of them across 225 documents. Rule 9 was
+  // written for that, and these four scenarios put the published text back.
+  //
+  // They are deliberately four rather than one, because rule 9 has four independent ways to be right
+  // and a revert that exercises one of them proves nothing about the other three.
+  {
+    id: 'GAS-UNCITED-PROSE',
+    what: 'VERIFY_EXEC_VERIFY.md published three gas figures in one table with no artifact behind any of them',
+    files: [join(ROOT, 'hackathon', 'VERIFY_EXEC_VERIFY.md'), join(SERVICE, 'docs', 'verify-exec-verify.md')],
+    from: '| `constantproduct` (benchmark only) | 671 | 1,293 | 10 | 2048 | 273,564 <!--gas:gateB5-2-constantproduct-evm#acceptGas~2%--> | 7,694 |\n'
+      + '| `execadverse` (benchmark + headline) | 932 | 1,797 | 15 | 2048 | 281,984 <!--gas:gateB5-5-execadverse-evm#acceptGas~2%--> | 8,754 |\n'
+      + '| delta | +261 | +504 | +5 | **unchanged** | *see below — a subtraction of two samples measures nothing* | +1,060 |',
+    to: '| `constantproduct` (benchmark only) | 671 | 1,293 | 10 | 2048 | 276,892 gas | 7,694 |\n'
+      + '| `execadverse` (benchmark + headline) | 932 | 1,797 | 15 | 2048 | 279,280 gas | 8,754 |\n'
+      + '| delta | +261 | +504 | +5 | **unchanged** | **+2,388 gas (+0.9%)** | +1,060 |',
+    names: [
+      'publishes 276,892 gas without citing the artifact that measured it',
+      'publishes 279,280 gas without citing the artifact that measured it',
+      'publishes 2,388 gas without citing the artifact that measured it',
+    ],
+  },
+  {
+    id: 'GAS-UNCITED-TABLE',
+    what: 'VERIFY_PORTFOLIO_GATE.md published six per-leg gas figures in a table column where the word "gas" appears only in the header',
+    files: [join(ROOT, 'hackathon', 'VERIFY_PORTFOLIO_GATE.md'), join(SERVICE, 'docs', 'verify-portfolio-gate.md')],
+    // This is a SEPARATE scenario from the one above and not a duplicate of it: the prose half of rule
+    // 9 keys on the word "gas" next to the number, and in this table that word is in the header and on
+    // none of the rows. A rule with only the prose half was measured green over all six of these.
+    from: '| 1 | 279,678 <!--gas:gateB10-portfolio-perleg#gasByLegCount.0.gas~2%--> | 279,678 |',
+    to: '| 1 | 276,448 | 276,448 |',
+    names: ['table column "gas" publishes 276,448 without citing the artifact that measured it'],
+  },
+  {
+    id: 'GAS-WRONG-ARTIFACT',
+    what: 'the benchmark verifier\'s gas figure attributed to the headline verifier — a real 3% misattribution, not a re-sample',
+    files: [join(ROOT, 'hackathon', 'VERIFY_EXEC_VERIFY.md'), join(SERVICE, 'docs', 'verify-exec-verify.md')],
+    // Presence is not enough. This scenario leaves the citation in place and points it at the WRONG
+    // artifact, which is what "a published marginal took its two terms from different runs" is made
+    // of. It proves the VALUE comparison can fail, where GAS-UNCITED-* only prove the presence check
+    // can.
+    // The wrong artifact is the 3-leg PORTFOLIO verifier, not the sibling `execadverse` one. Pointing
+    // it at `execadverse` first put the scenario 2.99% out in this tree and 2.05% out in the mirror —
+    // red in both, but by 0.05 percentage points in one of them, which is a scenario that would flip to
+    // MISS on the next re-run of a gate and teach the reader that the revert is flaky rather than that
+    // the rule works. A misattribution the rule should catch has to be unambiguously outside the band.
+    from: '**B5-2** `constantproduct` in an EVM — PASSED. Accept 273,564 gas <!--gas:gateB5-2-constantproduct-evm#acceptGas~2%-->',
+    to: '**B5-2** `constantproduct` in an EVM — PASSED. Accept 273,564 gas <!--gas:gateB8-2-portfolio-evm#acceptGas~2%-->',
+    names: ['citing gateB8-2-portfolio-evm#acceptGas within ~2%'],
+  },
+  {
+    id: 'GAS-MARGINAL-3318',
+    what: 'the marginal restored to 3,318 — one of the four values that one quantity has been published as',
+    files: [join(ROOT, 'hackathon', 'VERIFY_EXEC_VERIFY.md'), join(SERVICE, 'docs', 'verify-exec-verify.md')],
+    // A DERIVED statistic is held EXACTLY, with no tolerance, because the whole defect was that its two
+    // terms came from different runs. 2,388 / 3,318 / 6,340 / 8,420 are the four values this one
+    // quantity has taken; every one of them is now a red.
+    from: '  **+3,815 gas** <!--gas:probe-execadverse-marginal#marginal.meanMinusMean-->, standard error 288, 95%',
+    to: '  **+3,318 gas** <!--gas:probe-execadverse-marginal#marginal.meanMinusMean-->, standard error 288, 95%',
+    names: ['publishes 3,318 citing probe-execadverse-marginal#marginal.meanMinusMean'],
+  },
 ];
 
 const results = [];
@@ -153,6 +224,22 @@ if (base.code !== 0) {
 say(`  BASELINE  ${base.out.trim().split('\n').pop()}\n`);
 
 for (const d of DEFECTS) {
+  // A defect may live at a DIFFERENT PATH in each tree. The four gate reports sit at
+  // `hackathon/VERIFY_*.md` beside the service and at `Quiver/docs/verify-*.md` in the published
+  // mirror, so `files` lists the candidates and the first one present is the one reverted. Naming a
+  // single path made every gas defect ERROR OUT in the mirror, which reports a broken revert rather
+  // than a broken checker — the same trap the `preCorpus` comment above records.
+  if (d.files) {
+    const found = d.files.find((p) => existsSync(p));
+    if (!found) {
+      results.push({ id: d.id, ok: false });
+      say(`  *MISS*  ${d.id.padEnd(16)} ${d.what}`);
+      say(`     ERROR none of these paths exist in this tree: ${d.files.map((p) => relative(ROOT, p)).join(', ')}`);
+      say();
+      continue;
+    }
+    d.file = found;
+  }
   const original = readFileSync(d.file, 'utf8');
   const chosen = d.either
     ? d.either.find((e) => original.includes(e.from)) || d.either[0]

@@ -70,6 +70,50 @@ const SUITE_SIZE = (() => {
   return n;
 })();
 
+// The measured gas figures, read from the artifacts that measured them. Loaded lazily and cached,
+// because most documents cite none and the directory holds 169 files.
+//
+// WHY THIS IS HERE AT ALL. On 30 July every gas figure in the four `VERIFY_*.md` reports disagreed
+// with the JSON that produced it — seven for seven on the first pass, twenty-one once the table
+// columns were counted too — and this tool passed over all of them across 225 documents, because
+// nothing here had ever looked at a gas number. Same shape as the README that claimed every gate
+// passed: a checker is blind to whatever it was never told to compare.
+//
+// The mechanism was worse than staleness. `gateB5-5` wrote at 00:34:48 and `gateB5-2` at 00:34:52,
+// four seconds apart, and the published marginal took its two terms from the two different runs. So
+// the figures do not merely go stale — they are SAMPLES of a noisy quantity, and re-running a gate
+// changes them. `gateB6-portfolio-routes.json` was re-run mid-session by a sibling and its eleven-leg
+// figure moved from 2,941,749 to 2,939,559 while this rule was being written.
+//
+// That is why the rule is deliberately BRITTLE against a re-run: if a gate is measured again and a
+// document still quotes the old sample, the document is stale and must say so. Going red on that is
+// the alarm that was missing, not a false positive.
+// WHERE `zk/build` IS depends on which tree this runs in, and hardcoding one answer made the mirror
+// permanently red. Beside the service it is `<root>/zk/build`; in the published repository the
+// artifacts ship INSIDE it at `Quiver/zk/build`, and `ROOT` there resolves one level too high for the
+// same reason `hasSiblings` exists below. Candidates are tried in order and the first that exists wins.
+//
+// If NONE exists — a checkout that ships documents without artifacts — the citation half of rule 9
+// cannot run, and it says so on stderr rather than passing quietly. A checker that examines nothing
+// and reports success is the failure this whole file is a monument to.
+const GAS_BUILD = [
+  join(ROOT, 'zk', 'build'),
+  join(SERVICE, 'zk', 'build'),
+  join(SERVICE, '..', 'zk', 'build'),
+].find((p) => existsSync(p)) || null;
+if (!GAS_BUILD) console.error('!! no zk/build in this checkout — gas CITATIONS cannot be checked against artifacts (the requirement to carry one still is).');
+const gasCache = new Map();
+const gasArtifact = (name) => {
+  if (!GAS_BUILD) return undefined;          // undefined = cannot check; null = checked and absent
+  if (gasCache.has(name)) return gasCache.get(name);
+  const p = join(GAS_BUILD, `${name}.json`);
+  let v = null;
+  if (existsSync(p)) { try { v = JSON.parse(readFileSync(p, 'utf8')); } catch { v = null; } }
+  gasCache.set(name, v);
+  return v;
+};
+const gasField = (json, field) => field.split('.').reduce((o, k) => (o == null ? o : o[k]), json);
+
 const FACTS = {
   partCount: partFiles.length,
   paperTables: paperShape.tables,
@@ -484,6 +528,185 @@ for (const f of docs) {
     const ln = lineOf(s, m.index);
     if (fenced[ln - 1]) continue;
     note(f, ln, `sentence ends "${m[0].trim()}" — the word after it is missing`);
+  }
+
+  // 9. A PUBLISHED GAS FIGURE MUST CITE THE ARTIFACT THAT MEASURED IT.
+  //
+  //    Two halves, and the second is what stops the first being opt-in:
+  //
+  //    (a) every citation is CHECKED. `<!--gas:gateB5-2-constantproduct-evm#acceptGas-->` after a
+  //        number means "this figure is that field", and the field is read and compared. A citation
+  //        to a missing artifact, a missing field, or a different value is red. Applies to logs too:
+  //        a log may say what was true when it was written, but it may not cite an artifact for a
+  //        figure the artifact does not contain — that is a false attribution, not a dated record.
+  //
+  //    (b) inside a gate REPORT — `VERIFY_*.md` and its mirrored `verify-*.md` — every verify-scale
+  //        gas figure must carry a citation. Without this, (a) is a rule you comply with by deleting
+  //        the annotation, which is the "verifier that cannot fail" disease with an extra step.
+  //
+  //    Read from `raw`, never the prose view: `asProse()` blanks anything between angle brackets, so
+  //    on an `.html` file it would erase exactly the annotation being checked. A citation is
+  //    structure, like the `/paper/N` URLs in rule 1.
+  //
+  //    SCOPE, stated rather than implied. (b) covers the report class this defect occurred in and
+  //    nothing else. Measured across this corpus, 39 documents name a gate artifact AND publish a
+  //    verify-scale gas figure, 111 figures in total — including `assets/whitepaper.*`, which is
+  //    frozen. Widening (b) to all 39 is the right end state and is NOT done here; what is done is
+  //    the class of document whose entire purpose is to report a measurement.
+  //
+  //    The `\*{0,2}` on both sides of the number is not decoration. `the wide 3-leg verifier's
+  //    **291,708** gas` is the exact form of one of the wrong figures, and a pattern requiring a bare
+  //    space between the number and the word walked straight past it — the same hole rule 2 already
+  //    records having had, in this same file, for the same reason.
+  const GAS_SCALE = (n) => n >= 200_000 && n <= 4_000_000;
+  // Below verify scale a gate report still publishes measured gas — a `rejectGas` of 573, and the
+  // MARGINAL, which is the figure that took four different values and started all of this. So the
+  // floor for a gate report is 500, not 200,000.
+  //
+  // The exemptions are ARITHMETIC ABOUT THE EVM, not measurements of this system: a cold account
+  // access is 2,600 and a warm one 100 by EIP-2929, three precompiles make the 7,500 cold/warm gap,
+  // and 21,000 is the intrinsic cost of a transaction. Those are properties of Ethereum that no
+  // artifact in `zk/build` measures or could, and demanding a citation for them would be the checker
+  // asking a document to source the yellow paper. Every one is a round number fixed by protocol; a
+  // MEASURED figure of this system has never landed on one.
+  const EVM_CONSTANT = new Set([100, 500, 2500, 2600, 5000, 7500, 21000]);
+  const REPORT_SCALE = (n) => n >= 500 && n <= 4_000_000 && !EVM_CONSTANT.has(n);
+  // The figure a citation refers to is the LAST number before it on the line. Two digits is the floor,
+  // not four: `573 gas <!--gas:…#rejectGas-->` and `from 198 <!--gas:…#oneShotSmallest-->` are both
+  // real citations in these reports, and a four-digit floor silently skipped past both to report "no
+  // figure precedes the citation" — a checker complaining about the wrong thing, which is how a real
+  // finding gets lost in noise the reader learns to ignore.
+  const numAt = (t) => {
+    const m = [...t.matchAll(/(\d{1,3}(?:,\d{3})+|\d{2,9})/g)].pop();
+    return m ? Number(m[1].replace(/,/g, '')) : null;
+  };
+
+  // The whole rule is off in PRE_WIDENING, because the walk that shipped these seven wrong figures had
+  // no gas rule of any kind. Modelling it as "the old walk but with rule 9" would demonstrate a blind
+  // spot that never existed and hide the one that did.
+  if (PRE_WIDENING) continue;
+
+  // (a) every citation is checked, in every document.
+  //
+  //     TWO FORMS, because two different kinds of quantity live in these artifacts and holding them
+  //     to the same standard is what produced the mess.
+  //
+  //       `<!--gas:F#field-->`      EXACT. For anything deterministic: `rejectGas`, deployed byte
+  //                                counts, a probe's own recorded statistics. These reproduce to the
+  //                                digit and a difference is a real defect.
+  //       `<!--gas:F#field~2%-->`   WITHIN 2%. For a single verify-gas sample, which is NOT
+  //                                deterministic. Measured 30 July: 1.24%, 1.59% and 1.73% spread
+  //                                across proofs of an IDENTICAL statement, so re-running a gate moves
+  //                                the figure by thousands with nothing having changed. Three gates
+  //                                were re-run by siblings DURING this rule's development and every
+  //                                figure in them moved.
+  //
+  //     Why the tolerance form has to exist, and why it is not a weakening. The stale figure that
+  //     started this — 276,892 against the artifact's 273,564 — differs by 1.2%, which is INSIDE the
+  //     noise. So it was never a wrong measurement; it was a legitimate sample, published to six
+  //     significant figures it does not have and then SUBTRACTED from another such sample. An exact
+  //     rule would go red on that for the wrong reason and, worse, would go red on every honest
+  //     re-run — which trains the next reader to delete the citation. A 2% rule says the thing that is
+  //     actually true: this figure must be a sample of THIS artifact's quantity, not of some other
+  //     circuit's, and it may not be quoted as if the digits mattered.
+  //
+  //     What the tolerance still catches, measured: every cross-artifact confusion in these four
+  //     documents. 291,708 against a wide-verifier 292,124 passes at 2% and SHOULD — same quantity,
+  //     different proof. 279,280 attributed to the benchmark verifier when the benchmark measures
+  //     273,564 is 2.1% out and goes red. A marginal is held EXACTLY, because a marginal is a derived
+  //     statistic and the whole defect was that its two terms came from different runs.
+  for (const m of raw.matchAll(/<!--\s*gas:([A-Za-z0-9_-]+)#([A-Za-z0-9_.]+)(?:~([\d.]+)%)?\s*-->/g)) {
+    const [, file, field, tolPct] = m;
+    const ln = lineOf(raw, m.index);
+    // `<!--gas:ARTIFACT#FIELD-->` is the SYNTAX, quoted verbatim by this rule's own error message and
+    // therefore by every document that records the rule. It is not a citation, and accusing it is the
+    // checker accusing its own documentation — the same mistake rule 8 records making when it fired on
+    // the string `TEN-TABLES`, which is the name of a revert scenario rather than a claim about the
+    // paper. Narrowed to the exact literal so a real artifact called anything else is still checked.
+    if (file === 'ARTIFACT' && field === 'FIELD') continue;
+    const json = gasArtifact(file);
+    if (json === undefined) continue;        // no build directory at all — already announced on stderr
+    if (!json) {
+      note(f, ln, `cites zk/build/${file}.json for a gas figure; that artifact is not in this checkout`);
+      continue;
+    }
+    const v = gasField(json, field);
+    if (v === undefined || v === null) {
+      note(f, ln, `cites ${file}#${field}; that artifact has no such field (top level: ${Object.keys(json).join(', ')})`);
+      continue;
+    }
+    // The figure being cited is the last number before the annotation on its own line.
+    const lineStart = raw.lastIndexOf('\n', m.index - 1) + 1;
+    const claimed = numAt(raw.slice(lineStart, m.index));
+    if (claimed === null) {
+      note(f, ln, `cites ${file}#${field} but no figure precedes the citation on this line`);
+      continue;
+    }
+    // Gas is integral, but a probe that reports a MEAN over 25 proofs stores 3815.2. A document
+    // publishing that as "3,815 gas" is correct, so the comparison rounds — it does not widen.
+    const truth = Math.round(Number(v));
+    const when = json.at ? ` as measured at ${json.at}` : '';
+    if (tolPct === undefined) {
+      if (claimed !== truth) {
+        note(f, ln, `publishes ${claimed.toLocaleString('en-US')} citing ${file}#${field}, which is ${truth.toLocaleString('en-US')}${when}`);
+      }
+    } else {
+      const tol = Number(tolPct);
+      // A tolerance of zero is the exact form written the long way, and a tolerance wide enough to
+      // admit anything is a citation that cannot fail — which is the disease, not the cure. 5% of a
+      // verify-gas figure is 14,000 gas, three times the measured spread; past that the citation is
+      // decoration.
+      if (!(tol > 0) || tol > 5) {
+        note(f, ln, `cites ${file}#${field} with a ~${tolPct}% tolerance; a gas citation must be exact or within 5%, or it cannot fail`);
+        continue;
+      }
+      const off = Math.abs(claimed - truth) / truth * 100;
+      if (off > tol) {
+        note(f, ln, `publishes ${claimed.toLocaleString('en-US')} citing ${file}#${field} within ~${tolPct}%, but that field is ${truth.toLocaleString('en-US')}${when} — ${off.toFixed(2)}% away`);
+      }
+    }
+  }
+
+  // (b) in a gate report, an uncited verify-scale gas figure is itself the finding.
+  const isGateReport = /(?:^|[\\/])(?:VERIFY_[A-Z0-9_]+\.md|verify-[a-z0-9-]+\.md)$/.test(f);
+  if (isGateReport && !PRE_WIDENING) {
+    // prose form: "281,984 gas", "**291,708** gas", "7,500-gas"
+    const cited = (idx) => {
+      const lineEnd = raw.indexOf('\n', idx);
+      return /<!--\s*gas:/.test(raw.slice(idx, lineEnd < 0 ? raw.length : lineEnd));
+    };
+    for (const m of raw.matchAll(/(\d{1,3}(?:,\d{3})+|\d{3,7})\*{0,2}\s*(?:-\s*)?gas\b/gi)) {
+      const n = Number(m[1].replace(/,/g, ''));
+      if (!REPORT_SCALE(n)) continue;
+      const ln = lineOf(raw, m.index);
+      if (fenced[ln - 1]) continue;
+      if (isQuoted(raw, m.index)) continue;
+      const near = raw.slice(Math.max(0, m.index - 240), m.index + 160);
+      if (/\bsaid\b|\bwas\b|\bwere\b|corrected|stale|no longer|used to|earlier|previously|recalled|superseded|disagree/i.test(near)) continue;
+      if (cited(m.index)) continue;
+      note(f, ln, `publishes ${m[1]} gas without citing the artifact that measured it — add <!--gas:ARTIFACT#FIELD-->`);
+    }
+    // table form: a body cell in a column whose header is exactly "gas". Six of the wrong figures
+    // lived here, in a column where the word "gas" appears once in the header and never on the rows,
+    // so the prose pattern above could not see any of them.
+    for (let i = 0; i < lines.length; i++) {
+      if (fenced[i] || !/^\s*\|/.test(lines[i])) continue;
+      let delim = -1;
+      for (let j = i - 1; j >= 0 && /^\s*\|/.test(lines[j]); j--) {
+        if (/^\s*\|[\s:|-]+\|\s*$/.test(lines[j]) && lines[j].includes('-')) { delim = j; break; }
+      }
+      if (delim < 1) continue;
+      const cellsOf = (L) => L.trim().replace(/^\|/, '').replace(/\|$/, '').split('|');
+      const head = cellsOf(lines[delim - 1]).map((c) => c.replace(/\*/g, '').trim().toLowerCase());
+      const cells = cellsOf(lines[i]);
+      for (let c = 0; c < cells.length && c < head.length; c++) {
+        if (!/^(?:accept |reject |verify )?gas$/.test(head[c])) continue;
+        const n = numAt(cells[c].replace(/<!--[\s\S]*?-->/g, ''));
+        if (n === null || !GAS_SCALE(n)) continue;
+        if (/<!--\s*gas:/.test(cells[c])) continue;
+        note(f, i + 1, `table column "${head[c]}" publishes ${n.toLocaleString('en-US')} without citing the artifact that measured it — add <!--gas:ARTIFACT#FIELD-->`);
+      }
+    }
   }
 }
 

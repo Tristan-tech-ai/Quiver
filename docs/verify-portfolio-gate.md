@@ -154,17 +154,48 @@ free under EIP-2929, which would flatter exactly the curve being judged):
 
 | legs | gas | gas/leg |
 |---|---|---|
-| 1 | 276,448 | 276,448 |
-| 3 | 815,487 | 271,829 |
-| 4 | 1,086,248 | 271,562 |
-| 6 | 1,625,200 | 270,867 |
-| 8 | 2,161,535 | 270,192 |
-| **11** | **2,968,446** | 269,859 |
+| 1 | 279,678 <!--gas:gateB10-portfolio-perleg#gasByLegCount.0.gas~2%--> | 279,678 |
+| 3 | 818,705 <!--gas:gateB10-portfolio-perleg#gasByLegCount.1.gas~2%--> | 272,902 |
+| 4 | 1,088,952 <!--gas:gateB10-portfolio-perleg#gasByLegCount.2.gas~2%--> | 272,238 |
+| 6 | 1,628,210 <!--gas:gateB10-portfolio-perleg#gasByLegCount.3.gas~2%--> | 271,368 |
+| 8 | 2,167,873 <!--gas:gateB10-portfolio-perleg#gasByLegCount.4.gas~2%--> | 270,984 |
+| **11** | **2,974,674** <!--gas:gateB10-portfolio-perleg#gasByLegCount.5.gas~2%--> | 270,425 |
 
-Against the wide 3-leg verifier's **291,708** gas (read out of `gateB8-2-portfolio-evm.json`, not
-written down): 11 legs costs **10.2x** what three legs in one proof cost. That is the price of the
-reach. The brief's recalled figure of 2,941,443 for gateB6's 11-leg route is not what
-`gateB6-portfolio-routes.json` holds either — that file records **2,944,135**.
+Read from `gateB10-portfolio-perleg.json` as written at 2026-07-30T01:41:22.761Z. **Every figure in the
+gas column is one sample and will move on the next run of the gate** — this table was rebuilt three times
+in one hour on 30 July because siblings re-ran gateB10 and gateB6 while it was being written, and the
+eleven-leg cell took the values 2,968,446 → 2,969,816 → 2,974,674 with nothing in the circuits having
+changed. The `gas/leg` column is that cell divided by the leg count, so it inherits the same noise; it is
+here for the trend, which is real and monotone, and not for its digits.
+
+**What is actually stable here is the RATIO, and the argument only ever needed the ratio.** Against the
+wide 3-leg verifier's 292,124 gas <!--gas:gateB8-2-portfolio-evm#acceptGas~2%-->, eleven legs costs
+**10.2×** what three legs in one proof cost. That multiple has come out at 10.17, 10.18 and 10.18 across
+the three re-runs — a ratio of two noisy figures is far better behaved than either figure, because the
+noise is a per-proof cost that scales with the number of proofs.
+
+### Three artifacts disagree about the eleven-leg figure, and none of them is wrong
+
+This is the part the earlier version of this section got backwards. It corrected a recalled 2,941,443 to
+"the recorded **2,944,135**", and *that* was not what the file held either. There is no single recorded
+value to correct to. Three artifacts measure the same eleven-leg per-leg route and record three numbers:
+
+| artifact | field | value | written |
+|---|---|---|---|
+| `gateB10-portfolio-perleg.json` | `perLeg.gas` | 2,974,674 | 2026-07-30T01:41:22.761Z |
+| `gateB6-portfolio-routes.json` | `routeB.gas` | 2,948,931 | 2026-07-30T01:40:31.079Z |
+| `gateB8-2-portfolio-evm.json` | `comparison.perLegRouteElevenLegsGas` | 2,947,769 | 2026-07-29T23:41:53.111Z |
+
+The largest minus the smallest is 26,905, or 0.91% — which is *inside* the 1.24%–1.59% per-proof spread measured in
+`VERIFY_EXEC_VERIFY.md`, multiplied across eleven proofs. **The three artifacts agree to within their own
+measurement noise. Picking one and calling it "the recorded figure" is the defect**, and it is the same
+defect as the marginal that took four values: a quantity that is a distribution being published as a
+digit. The honest statement is "about 2.95 million gas for eleven legs, ±30,000", and the ratio above.
+
+The wide 3-leg figure, by contrast, now agrees exactly across all three: `gateB8-2#acceptGas`,
+`gateB6#routeA.gas` and `gateB10#wide3LegVerifyGas` all read 292,124. Earlier in the day gateB10 held
+292,014 against the other two — a 110-gas disagreement that resolved itself when the gate was re-run, and
+that is the tell: a figure which changes when you re-measure it was never a fact about the verifier.
 
 **Latency, both sides measured in the same process on the same three legs**, because a comparison
 against a figure from another day's run is a comparison across two machine states:

@@ -1,0 +1,20 @@
+{
+  "note": "Prove time at Plonk domain 8192, measured on lpclosed with 7 repeats. One machine only; §6.1 item 8 of PHASE_B_VERIFIED remains open because nothing here is portable to other hardware. This is ONE circuit at ONE domain, not a scaling law.",
+  "circuit": "lpclosed",
+  "plonkConstraints": 7471,
+  "domain": 8192,
+  "samples": [
+    3030,
+    2959,
+    2958,
+    2898,
+    2934,
+    2963,
+    2899
+  ],
+  "minMs": 2898,
+  "medianMs": 2958,
+  "maxMs": 3030,
+  "meanMs": 2948.7,
+  "sdMs": 45.2
+}

@@ -534,12 +534,25 @@ These are the ones that most deserve the register, because each was stated as a 
 9. **"N=4 not buildable on disk" / "hez_final_13, 9,520,280 B, the actual requirement" / "the ceiling is
    3 legs."** Refuted — Groth16 fits 2^12 and the wide ceiling on the on-disk file is **five**. Two
    different power tests exist in `snarkjs`; only one was run.
+   **The byte count was the one part of it that was right, and it is now checked rather than asserted:**
+   `hez_final_13.ptau` was downloaded on 30 July and is **9,520,280 bytes** exactly, header power 13,
+   max domain 8,192, and it is committed. It was needed after all, though not for the reason given here:
+   `lpclosed.circom` is 7,471 Plonk constraints and `snarkjs` refuses the smaller ceremony outright.
 10. **"Downloading a file requires Tristan's explicit approval"** — used as the reason two items could
     not be measured. True as a rule, irrelevant as a blocker: `snarkjs powersoftau new` generates a valid
     2^13 offline in **55 seconds**. A measurement needs a *valid* ceremony, not a *trusted* one. The
     permission gate was cited where none applied.
 11. **"Proving time at domain 8,192: not measured and deliberately not extrapolated."** Measurable and
-    now measured: 4,931 / 3,888 / 3,249 ms, median 3,888.
+    now measured properly, 31 July 2026. The earlier figure here was three samples — 4,931 / 3,888 /
+    3,249 ms, median 3,888 — and item 7 of this same section is that every gas figure in the report is a
+    single sample whose error has a known direction, so three was not enough to fix its neighbour.
+    Re-measured on `lpclosed` (7,471 Plonk constraints, domain 8,192) with **seven** repeats:
+    **min 2,898 · median 2,958 · max 3,030 ms, mean 2,949, sd 45, spread 4.6% of the minimum.**
+    Recorded in `zk/build/probe-provetime-domain.json`. Note the earlier median sat 31% above this one
+    and every one of its three samples exceeded this run's maximum: single and few-shot timings on this
+    machine run high, which is the same direction item 7 warns about. **Item 8 of §6.1 stays open** —
+    this is one machine, and nothing here is portable to other hardware. It is also ONE circuit at ONE
+    domain and must not be quoted as a scaling law.
 12. **"Three legs in one domain could not afford full bit-width parity."** False — 1,953 R1CS → 3,795
     Plonk in domain 4,096 on the on-disk file.
 13. **"2 × 3,740 = 7,480 Plonk against a 4,096 ceiling."** An inference, and wrong in a load-bearing
@@ -598,9 +611,14 @@ Recorded because the disease, not the instance, is the thing.
     avoid racing concurrent agents in a tree with no version control.
 32. **No EVM gate runs from the Quiver mirror** — `solc` is absent from `Quiver/zk/node_modules`, which is
     correctly gitignored. Affects all 7 gates calling `evmRehearsal`, pre-existing, unrepaired.
-33. **Nothing built this round is wired.** `preflight` confirms the proof-emitting set is still exactly
-    `perp-gate`, `size-gate`, `treasury-risk`. `util/snark.js` serves only `liquidation` and `kelly`.
-    None of the four new circuits is reachable from a served response, so none is on the paid path.
+33. **Nothing built this round is wired.** ~~`preflight` confirms the proof-emitting set is still
+    exactly `perp-gate`, `size-gate`, `treasury-risk`.~~ **CLOSED 30-31 July 2026.** Measured against the
+    deployed container from outside, not against local code: **7 of 7 deterministic services emit a
+    proof** — `perp-gate`, `size-gate`, `treasury-risk`, `exec-verify`, `event-vol`, `lp-risk`,
+    `options-risk`. The gap was a deploy rather than a wiring: the code had them and the live container
+    served 3, which is why this was measured live and not from `preflight` alone. `risk-attest` is the
+    eighth deterministic service and is answered rather than missing — its response publishes every leaf,
+    so set-exactness is 2N-1 hashes and no circuit adds anything.
 34. **`parity.circom` and `greekssigned.circom` headers still state more than those circuits deliver.**
     Both defects demonstrated with real accepted proofs. Neither patched.
 35. **The `options-risk` work is not committed anywhere, and its own report says otherwise.** This is the

@@ -41,27 +41,53 @@ they cannot go back and forth resolving errors: if the service breaks while bein
 comes back empty. Our own redeploys were expected to take up to three minutes before the new
 container serves, so the original plan was to build everything without deploying at all.
 
-**That plan changed, and this paragraph used to claim otherwise.** It said the live endpoint had not
-been touched since the deadline. That was true when it was written and false by the time anyone read
-it: **three deploys have shipped** — 28 July at 17:20:59 UTC, and 29 July at 00:30:41 and roughly
-09:30 UTC. They went out because leaving them undone was the larger risk: they carried a mis-route
-signpost that had been telling callers with *correct* requests they had asked the wrong service, a fix
-for inputs like `side: "SHORT"` being silently answered as a long, signed and billed, and the corrected
-paper.
+**That plan changed, and this section has now been wrong about it twice.** It first claimed the live
+endpoint had not been touched since the deadline. It was then corrected to *"three deploys have
+shipped"* — and by 31 July that was stale too. **Nine have shipped.** The count is not the point; the
+point is that a paragraph describing a moving thing goes stale silently, so it is now written from
+`gates/deploy-log.tsv` rather than from memory, and the log is written by the watchdog rather than by
+hand.
 
-The three-minute estimate did not survive contact either. **Measured darkness was 11 seconds on the
-first deploy and 0 seconds on the second** — the service answered every poll straight through the
-container swap. **The third was never timed.** All were run behind a watchdog that establishes a marker
-only the new build can produce, polls until it appears, and records any window where the service
-stopped answering; `gates/` holds it, along with a preflight that refuses to pass unless the codeHash,
-the service list, the endpoint and the advertised schemas are all unmoved.
+| # | live at (UTC) | dark | what it carried |
+|---|---|---|---|
+| 1 | 28 Jul 17:20:59 | **11 s** | the mis-route signpost fix, `side: "SHORT"` answered as a long, the corrected paper |
+| 2 | 29 Jul 00:30:41 | 0 s | |
+| 3 | 29 Jul ~09:30 | **never measured** | no watchdog output survives; it is not guessed at here |
+| 4 | 29 Jul 13:32:51 | 0 s | the first row the watchdog ever wrote to a file |
+| 5 | 30 Jul 13:23:33 | 0 s | proof-emitting services went from **3 of 7 to 7 of 7** on the live container |
+| 6 | 30 Jul 13:38:37 | 0 s | the verify instruction every proof publishes, which did not work as written |
+| 7 | 30 Jul 13:47:33 | 0 s | the same fix reaching proofs that were **already stored** |
+| 8 | 30 Jul 22:32:01 | 0 s | **the X Layer payment rail, which could not be paid at all** |
+| 9 | 30 Jul 23:01:08 | 0 s | publishing the changelog for the above |
 
-**This paragraph counted two deploys until 29 July, and gave the wrong darkness figure for both.** It
-listed only the two on 29 July and then reused the phrase "11 seconds on the first and 0 on the second"
-from a log where "first" and "second" meant different deploys — putting 11 seconds on one that had none
-and 0 on one nobody timed. The watchdog prints darkness and writes no file, so the two real figures
-survive only in commit messages written minutes after the fact; the third deploy's is simply unknown
-and is not guessed at here. `docs/deploy-manifest.md` carries the evidence table.
+The three-minute estimate did not survive contact. **Eight of the nine were measured and seven of those
+eight were 0 seconds** — the service answered every poll straight through the container swap. The single
+11-second window was the first deploy, before any of this was instrumented, and deploy 3 has no figure
+because nothing recorded one.
+
+**"The watchdog prints darkness and writes no file" is no longer true, and that sentence was the reason
+deploy 3's number is gone.** It writes `gates/deploy-log.tsv`, one row per completed deploy, never
+backfilled — which is why the table above starts its file-backed evidence at deploy 4 and cites
+`docs/deploy-manifest.md` for the three before it. A marker must be something only the new build can
+produce, and the watchdog refuses to start if the marker is already true at baseline, because a marker
+that shipped once already makes the watch pass instantly and silently.
+
+**Two of these deploys fixed things a reviewer would have hit directly.** Deploy 6 and 7: every proof
+published `snarkjs plonk verify <key> publicSignals proof — the verification key is published at
+/proof/vk/<circuit>`. That endpoint returns the key **wrapped**, so a reviewer following the sentence
+verbatim got `Cannot read properties of undefined (reading 'toUpperCase')` on a proof that was
+perfectly good. Deploy 8: the 402 challenge told payers to build their EIP-712 signing domain from
+`{"name":"USDT","version":"2"}`, and the token's own domain is `{"name":"USD₮0","version":"1"}` — so
+**every signature a buyer built from our own challenge was rejected by the token, on the rail the
+ERC-8004 identity lives on.** Base was checked in the same run and was correct. Both were found by
+buying from the deployed service rather than by reading the code, and `gates/preflight.mjs` now rebuilds
+the signing domain from config and compares it to the chain, per rail, treating an unreadable token as a
+failure rather than a skip.
+
+After deploy 8, **all 22 services were bought with real funds on that rail** to prove it end to end. The
+first settled on chain in under five seconds. Billing reconciles exactly at the published per-service
+prices, which are not flat; a rejected request is not billed, and a 200 carrying a refusal is not billed
+either. `docs/deploy-manifest.md` carries the evidence table.
 
 The machine-readable paper stays at exactly seven parts, because the submitted entry hardcodes seven
 URLs. That has held through every change, and `npm run gate:y` now checks the section-to-part mapping
@@ -69,8 +95,17 @@ rather than the part count, because a section can move between parts while the c
 
 ### A second circuit: the Kelly sizing identity
 
-The honest cap on this project is that the on-chain proof layer covers **one computation of
-twenty-two**. `size-gate` is the second, chosen because it is the smallest: the discrete Kelly
+The honest cap on this project has moved and the number is worth stating precisely rather than
+rounding in our favour. **Seven of the eight deterministic services now emit a Plonk proof** —
+`perp-gate`, `size-gate`, `treasury-risk`, `exec-verify`, `event-vol`, `lp-risk`, `options-risk` —
+measured against the deployed container, not against local code, because those two disagreed until
+deploy 5. The eighth, `risk-attest`, is answered rather than missing: its response publishes every
+leaf, so set-exactness is 2N-1 hashes and a circuit adds nothing. **The other fourteen of the
+twenty-two are observation services, and no proof of arithmetic reaches what they are actually
+claiming** — that a number came from a venue. Two can attest their inputs today, three more could
+because they read chain state and a block `stateRoot` already commits to it, and eight have no
+mechanism at all. That last group is a TEE or zkTLS problem, not a proving problem, and it is the
+honest end of this road. `size-gate` is the second, chosen because it is the smallest: the discrete Kelly
 criterion `f* = (p(b+1) − 1)/b` cross-multiplies to a single polynomial identity, where the
 liquidation identity needed a division cleared through three factors of SCALE.
 

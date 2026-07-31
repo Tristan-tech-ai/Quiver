@@ -507,7 +507,25 @@ are marked so, because a resolved gap is still worth recording as having been op
    stops holding. `ncdf` is `r`-independent, but **both bindings that make it useful assume `df = 1`**:
    `delta = N(d₁)` and `gamma = φ(d₁)/(F σ √T)`. Every discount-factor-bearing leg is outside everything
    measured.
-3. **`concentrationFactor > 1` is outside every circuit, old and new.** The service publishes
+   **TESTED 31 July 2026, and the service is fail-closed about it.** The engine handles `r ≠ 0` fine:
+   all **6 self-checks pass at r = 0, 0.01, 0.02, 0.05 and 0.10**, `r` is echoed in `proof.inputs`,
+   and the contentHash binds it — `992af326…` at `r = 0` against `5c676738…` at `r = 0.10`. What the
+   claim is really about is the CIRCUIT, and there the service **refuses to attach a proof at all** once
+   `r ≠ 0`. Measured: `snark.status` is `building` at `r = 0` and `unavailable` at both `r = 0.001`
+   and `r = 0.05`, with a reason that names the mathematics rather than shrugging — *"At r ≠ 0 theta
+   regains its r·price term, and price needs N(d2), a second CDF point this circuit does not carry, while
+   the other five gain a discount factor e^{-rT} that is itself a transcendental nothing here pins.
+   Refusing rather than certifying five of six greeks under a heading that says six."* So the gap is real
+   and the service declines instead of certifying the wrong thing.
+3. **`concentrationFactor > 1` is outside every circuit, old and new** — still true, and **checked
+   31 July 2026 to see whether the service over-claims because of it. It does not.** `lp-risk` does keep
+   attaching a proof at `concentrationFactor` 1.5 and 3, which looks wrong until the arithmetic is
+   read: `conc` cancels in the breakeven, both sides of `fees == |E[IL]|` carrying the same factor, and
+   the breakeven is what `lpbracket` certifies. Measured, `breakevenVolatilityProven` is **0.06648 at
+   both `conc = 1` and `conc = 3`** while the headline `expectedIlPct` moves to −2.7994. And the
+   envelope says so without being asked: `doesNotProve` names it in as many words — *"Nor the fee
+   arithmetic, the concentration factor, the USD figures, or the verdict sentence."* The proof covers the
+   conc-independent quantity and disclaims the conc-dependent one. The service publishes
    `ilFull × conc`, a linearisation with no term in `divergence`, `lpbracket`, `lpexpectation` or the
    closed form. Any wiring must refuse it **by name**; that refusal was not built.
 4. **The wrong-CDF detection was never tested against an adaptive adversary.** The three wrong CDFs used

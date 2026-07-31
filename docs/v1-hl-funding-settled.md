@@ -111,7 +111,7 @@ rows — an artefact of the comparator, not of the formula. Measured and discard
 
 ## 3. B reproduces too, and identifies the procedure
 
-I did not have B's script. B is identified from its **output signature**: four statistics, matched
+this work did not have B's script. B is identified from its **output signature**: four statistics, matched
 simultaneously. Search over candidate compositions and coin sets (`bsearch.mjs`, `bconfirm.mjs`):
 
 ```
@@ -236,7 +236,7 @@ five-second samples, compute both candidates and compare to what the venue publi
 | HYPE | -0.0001152184 | **0.0000125** | **1.250000e-5** | 1.591154e-5 |
 
 Clamp-of-the-mean agrees with the venue; mean-of-the-clamped does not, and misses in *both*
-directions. (The four binding majors are omitted from this table on purpose: my window covers only
+directions. (The four binding majors are omitted from this table on purpose: this work’s window covers only
 22 of the 60 minutes, so neither aggregate can reproduce a rate that depends on the full-hour mean.
 BTC and HYPE are informative precisely because in the non-binding region clamp-of-the-mean is pinned
 at the constant while mean-of-the-clamped is not.)
@@ -316,7 +316,7 @@ general:
    **5.00e-4** and the max is **6.00e-4**. `|P| < 4e-4` is sufficient but not necessary; the correct
    sufficient condition is the asymmetric band.
 3. **The 4%/hour cap branch is never exercised.** Largest `|fundingRate|` in 167,257 rows is
-   **6.276e-3** (BLUR, 2026-07-07T12:00Z, premium -0.0507). Neither A's measurement nor mine tests
+   **6.276e-3** (BLUR, 2026-07-07T12:00Z, premium -0.0507). Neither A's measurement nor this work’s tests
    that branch of the venue's code. It is transcribed, not verified.
 
 A's exclusion of rows where `premium == 0 && fundingRate == 0` was audited rather than taken on
@@ -338,8 +338,8 @@ clean.
 ## 9. What is not settled
 
 - **B was identified by output signature, not by reading its code.** Four statistics matching to the
-  digit is strong, but I never saw B's script. If B's write-up and B's code disagree about which
-  formula ran, that is the finding; I can only show that B's *numbers* cannot have come from the
+  digit is strong, but this work never saw B's script. If B's write-up and B's code disagree about which
+  formula ran, that is the finding; this work can only show that B's *numbers* cannot have come from the
   formula B says it tested.
 - **All of this concerns the venue's published fields.** It establishes that the published rate is a
   deterministic, exactly-checkable function of the published premium. It does not establish that

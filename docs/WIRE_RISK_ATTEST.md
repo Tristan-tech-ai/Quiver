@@ -266,7 +266,7 @@ perfectly self-consistent and stops agreeing with the engine.
 
 All five go red. The restored gate is green. Engine build id identical on both sides.
 
-## 8. Not mine, and left alone
+## 8. Not this work’s, and left alone
 
 When this work was first written `gates/preflight.mjs` was **red on arrival**, on the grid-snapping check
 and on the pinned proof-emitting set — a sibling's in-flight lp-risk and event-vol proof wiring. That was

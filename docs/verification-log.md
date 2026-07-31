@@ -21,7 +21,7 @@ HTTP compresses before TLS encrypts, so an MPC-TLS cost model pays for the compr
 `arrayBuffer()`, which reported 372,321 bytes for BOTH requests, and would have led me to conclude the
 server was not compressing at all. Node's fetch decompresses transparently, so `arrayBuffer()` returns
 the decoded size whatever the encoding. The `content-encoding: gzip` header was right there in the
-response and I read past it. Anything measuring payload size through a client that auto-decompresses
+response and this work read past it. Anything measuring payload size through a client that auto-decompresses
 is measuring the wrong number.
 
 ## V5 — `gate:e` is genuinely flaky, 1 run in 3

@@ -116,7 +116,7 @@ shape, which was never the thing that was wrong.
 | artifact | gas only | `answers` and `ranking` blocks record what the minimum is over |
 | revert | none | `npm run gate:b6-revert` |
 
-Two of the new checks **failed on first run** and were right to. Both had the same cause: I used
+Two of the new checks **failed on first run** and were right to. Both had the same cause: this work used
 `toScaled(servedPrice)` as the reference for `pLiqHat`. The served price is `round(pLiq, 2)` and the
 circuit is handed the canonical integer solve — on leg 3 that is 0.47 against 0.470647773. The reference
 is now the encoder's own `built.encoded.pLiqHat`, with the encoder's `gapToServed` asserted against the

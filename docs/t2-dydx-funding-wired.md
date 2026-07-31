@@ -70,7 +70,7 @@ The ticker set is deliberately mixed, and that matters — see §2.
 
 The sampled-market disagreement hits **every** sampled market in a round simultaneously or none of
 them. That is the signature of a `num_premiums` clock difference between the anchored block and the
-indexer's snapshot, not of a per-market disagreement — and §3 is what happened when I tried to turn
+indexer's snapshot, not of a per-market disagreement — and §3 is what happened when this work tried to turn
 that observation into a bound.
 
 ---
@@ -132,9 +132,9 @@ Two smaller corrections, both in the direction of *narrower* claims than the doc
 
 ## 3. The bound this report got wrong, and how the gate caught it
 
-Worth recording, because the first version of the new test passed my calibration and was still wrong.
+Worth recording, because the first version of the new test passed this work’s calibration and was still wrong.
 
-I calibrated the predicted rate's bound over 280 observations and wrote the obvious test: unsampled
+this work calibrated the predicted rate's bound over 280 observations and wrote the obvious test: unsampled
 markets must match the indexer exactly (measured 200/200), sampled markets within 6e-2 relative
 (worst observed 2.51e-2). All 280 observations happened to sit at `num_premiums` 50–53, late in an
 hourly epoch.

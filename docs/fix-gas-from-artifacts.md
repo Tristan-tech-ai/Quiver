@@ -260,7 +260,7 @@ Three further limits, stated rather than left to be discovered:
 - **Derived arithmetic escapes.** The `gas/leg` column, and "largest minus smallest is 26,905", are
   computed from cited figures but are not themselves cited. The rule sees `N gas` adjacency and table
   columns headed `gas`, nothing else.
-- **The two artifact sets are still divergent.** I did not refresh `Quiver/zk/build` from `zk/build`,
+- **The two artifact sets are still divergent.** this work did not refresh `Quiver/zk/build` from `zk/build`,
   because measured against the values a sibling's docs cite it would not have fixed them and gateB6 had
   re-run twice more by the time the check finished. §9 carries this as open.
 
@@ -352,7 +352,7 @@ npm test                          386 tests · 0 fail · 5 skipped
 1. **`gas-facts.mjs`'s own comment is now understated.** Its header says "a 3,328-gas spread, 1.26%" and
    `GAS_VARIANCE_NOTE` says the same. Measured today: 1.24%, 1.59%, 1.73%. The module is otherwise exactly
    right and is the reason this was fixable; its number wants widening to ~4,500 gas. Not changed here
-   because `gas-facts.mjs` is imported by gates I did not run.
+   because `gas-facts.mjs` is imported by gates this work did not run.
 2. **Two artifact sets still disagree.** `Quiver/zk/build` is hours behind `zk/build` for every gate cited
    in this report. Refreshing it is a data change with a sibling's name on it and it does not converge
    while gateB6 re-runs every ten minutes. The real fix is one artifact set, or a generator that rewrites

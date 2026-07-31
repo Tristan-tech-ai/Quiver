@@ -7,10 +7,10 @@
 
 > not on chain at Hyperliquid (scanned `0x800`-`0x830`, no match), not located in dYdX's stores
 
-I redid that scan, widened it, and attacked the dYdX store directly. **Half of that claim is wrong.**
+this work redid that scan, widened it, and attacked the dYdX store directly. **Half of that claim is wrong.**
 dYdX's funding rate is not stored, but it is *exactly recomputable* from state that carries an ICS-23
-proof, and I recomputed it. 144 of 144 funding ticks, integer-exact. The Hyperliquid half survives,
-and I can now name precisely which single quantity is missing and why.
+proof, and this work recomputed it. 144 of 144 funding ticks, integer-exact. The Hyperliquid half survives,
+and this work can now name precisely which single quantity is missing and why.
 
 ---
 
@@ -18,7 +18,7 @@ and I can now name precisely which single quantity is missing and why.
 
 My first attempt at this returned **zero** responders over a range where `0x806` demonstrably works.
 The bug is worth recording because it inverts the answer, and because a scanner that has it reports
-a clean "nothing here" rather than failing loudly. I have not read the original scan's code and do
+a clean "nothing here" rather than failing loudly. this work has not read the original scan's code and do
 not claim it had this defect.
 
 On HyperEVM, an address with no precompile behind it returns **success with empty data** (`0x`).
@@ -45,7 +45,7 @@ range and a corrected detector.**
 
 ### Word identification without guessing the scale
 
-Rather than test funding against six hand-picked scale factors, I solved for the scale: for each
+Rather than test funding against six hand-picked scale factors, this work solved for the scale: for each
 (precompile, word position) compute `word / funding` across many assets and require the ratio to be
 *constant*. A coincidence does not survive 32 assets with 19 distinct funding values.
 
@@ -107,7 +107,7 @@ Reconciles against the venue's own published `impactPxs` and `oraclePx` on **39 
 absolute error 4.9e-11**. So the premium is fully determined by three numbers: oracle price, impact
 bid, impact ask.
 
-`impact_bid` and `impact_ask` are the average execution prices for a fixed notional. I confirmed that
+`impact_bid` and `impact_ask` are the average execution prices for a fixed notional. this work confirmed that
 definition by recomputing them: walking the live L2 book to a candidate notional reproduces the
 published `impactPxs` to between 7.1e-6 and 1.6e-4 relative on 5 coins, exactly on BTC. The residual
 is the gap between the two fetches. **An impact price is a book walk.**
@@ -152,7 +152,7 @@ So in the regime measured the bound is real but **too wide**: a median half-widt
 band that needs 4 bps. The bound is valid; it does not currently pin the rate. This is one block in
 one regime, with the whole perp complex trading below spot, and it is not a constant.
 
-An earlier version of this test reported the bound *violated* on 30 of 39 assets. That was my error:
+An earlier version of this test reported the bound *violated* on 30 of 39 assets. That was this work’s error:
 the API snapshot was minutes stale by the time the precompile reads ran. Pinning the block removed it.
 
 ---
@@ -192,7 +192,7 @@ funding-sample duration 60 s. For BTC (`Large-Cap`, IM 20,000 ppm, MF 600,000 pp
 works out to **+/- 48,000 ppm per hour**, which never binds in practice.
 
 The indexer publishes the hourly rate as `fundingPpm / 8e6`; dYdX quotes funding on an 8-hour
-convention. Every published rate in my sample is an exact multiple of 1/8 ppm, which is what
+convention. Every published rate in this work’s sample is an exact multiple of 1/8 ppm, which is what
 confirms the divisor.
 
 ### The measurement
@@ -232,7 +232,7 @@ declared `repeated sint32` with `zigzag32` encoding. Decoded as a plain `int32` 
 comes back as roughly `-2x` its true value. That single wrong wire type is the entire difference
 between "dYdX funding is unverifiable" and 144 of 144.
 
-I flag it because the prior conclusion was reached by looking for a stored rate and not finding one.
+this work flag it because the prior conclusion was reached by looking for a stored rate and not finding one.
 The rate is not stored. The inputs are, and they decode to the answer.
 
 ### End to end, against a signed header
@@ -270,7 +270,7 @@ across 5 sample-epoch boundaries, with misses small (1 to 15 ppm).
 The cause is identified, not mysterious: votes arriving in block `H` are applied before the
 end-of-block sample computation, so `PremVotes` read at `H-1` is missing exactly one block's votes.
 Recovering it needs the block's own `MsgAddPremiumVotes` from the block data, which is committed
-under the header's `data_hash` and therefore provable. **I did not do that.** It is named, bounded
+under the header's `data_hash` and therefore provable. **this work did not do that.** It is named, bounded
 work, not an obstacle.
 
 ### Historical state is not universally available
@@ -299,8 +299,8 @@ Measured, ETH-USD across three ticks:
 | 99,331,840 | 1117858 -> 1117750 | -108 | -0.00005775 | | |
 
 The index delta recovers the rate as `delta / (price * 1000)`, consistent on 3 of 3. **The factor
-1000 is fitted, not read**: the file defining `GetFundingIndexDelta` was not at any path I tried, so
-I have not confirmed the quantum arithmetic from source. The precision is limited by the index being
+1000 is fitted, not read**: the file defining `GetFundingIndexDelta` was not at any path this work tried, so
+this work has not confirmed the quantum arithmetic from source. The precision is limited by the index being
 an integer: about 0.3% relative for ETH, and worse for lower-priced assets, where a delta of a few
 units carries the whole rate. **This path is strictly worse than recomputing from `PremSamples`,**
 which is integer-exact. It is worth having only as an independent cross-check.
@@ -318,7 +318,7 @@ yield the rate by division.
 values. `0x800` returns exactly five words, matching the documented
 (`szi`, `entryNtl`, `isolatedRawUsd`, `leverage`, `isIsolated`).
 
-*Not tested*: I did **not** probe the account-shaped precompiles (`0x800`, `0x803`, `0x80f`, and the
+*Not tested*: this work did **not** probe the account-shaped precompiles (`0x800`, `0x803`, `0x80f`, and the
 unidentified `0x802`, `0x811`, `0x813`) against the per-position `cumFunding` figure the HTTP API
 exposes. So "no cumulative funding on chain" is **not found rather than not there**, and that probe
 is the cheapest remaining test on this venue.
@@ -326,7 +326,7 @@ is the cheapest remaining test on this venue.
 *Argued, not measured*: the readable account aggregates (`0x803` withdrawable, `0x80f` account margin
 summary) move for trades, fees and unrealised PnL as well as funding, so an hourly delta should be
 confounded for any account that is not quiescent, and quiescence is not a property you can prove about
-someone else's account. **I did not run the cross-boundary delta experiment**, so this is reasoning
+someone else's account. **this work did not run the cross-boundary delta experiment**, so this is reasoning
 from what the fields are, not a measurement. A self-owned quiescent probe position would sidestep it,
 at the cost of capital, and it would measure the rate rather than prove the venue's.
 

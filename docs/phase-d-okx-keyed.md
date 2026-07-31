@@ -10,7 +10,7 @@ was made.**
 > Worst case. Unsigned, **and** the buyer cannot re-fetch without their own HMAC credentials, so even
 > the weak "go look yourself" fallback is unavailable.
 
-The first clause is true and I reconfirmed it. **The second clause is false**, and it is false for six
+The first clause is true and this work reconfirmed it. **The second clause is false**, and it is false for six
 of the eight endpoints involved. It was never measured; it was inferred from the fact that Quiver
 holds keys. The adapter that holds them says so in its own header comment, and the comment was read
 past rather than tested:
@@ -52,7 +52,7 @@ matter more than anything else about it (§7).
 
 ## 2. Six of eight endpoints answer an uncredentialed caller
 
-`probe-unkeyed.mjs` called every endpoint with no `OK-ACCESS-*` headers at all. I hold no OKX
+`probe-unkeyed.mjs` called every endpoint with no `OK-ACCESS-*` headers at all. this work hold no OKX
 credentials on this machine, so this is literally the buyer's position, not a simulation of it.
 
 | endpoint | unkeyed status | x402 price | used by |
@@ -127,11 +127,11 @@ reproduces exactly:
 
 A removed route and a gated route are distinguishable, and the oracle routes are in the removed class.
 
-**One gap I could not close, stated rather than papered over.** The instrument available to me returns
+**One gap this work could not close, stated rather than papered over.** The instrument available to me returns
 the keyed response *body* but not its *headers*, so "no signature header on a keyed 200" is inference
 from the same gateway's unkeyed 402s and public 200s, not direct measurement. The body claim is
-measured: I enumerated every top-level field of all six keyed 200s and none matches the pattern.
-Closing the header gap needs either an x402 payment or an echo route, and I did neither.
+measured: this work enumerated every top-level field of all six keyed 200s and none matches the pattern.
+Closing the header gap needs either an x402 payment or an echo route, and this work did neither.
 
 **OKX's only cryptographic attestation product is Proof of Reserves**, a zk-STARK over exchange
 account balances. It publishes nothing about a DEX tape, a candle, a wallet's PnL, or a holder count.
@@ -322,7 +322,7 @@ incapable of being right. Version two matched per-transaction rather than per-po
 USDT units on the 4-hop route, producing a confident `-72.64%`. Only version three, keyed on the pool
 as the invariant, produced numbers that mean anything. Two rounds of a verifier returning decisive
 wrong answers about correct data, which is precisely the failure mode `VERIFIER_DISCIPLINE` describes.
-Had I stopped at version one, this document would have accused OKX of fabricating trade sides.
+Had this work stopped at version one, this document would have accused OKX of fabricating trade sides.
 
 ---
 
@@ -338,7 +338,7 @@ $9,614 to $25,456 over the same bars.
 
 **`portfolio/overview` reports zero trades for wallets OKX itself says are trading.** Three wallets
 appeared as `userAddress` on `chainIndex: "1"` in trade rows **OKX's own keyed `trades` endpoint
-returned**. I verified all three on chain: transaction succeeded, sender equals the named wallet, swap
+returned**. this work verified all three on chain: transaction succeeded, sender equals the named wallet, swap
 executed against the PEPE pool, within the last 12.5 hours.
 
 | wallet | `portfolio/overview` chainIndex 1 | `dex-history` rows |

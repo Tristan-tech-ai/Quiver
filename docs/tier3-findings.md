@@ -50,7 +50,7 @@ The algebra survives. The **grid** does not.
 holds — on most surfaces. Then `gateB7-1-greeks-sweep.mjs` ran it against the real engine and the
 worst relative residual on identity B was **0.61**, which is sixty percent and cannot be rounding.
 
-Two causes, and the first was mine:
+Two causes, and the first was this work’s:
 
 **A scaling error.** The identity needs `V·100·S⁴` on the left and the circuit had `S³`. The sweep reported a
 relative residual of exactly **2.0**, which is the signature of one side being negligible against the

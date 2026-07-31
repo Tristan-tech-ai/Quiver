@@ -552,7 +552,7 @@ And within the domain the refusal rate is already **54.6%** across 1,500 books �
 naming no unambiguous nearest leg. That figure **excludes** the leg-count wall entirely, because the
 sweep that produced it never generates a book with more than three legs.
 
-There is a further defect waiting there, already measured and not mine to fix here: `portfolio-gate`
+There is a further defect waiting there, already measured and not this work’s to fix here: `portfolio-gate`
 does not grid-snap, so a proof today would certify liquidation prices up to 6.0e-3 from the ones served
 and distances up to 1.0e-2 percentage points off — twenty times the third decimal the ranking is
 published at.

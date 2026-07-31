@@ -108,7 +108,7 @@ chain's validator set committed to. For checkpointing a past height, expiry does
 
 The initial cross-check reported `next_validators_hash` **MISMATCH** on all five chains while `app_hash` and timestamp
 matched perfectly. A 48-byte value against a 32-byte one is not a chain disagreement, it is a decoding bug — and it was
-mine. The Cosmos REST layer serves:
+this work’s. The Cosmos REST layer serves:
 
 - `root.hash` as **base64** (it is a plain `[]byte`)
 - `next_validators_hash` as **uppercase hex** (it is `cmtbytes.HexBytes`, which marshals to hex in JSON)
@@ -329,7 +329,7 @@ checkpoint, importing veritape's own `ics23.js`), `multichain.mjs` (proven reads
 
 The §4c/§4d result was reproduced **twice, ~20 minutes apart**, the second time against a build of `ics23.js` that a
 concurrently running agent had edited in between (`ics23.js` mtime 14:44:16Z, `dydx-attest.js` 14:45:56Z — neither
-edit mine). It passed identically both times, on live endpoints, at different Osmosis heights.
+edit this work’s). It passed identically both times, on live endpoints, at different Osmosis heights.
 
 Constraints honoured: **no file under `src/engine/` was read or modified** (published hash `q1-e1fa99d08887d6cc`
 unaffected); **no adapter was modified** — `ics23.js` was imported and called read-only; nothing deployed; nothing

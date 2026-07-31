@@ -90,7 +90,7 @@ published rate == correctly-rounded (P + clamp(1e-4-P,±5e-4))/8
   non-binding rows printed literally 0.0000125: 34,217/34,217
 ```
 
-**V1's formula survives an independent re-derivation.** Two corrections to my *reproduction*, both
+**V1's formula survives an independent re-derivation.** Two corrections to this work’s *reproduction*, both
 recorded because each flattered the result:
 
 1. **My first checker could not fail.** It asked whether the published rate was the correctly-rounded
@@ -100,7 +100,7 @@ recorded because each flattered the result:
    headline read 66,816/66,816 before the fix and 50,976/50,976 after; only the second is a
    measurement.
 2. **The dead-market exclusion never fired.** V1 drops rows with `premium == 0 && fundingRate == 0`;
-   I compared against `"0"` but the API returns `"0.0"`. Those 15,840 rows are exactly 55 coins ×
+   this work compared against `"0"` but the API returns `"0.0"`. Those 15,840 rows are exactly 55 coins ×
    288 hours — the 55 delisted perps — and **zero** live rows have `funding == 0` with a non-zero
    premium, which is the counterexample that would matter. Consistent with V1 §8.
 

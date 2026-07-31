@@ -72,7 +72,7 @@ That shape recurs whenever a check has a boundary the conclusion ignores. The bo
 one directory out of four, a regex anchor, a JSON shape assumption, or a hash that covers half a
 tree. Every one of those appears below, with a real consequence.
 
-**Three of the instances below I introduced myself while running this audit.** They are marked
+**Three of the instances below this work introduced directly while running this audit.** They are marked
 *[self-inflicted]* and left in deliberately: they are the evidence that the defect is a default
 behaviour, not a one-off lapse.
 

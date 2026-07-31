@@ -228,7 +228,7 @@ Git corroborates the verification log's ordering and implies a third deploy: com
 UTC, and it never went dark at all"*. On that reading there were three deploys, the 11 seconds belongs
 to the first, and the README both undercounts and mis-assigns.
 
-**I cannot resolve which is right**, and that is the finding. No deploy log is committed. The watchdog
+**this work cannot resolve which is right**, and that is the finding. No deploy log is committed. The watchdog
 measures darkness and its output is not kept. The number a judge is most likely to quote back —
 *"eleven seconds"* — exists in three published accounts that disagree, and nothing can go red.
 
@@ -343,7 +343,7 @@ references":"* — a different reference count and a different trailing clause. 
 attributed to it first appears in **`2af7238`** (2026-07-27 22:38:51), eighteen minutes later, in a
 commit whose own subject is *"a padded bibliography"*.
 
-What is correct, and I checked it: the paper did hold exactly ten numbered tables at `b383426`, and
+What is correct, and this work checked it: the paper did hold exactly ten numbered tables at `b383426`, and
 Table 11 did arrive on 28 July in `a2a0602`. Only the commit and the quoted sentence are wrong.
 
 **Why it costs this much.** This is §2.1, "The one real defect" — the paragraph where the project
@@ -384,7 +384,7 @@ failed to catch something.
 **Adjacent, reported as context and not as a finding.** `Quiver/docs/phase-d-build-plan.md:183` says
 *"**Every gate proves it can fail by a scripted revert.** No exceptions, including for the ones that
 look obviously correct."* That sits under the heading "Constraints that hold throughout" in a
-forward-looking plan, so it is a rule for future work rather than a claim about the tree, and I am not
+forward-looking plan, so it is a rule for future work rather than a claim about the tree, and this work is not
 calling it false. It is worth noting only because the rule is already broken by a gate that shipped
 before the plan was written, and nothing would ever say so.
 
@@ -510,7 +510,7 @@ a state nothing polls.
 
 ### 2.4 — cost 60 · shape 2 · the launch thread, in the README's first screenful
 
-`Quiver/README.md:14` and `Quiver/assets/landing.html:56`. **True — I fetched it.**
+`Quiver/README.md:14` and `Quiver/assets/landing.html:56`. **True — this work fetched it.**
 `cdn.syndication.twimg.com/tweet-result?id=2080225222880526720` returns the post: author `Quiverrrs`,
 created `2026-07-23T09:35:16Z`, video attached. Ranked this high while true because
 `QUIVER_MISSION_CONTROL.md:740` records that the project's *previous* X account was suspended. A repeat
@@ -542,7 +542,7 @@ carries the five aliases; the working `zk/package.json` at the tree root still c
 
 ### 2.7 — cost 50 · shape 2 · the availability record, hosted off the service on purpose
 
-`Quiver/README.md:12`. **True — I fetched it.** The JSON endpoint returns `"status": "operational"`,
+`Quiver/README.md:12`. **True — this work fetched it.** The JSON endpoint returns `"status": "operational"`,
 `checkedAtUtc 2026-07-29T10:19:44Z`, a live probe up in 866 ms reporting 22 services, and a 24-hour
 window of 720 pings at 99.86%. It is a genuinely good design: an availability claim that does not depend
 on the thing it measures. It is also a third-party AWS deployment nothing in either tree pings, so if
@@ -578,7 +578,7 @@ the unresolved thing.
 
 ### 2.10 — cost 40 · shape 2 · the MCP registry listing
 
-`Quiver/README.md:9` and `Quiver/assets/whitepaper.part1.md:230`. **True — I fetched it.**
+`Quiver/README.md:9` and `Quiver/assets/whitepaper.part1.md:230`. **True — this work fetched it.**
 `registry.modelcontextprotocol.io/v0/servers?search=quiver-risk-brain` returns one server,
 `io.github.Tristan-tech-ai/quiver-risk-brain`, status `active`, remote `streamable-http` pointing at the
 live endpoint. Nothing fetches it; a de-listing or a host migration would leave the claim standing in
@@ -611,7 +611,7 @@ The part of this sweep that could be wrong.
 | **Which of the three deploy accounts is right** (1.6, 2.9) | **RESOLVED 31 July 2026: `gates/deploy-log.tsv` is committed and the watchdog writes a row per completed deploy, never backfilled.** It begins at deploy 4, so the three before it remain reconstructed from commit timestamps and deploy 3 still has no darkness figure. When this was written: no deploy log was committed and the watchdog's output was not kept. Git commit subjects imply three deploys and an ordering, but a commit subject is not a measurement. |
 | **Whether the HackQuest entry still holds the values in `QUIVER_SUBMISSION.md`** | The submission is behind a login; the hackathon page is public, the entry's field values are not. This is the largest genuinely unmeasurable surface in the project — seven hardcoded paper URLs, a Drive link and a thread link, none of which anything can read back. |
 | **Whether the 27 July ground-truthing pass happened** (1.14), and every "measured before touching anything" / "written down second" claim (2.2) | `hackathon/` is not a git repository, so nothing outside `Quiver/` has history. Roughly forty documents open with a sequencing assertion of this kind; some are checkable against `Quiver/`'s 126 commits and most are not. |
-| **`gates/preflight.mjs`'s reported blind spot** | `Quiver/docs/perp-snark-reachable.md:307` states that preflight *"reports success over a path it does not examine"* because it reads `SERVICES.map(s => s.run)` while the MCP handlers are a different array. If accurate this is a green gate over an unfixed path — the exact class hunted here, disclosed in prose only. I did not verify it, because `gates/` is read-only for this sweep and confirming it would mean reasoning about code I was told not to touch. **It should be verified.** |
+| **`gates/preflight.mjs`'s reported blind spot** | `Quiver/docs/perp-snark-reachable.md:307` states that preflight *"reports success over a path it does not examine"* because it reads `SERVICES.map(s => s.run)` while the MCP handlers are a different array. If accurate this is a green gate over an unfixed path — the exact class hunted here, disclosed in prose only. this work did not verify it, because `gates/` is read-only for this sweep and confirming it would mean reasoning about code this work was told not to touch. **It should be verified.** |
 | **The paid HTTP surface** | Every live measurement used `/build`, `/`, `/changelog`, the paper routes and the free `/mcp`. The paid x402 routes were not called, because that spends. Claims specific to the paid path are unverified here. |
 
 ---

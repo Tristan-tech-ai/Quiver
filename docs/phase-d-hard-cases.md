@@ -243,7 +243,7 @@ self-authenticating for order existence, and Polymarket would be serving somethi
 
 **Evidence quality, stated plainly.** The claim that those orders are EIP-712 signed comes from
 Polymarket's published CLOB documentation, not from anything measured here. The endpoint called
-`DOMAIN_SEPARATOR()` and `domainSeparator()` on both exchange contracts and **both reverted**, so I
+`DOMAIN_SEPARATOR()` and `domainSeparator()` on both exchange contracts and **both reverted**, so this work
 could not confirm a public domain-separator getter. The inference is strong (an on-chain fill
 requires a verifiable maker authorisation) but it is an inference.
 
@@ -275,11 +275,11 @@ credentials". **Measured, with no credentials of any kind:**
 
 Every 402 carries a well-formed x402 v2 body with
 `billing.payPerUse.available = true` and the description "You can continue paying per request via
-x402", quoting `eip155:196` (X Layer) in USDG `0x4ae46a…` or USD₮0 `0x779ded…`. **I read both token
+x402", quoting `eip155:196` (X Layer) in USDG `0x4ae46a…` or USD₮0 `0x779ded…`. **this work read both token
 contracts on X Layer directly: 6 decimals each**, so `amount: "100"` is **$0.0001** and `"200"` is
 **$0.0002**. No dev-portal account, no HMAC key, no subscription.
 
-I did not execute a payment, and nothing here should.
+this work did not execute a payment, and nothing here should.
 
 Two more facts that finish the case:
 
@@ -394,7 +394,7 @@ the immediately-successive reads scored 17 of 17 and 19 of 19.
 Independent sweep of **0x800 through 0x83f** with three calldata shapes. **16 live precompiles**
 found: 0x800, 0x801, 0x803-0x80e, 0x812, 0x813.
 
-Then a stricter hunt than the original. Instead of matching only the funding rate, I matched every
+Then a stricter hunt than the original. Instead of matching only the funding rate, this work matched every
 returned 32-byte word, for 4 assets, against **five** live quantities at every power of ten from 1e0
 to 1e18, both signs: `funding`, `premium`, `impactPxs[0]`, `impactPxs[1]`, `midPx`.
 

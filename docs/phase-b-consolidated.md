@@ -33,7 +33,7 @@ directory, an absence read from a single file, a retraction of the wrong stateme
 
 ## 2. Proof-emitting services — measured from `gates/preflight.mjs`
 
-Not restated. I imported `SERVICES` and `TOOLS`, applied preflight's own `EMITS_ZK` and `bodyOf`
+Not restated. this work imported `SERVICES` and `TOOLS`, applied preflight's own `EMITS_ZK` and `bodyOf`
 (`gates/preflight.mjs:206`, `:214`), and printed the set.
 
 ```
@@ -82,7 +82,7 @@ Every figure below was computed by this session. Where a party's number differs,
 | clone-portability section 1, dev tree | **120 required paths · 120 found · PASS** (19 fully checked × 6 + reduced sets for 3 exclusions) |
 | clone-portability section 1, `Quiver` mirror | **RED — 5 missing.** `git status` 29 paths before, 29 after: section 1 writes nothing |
 
-Repair 1 published "45 gate scripts"; the adversary measured 39; I measure 39. The fabricated 45 is
+Repair 1 published "45 gate scripts"; the adversary measured 39; this work measure 39. The fabricated 45 is
 committed into `zk/scripts/revert-clone-portability-section1.mjs`.
 
 ### The five "missing" liquidation artifacts — sha256, first 16 hex
@@ -101,7 +101,7 @@ broken from a clone — and the cause is the lookup, not the bytes.
 
 ### Gas figures, read off the artifacts with their own timestamps
 
-No gas figure here is a measurement of mine; each is a field read from a JSON on disk, quoted with the
+No gas figure here is a measurement made here; each is a field read from a JSON on disk, quoted with the
 artifact's own `at`. Plonk verify gas has a spread of roughly 1.2–1.7% (~3,500 gas) as measured by three
 prior parties, so no difference smaller than that is asserted to mean anything.
 
@@ -258,7 +258,7 @@ in the README passed every gate for days. This is the complete list, including t
    The repository already carries those bytes once. It is 5,436,000 B and the decision on the table is
    107,920 B.
 4. **`npm test ... fail 1`** published as a measurement with no test named and no pre-change baseline. It
-   does not reproduce: 11 runs by the adversary gave 10× `fail 0`, and my run gives `fail 0`. Nobody
+   does not reproduce: 11 runs by the adversary gave 10× `fail 0`, and this work’s run gives `fail 0`. Nobody
    established whether it failed before the change, so it cannot rule out that the repair broke a test.
 5. **"Two figures match no copy in either tree… `291,708`… that file has never held 291,708 in either
    tree."** Absence read from the one artifact the doc *named*, without searching. It is in the mirror's
@@ -302,43 +302,43 @@ in the README passed every gate for days. This is the complete list, including t
 20. **"Both arms refuse 21,311 vs 21,370 of the same 226,761 trades."** A scratchpad probe whose script is
     in neither tree, so it is unverifiable from the repository.
 21. **"docs-consistency reads 229 documents"** (`KNOWN_DEFECTS.md:44` and the `gateN` header) — a moving
-    literal published as a fact inside the sentence justifying the gate. It was 238 when I started.
+    literal published as a fact inside the sentence justifying the gate. It was 238 when this work started.
 
 ### Unmeasured in the six adversarial reviews
 
 22. **`encodingTokens > displayTokens` on 30.8%, and `round(certifiedShortfall,8) != served` on 19.7%,
-    of 49,241 trades.** I confirmed the structural defect — `displayTokens` has no readers, and
-    `services.js:870` does claim "no tolerance of any kind" — but I did **not** re-run the sweep. The
+    of 49,241 trades.** this work confirmed the structural defect — `displayTokens` has no readers, and
+    `services.js:870` does claim "no tolerance of any kind" — but this work did **not** re-run the sweep. The
     rates and the worst gap (4.862e-6 tokens) are the adversary's numbers, and they were produced with
     the 10,466-state generator, so they describe that sample and not the input space.
 23. **"1 in 8 of my proofs rounds to 133.5×"** and the 8-sample accept-gas distribution. One party's run.
 24. **"Three different seeds give bit-identical worst cases; 60,000 and 600,000 runs give the same 47,587
     distinct trades."** The structural cause is measured (period 10,466, confirmed here); the specific
-    distinct-trade counts are the adversary's single run and I did not reproduce them.
+    distinct-trade counts are the adversary's single run and this work did not reproduce them.
 25. **"exec-verify's direct checker is a 1,172-byte contract at 5,011 gas."** Read from
     `FIX_REPRODUCIBLE_ARTIFACTS.md`; not re-run here.
 26. **The 200,000-trial and 100,000-trial randomised searches** establishing that two of the
-    non-vacuity assertions are identities. I confirmed the identities by reading the two expressions;
+    non-vacuity assertions are identities. this work confirmed the identities by reading the two expressions;
     the trial counts are theirs.
 27. **"7.8 sigma as published, 8.8 sigma now"** on the three-way eleven-leg disagreement. The
-    propagation is correct in form; the per-proof sd it rests on is a cited figure, not one I took.
+    propagation is correct in form; the per-proof sd it rests on is a cited figure, not one this work took.
 28. **"pg5 builds, pg6 is refused, 1,785,380 B"** — one Groth16 setup by one party.
 
 ### Unmeasured on this page
 
-29. **Every gas figure in section 3 is a field read from a JSON, not a measurement of mine.** I took no
+29. **Every gas figure in section 3 is a field read from a JSON, not a measurement made here.** this work took no
     gas measurement this session and publish no marginal, no ratio and no delta.
-30. **The ~1.2–1.7% Plonk verify spread** is three prior parties' figure. I did not re-measure it, and
-    I do not assert which end of the range is right — only that nothing here rests on a difference
+30. **The ~1.2–1.7% Plonk verify spread** is three prior parties' figure. this work did not re-measure it, and
+    this work does not assert which end of the range is right — only that nothing here rests on a difference
     smaller than it.
-31. **I did not run** `gate:ex`, `gate:z`, `gate:b6`, `gate:clone-revert`, `gate:n-revert`, `gate:ex-revert`,
+31. **this work did not run** `gate:ex`, `gate:z`, `gate:b6`, `gate:clone-revert`, `gate:n-revert`, `gate:ex-revert`,
     `docs:revert`, or sections 2–3 of the clone-portability gate to completion (section 3 spawns 39 gates
     and four sessions are editing them underneath a run). Their verdicts on this page are the running
     parties' or read from code.
-32. **`gateZ`'s 62 passing rows** are read from its artifact at 03:03:47.107Z. I did not re-run it — it
+32. **`gateZ`'s 62 passing rows** are read from its artifact at 03:03:47.107Z. this work did not re-run it — it
     needs `circom.exe` and a work directory, and a reader reproducing into an empty directory still
     writes `adversary-repro.json` back into the repository.
-33. **I did not verify that the 37 tracked adversary circuits actually rebuild.** I verified they are
+33. **this work did not verify that the 37 tracked adversary circuits actually rebuild.** this work verified they are
     tracked, which is what makes §13's row false; whether `build-adv.mjs` reproduces every count from
     a clean clone is repair 5's claim, tested by repair 5.
 34. **Nothing here was measured on any machine but this one**, on win32, with the toolchain in this tree.

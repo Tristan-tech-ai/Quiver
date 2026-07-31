@@ -5,7 +5,7 @@ to an adversary told to break it. This document is the single read across all fi
 
 ## Provenance rule for every number below
 
-This report consolidates work I did not do. That makes it exactly the kind of document that has
+This report consolidates work this work did not do. That makes it exactly the kind of document that has
 already shipped false claims here — a figure copied from a hand-off report into a document, where no
 gate can reach it. So every figure carries its source, and the list of what was measured directly is
 closed:
@@ -32,7 +32,7 @@ fact. Section 4 lists the ones nobody measured at all.
 | **options-risk** | Unreachable by every file in the tree, because `d1` needs `ln(F/K)` and the price needs two CDF points. | The observation that opens it: at r=0 all six `greeks` are rational functions of exactly two transcendentals at the **same** point `d1`. `ncdf.circom` already publishes and pins both. One instance pins six published fields; no new circuit, zkey, ceremony or verifier. Wired both surfaces through one shared builder. Preflight's emitting set and grid exemption updated by name. Caught two of its own defects and recorded both — a bound that could not fail, and a 100x-wrong ratio in its own write-up. | **STOOD UP.** Re-derived both envelope constants bit-identically, re-ran the substitution attack on two seeds, reproduced the public signals bit-for-bit, ran the gate itself (44 checks, 0 failures), reproduced the corrected 6,200x ratio to five digits, and confirmed a third gas sample inside the stated spread. No unsoundness across ~450,000 legs in six boxes plus a hill-climb. | `FP_OPS = 9` (`src/util/optionsRiskNcdfWitness.js:90`, verified by me) is the one term in the encoding bound that nothing constrains — see §4.2. The adversary also measured that the headline "99.9965% of bound" is insensitive to that term over ten million-fold, that one of the seven revert mutations is a tautology (`1.01 > 1`), and that reachability on a realistic position-size box is 84.77% rather than the served 98.62%. All attributed, none re-measured by me. |
 | **event-vol** | Already wired (`be0d4c9`) on both surfaces. | Found the gate **red before any edit** and reproduced the cause deterministically: the proof store released its in-flight marker at enqueue, so insertion-order eviction could evict a `building` record, and a repeat request then wrote `unavailable: prover busy` over a proof that was in the prover. Fixed in `put()`; added a gate and a two-sided revert. Corrected nine stale published figures and the TOLC comment trap (the circuit's comparator enforces TOLC/2, so "fixing" 12 to 6 without the evaluator term makes the envelope unsound while looking like a fix). | **BROKE IT.** Rebuilt the circuit's integer path from the circom, replicated the session's evaluator figure to the bit, then **beat it** — 2.536 ulp against a published 2.110, at a point inside event-vol's own domain. Every derived figure moves. Confirmed the shipped guard stays sound and nothing served is wrong. | The published **buyer envelope is not a bound** — it is a sampled maximum presented as a supremum, and it is understated in the direction that flatters the buyer. See §4.3. The eviction fix itself held under attack; two harness observations (a ~2x timing margin in the new gate, and both `put()` hunks reverted as one) are attributed and not re-measured. |
 | **risk-attest** | Examined earlier the same day; a 226-line report and 14 supporting files, committed as `6d1037c` and already pushed — the brief's "nobody has ever examined it" was false. | Became its first independent examiner. Replicated the crux from a second implementation transcribed off the response's own `verify` string: set-exactness in 2N−1 hashes, and a root over 9 leaves whose response lists 8 passes every served inclusion proof and is refused by recomputation. Then found two published figures that did not survive a re-run (a headroom and a linearity claim from a 3-point fit with one residual degree of freedom) and **rebuilt the estimator rather than widening the tolerance.** | **STOOD UP.** Re-derived the whole OLS from raw means — every figure matched. Rebuilt the instrument and pushed it past 64 signals. Attacked the linearity with a quadratic out of sample and failed to break it. Replicated the crux at three hidden-leaf positions. | **The finding survives; the gas leg does not.** The adversary measured that a set can be named by a digest rather than enumerated (4 public signals, constant in N), which makes the SNARK route ~42% cheaper — and that no pairing verifier for the enumerated statement can be deployed at all above N=44 (EIP-170, bisected with real deploys). Two clauses of `PROVES` are false as written and revert #5 canonises the strawman. The **finding** never needed the gas leg: the circuit is unbuildable on the constraint floor and there is no privacy to buy. Also: one of the 72 published checks is a tautology (`verify-attest-report.mjs:130`, verified by me). |
-| **chart-press / poly-fill / portfolio-gate** | Gate G, its revert, and `wire-classify-two.md` already landed in `b714687` — the task was done and pushed. | Re-measured from the original brief instead of restating it. **Could not reproduce chart-press's throw** in 40 runs across 5 call conventions — it was the harness, not the handler. Reproduced poly-fill's refusal exactly and separated its offline (throws) from its live (refuses) behaviour. Re-derived portfolio-gate's signal layout from the `.sym` rather than from circom convention. Found and pinned a rotted figure in the report itself (proof-emitting set stated as 4 services / 8 entries; it was 6/12). | **BROKE IT.** The corrected figure was **stale again in the same tree**: measured 14 entries / 7 services while both copies of the report still say twelve / 19. The new gate is structurally blind to the mechanism that rotted the figure. And "no divergence bound was derived" is false — the bound exists, is enforced, and the same artifact's `refusalSweep` already shows honest cases exceeding it. | 12/6 is now **14/7** — I re-measured it independently and confirm the report is stale (§4.5). portfolio-gate's circuit is built-not-wired and its `refHat` enters only a range check, so the mark is prover-chosen and the "no other leg is nearer" claim is reorderable without omitting anything. chart-press and poly-fill correctly route to input attestation, not a circuit. |
+| **chart-press / poly-fill / portfolio-gate** | Gate G, its revert, and `wire-classify-two.md` already landed in `b714687` — the task was done and pushed. | Re-measured from the original brief instead of restating it. **Could not reproduce chart-press's throw** in 40 runs across 5 call conventions — it was the harness, not the handler. Reproduced poly-fill's refusal exactly and separated its offline (throws) from its live (refuses) behaviour. Re-derived portfolio-gate's signal layout from the `.sym` rather than from circom convention. Found and pinned a rotted figure in the report itself (proof-emitting set stated as 4 services / 8 entries; it was 6/12). | **BROKE IT.** The corrected figure was **stale again in the same tree**: measured 14 entries / 7 services while both copies of the report still say twelve / 19. The new gate is structurally blind to the mechanism that rotted the figure. And "no divergence bound was derived" is false — the bound exists, is enforced, and the same artifact's `refusalSweep` already shows honest cases exceeding it. | 12/6 is now **14/7** — this work re-measured it independently and confirm the report is stale (§4.5). portfolio-gate's circuit is built-not-wired and its `refHat` enters only a range check, so the mark is prover-chosen and the "no other leg is nearer" claim is reorderable without omitting anything. chart-press and poly-fill correctly route to input attestation, not a circuit. |
 
 Nothing in the fifth row was wired. Two services were wired this cycle: **options-risk** (new) and
 **event-vol** (repaired). **lp-risk** was already wired and was verified.
@@ -130,7 +130,7 @@ are **refuted**.
 
 3,023 is an **R1CS** count. 4,096 is the **Plonk domain size** `hez_final_12` supports. Different
 units. **The only R1CS→Plonk expansion that exists in this tree was measured, from the zkey header
-myself:**
+directly:**
 
 ```
 zk/build/lpbracket_plonk.zkey  §1 protocolId = 2 (Plonk)
@@ -174,7 +174,7 @@ is 98.60%; the adversary measured 84.77% on a realistic position-size box.
 ### 4.3 event-vol's "own derived buyer bound" is the artifact's own composition, and it is not a bound
 
 The session's headline was "MY OWN DERIVED BUYER BOUND (independent, three terms) = 8.309517526919466
-ulp". **I read that value, all three of its terms, and its absolute form straight out of
+ulp". **this work read that value, all three of its terms, and its absolute form straight out of
 `zk/build/gateB7-5-ncdf.json`:**
 
 ```
@@ -215,7 +215,7 @@ outlier the session correctly withdrew.
 
 `Quiver/docs/wire-classify-two.md:132` and `hackathon/WIRE_CLASSIFY_TWO.md:132`, both copies,
 verified by me: *"twelve entries of 31 handlers (22 HTTP + 9 MCP), and the other 19 build no
-proof."* **I measure 14 entries and 17 non-emitting.** The figure moved 8/4 → 12/6 → 14/7; the
+proof."* **this work measure 14 entries and 17 non-emitting.** The figure moved 8/4 → 12/6 → 14/7; the
 document has been corrected once and is stale again.
 
 `gateG/8` was added to stop exactly this and cannot see it: it compares the document against
@@ -253,13 +253,13 @@ No gas figure in this tree is reproducible to better than its own spread, and se
 their own artifacts. `docs/verify-lp-risk.md` says 278,051 for the bracket; its artifact says
 277,329; earlier passes said 277,953 and 277,121. `WIRE_EVENT_VOL.md` publishes 273,920 and 275,584;
 its artifact holds 274,752 — neither published figure is in the repo. Plonk verify gas has a measured
-1.22% spread (~3,500 gas), so **every marginal-gas claim smaller than that is noise.** I quote no gas
+1.22% spread (~3,500 gas), so **every marginal-gas claim smaller than that is noise.** this work quote no gas
 figure in this document and computed none.
 
 ### 4.8 Everything in §1 that is not in the provenance list
 
 Every figure in the table's *What was done* and *Adversary* cells is attributed and was not
-re-measured here. I did not re-run gateLP-bracket-snark, gateB7-6, gateB7-7, gateAT, gateG, gateIF,
+re-measured here. this work did not re-run gateLP-bracket-snark, gateB7-6, gateB7-7, gateAT, gateG, gateIF,
 or any of the five revert harnesses. Their reported results are claims by the sessions and adversaries
 that ran them, and two of the adversaries demonstrated that reading a gate's report is not the same
 as running it.
@@ -314,7 +314,7 @@ as running it.
    gets the 13.3 KB-shorter one. `WIRE_RISK_ATTEST.md` sits in `docs/` under the uppercase convention
    with no lowercase mirror at all. Pick one convention and delete the other copy.
 9. **Stale figures with no gate over them.** `wire-classify-two.md`'s 12/6 (now 14/7, §4.5), and the
-   document-corpus count, which reads 252 in one report, 255 in two others, and **260** when I ran
+   document-corpus count, which reads 252 in one report, 255 in two others, and **260** when this work ran
    `docs-consistency` — a number that moves whenever anyone adds a document and is quoted as a fact in
    three places.
 10. **Single-writer discipline for the `*-revert` harnesses.** Five of them back up, rewrite and
@@ -339,7 +339,7 @@ as running it.
 **Yes — and more than the tree admits. Measured by me, live, with a like-for-like local control for
 every call.**
 
-I called the deployed container's free MCP surface with `snark: true` and identical bodies locally,
+this work called the deployed container's free MCP surface with `snark: true` and identical bodies locally,
 and compared whether a top-level `snark` block came back. (My first attempt looked for
 `proof.snark`, found nothing anywhere, and would have "proved" that no service serves a proof —
 the local control is what caught that. The block is top-level.)
@@ -383,7 +383,7 @@ number in hand.
 
 ```
 node tools/docs-consistency.mjs   CONSISTENT — 260 before this file, 263 after
-                                  (I predicted 262; it came back 263 — decision 9, demonstrated)
+                                  (this work predicted 262; it came back 263 — decision 9, demonstrated)
 node gates/preflight.mjs          PREFLIGHT PASSED — safe to deploy
 npm test                          386 tests · 381 pass · 0 fail · 5 skipped
 diff -rq src/engine ../../Quiver/src/engine    byte-identical
@@ -396,16 +396,16 @@ gates/preflight.mjs:387 pin       14 entries / 7 services — matches what was m
 previously reported as open: `src/util/lpBoundedness.js` is now in HEAD (blob `c715acb7`), so a clone
 loads; and the stale duplicate `src/util/mcp.js` was removed from HEAD in `ddcc434`.
 
-## 8. What I did not verify
+## 8. What this work did not verify
 
 1. **No gate was re-run.** Not gateLP-bracket-snark, gateB7-6, gateB7-7, gateAT, gateG, gateIF, nor
    any of the five revert harnesses. Every gate result in §1 is the claim of the session or adversary
    that ran it. Given that this project's standing discipline note says reading an agent's report
    instead of re-running it is one of the nine ways a false claim shipped, treat §1 accordingly.
-2. **No EVM arm, no gas measurement, no proving run.** I generated no proof and deployed no verifier.
-   The only zk artifact I read is the `lpbracket_plonk.zkey` header, parsed by me.
-3. **The adversaries' own measurements are unreplicated by me**, except the eight claims I name as
-   verified. In particular I did not reproduce the 2.536-ulp evaluator maximum, the EIP-170
+2. **No EVM arm, no gas measurement, no proving run.** this work generated no proof and deployed no verifier.
+   The only zk artifact this work read is the `lpbracket_plonk.zkey` header, parsed by me.
+3. **The adversaries' own measurements are unreplicated by me**, except the eight claims this work name as
+   verified. In particular this work did not reproduce the 2.536-ulp evaluator maximum, the EIP-170
    bisection, the `FP_OPS` insensitivity sweep, the realistic-box reachability, or the `refusalSweep`
    reading.
 4. **The live probe is one sample per service.** Seven calls, each with a local control on the same
@@ -415,9 +415,9 @@ loads; and the stale duplicate `src/util/mcp.js` was removed from HEAD in `ddcc4
 5. **Nothing was deployed.** No `railway up`. The paper was not touched.
 6. **One figure was published without being measured, and it was wrong within four minutes.** §7 first read
    "262 once this file's two copies land" — arithmetic, not a measurement. The re-run returned **263**:
-   a sibling landed a document while I was writing. The figure is corrected above, the mistake is left
+   a sibling landed a document while this work was writing. The figure is corrected above, the mistake is left
    here, and it is the cheapest possible demonstration of decision 9 — a count nobody can hold still
    is quoted as a fact in four documents.
 7. **This document is prose and no gate reads it.** That is the exact condition under which the
-   figure in §4.5 rotted twice. Every figure here is either in my provenance list or attributed by
+   figure in §4.5 rotted twice. Every figure here is either in this work’s provenance list or attributed by
    name; none of it is protected by a check that can fail.

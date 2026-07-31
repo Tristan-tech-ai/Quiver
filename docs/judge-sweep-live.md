@@ -17,7 +17,7 @@ it is labelled below.
 direct attack: the published `codeHash` recomputes from a clean-room reimplementation of its own
 published rule, Appendix C reproduces byte for byte including its signature, four services re-run
 from their own echoed inputs to identical content hashes, and a served Plonk proof verifies against
-the served verification key and is rejected when one public signal is moved by one unit. I tried to
+the served verification key and is rejected when one public signal is moved by one unit. this work tried to
 break those and could not. The refusal machinery the last review complained about is now genuinely
 good — 36 of 36 bad calls came back with a corrected body, and none fired on a correct call.
 
@@ -87,7 +87,7 @@ Three consequences a reviewer will draw:
 2. **It is billable.** Derived from `src/x402.js` `isChargeable()` — not live-observed, since no
    payment was made: the rule returns `false` only for `ok === false` or a failed check. Here
    `ok:true` and every check passes, so the caller is charged for the inverted answer.
-3. **It is one word to fix**, in a file I was told to stay out of: add `enum: ['long','short']` to
+3. **It is one word to fix**, in a file this work was told to stay out of: add `enum: ['long','short']` to
    the side property in `services.js`, `enum: ['call','put']` to the option-type item property,
    extend `repairBody` into array items, and make the engines refuse an unrecognised value instead of
    defaulting. The engines' fail-open default is the part that needs an owner's decision.
@@ -108,7 +108,7 @@ survives contact with the code, because the premise is wrong.**
   answer to a plain curl with no credential, no OKX involvement, and CORS `*`. There is no upstream
   gateway in the path: the metering is Quiver's own, in `src/app.js` — an in-process
   `Map` keyed by IP, `MCP_DAILY_CALLS` default 300, tool calls only, `initialize`/`tools/list`
-  unmetered. I made ~180 tool calls without hitting it, consistent with a limit ≥ 180.
+  unmetered. this work made ~180 tool calls without hitting it, consistent with a limit ≥ 180.
 - All 22 `/api/*` routes return **402** to an unpaid POST, with both rails (X Layer USD₮0,
   Base USDC) and the full input schema in `accepts[].outputSchema.input.body`. The gate fires before
   validation, as documented.
@@ -126,10 +126,10 @@ survives contact with the code, because the premise is wrong.**
 
 **Unestablished — do not read as findings:**
 
-- Whether OKX's A2MCP registration for agent #5152 lists all 22 services as MCP-callable. I could
+- Whether OKX's A2MCP registration for agent #5152 lists all 22 services as MCP-callable. this work could
   not read the registry from here. If it does, 13 of those listings point at tools `/mcp` does not
   expose. Worth checking before judging.
-- Whether OKX proxies or meters anything upstream. I saw no evidence either way; I only established
+- Whether OKX proxies or meters anything upstream. this work saw no evidence either way; this work only established
   that the origin is directly reachable without it.
 - Any claim about paid-path behaviour that requires an actual settlement.
 
@@ -254,10 +254,10 @@ is null and the judge is told their hypothetical book is already liquidated. The
 
 | claim | verdict | evidence |
 | --- | --- | --- |
-| `/build` publishes a codeHash **and the rule that produced it** | **HOLDS** | Clean-room reimplementation of the published rule (recursive walk of `src/engine`, `` `${rel}:${utf8}` ``, `\n` join, `'q1-'+sha256.hex[0:16]`) over both repo copies → `q1-e1fa99d08887d6cc`, and the 37-file manifest matches the served list exactly, in order. Neither copy of my recomputation imported repo code. |
+| `/build` publishes a codeHash **and the rule that produced it** | **HOLDS** | Clean-room reimplementation of the published rule (recursive walk of `src/engine`, `` `${rel}:${utf8}` ``, `\n` join, `'q1-'+sha256.hex[0:16]`) over both repo copies → `q1-e1fa99d08887d6cc`, and the 37-file manifest matches the served list exactly, in order. Neither copy of this work’s recomputation imported repo code. |
 | **Appendix C reproduces byte for byte** | **HOLDS, fully** | Offline from the repo: liquidationPrice `58329.11`, moveToLiquidationPct `8.861`, `ABOVE_MAINTENANCE`, `deterministic: true`, self-check residual `2.05e-12` against tolerance `0.064`, contentHash `8575ce5ae5bfae9cdfdfc604250f8032e4ba85fb33560386586b7538d0ab0960` — all identical to the printed exhibit. Live over free MCP: same numbers, **and the signature is byte-identical** to the one printed (`0xcabfb195…c824111b`). `ethers.verifyMessage(contentHash, signature)` → `0x946324E0E5d7D77206731E35Ef4044a383e2a8C2`, the signer published in `/.well-known/agent-card.json`. All four of the appendix's own checks pass. |
 | `/proof/vk` serves a vk a served proof verifies against | **HOLDS** | `{"snark":true}` on perp-gate left the contentHash unchanged (`8575ce5a…`, so the flag is correctly stripped before hashing), proof ready in ~3 s. `snarkjs.plonk.verify(servedVk, servedSignals, servedProof)` → **true**. Moving `publicSignals[7]` (the certified liquidation price) by one unit → **false**. vk is plonk/bn128, nPublic 8, power 11. `signalsAttestation` present and signed by the same key. |
-| "Every answer is re-runnable" | **HOLDS for the 9 deterministic services** | `perp_gate`, `size_gate`, `options_risk`, `treasury_risk` all re-run from their own `proof.inputs` through the open repo engine to **identical content hashes**, and `proof.inputs` equalled what I sent in all four. It does **not** hold for the other 13, which say so themselves. |
+| "Every answer is re-runnable" | **HOLDS for the 9 deterministic services** | `perp_gate`, `size_gate`, `options_risk`, `treasury_risk` all re-run from their own `proof.inputs` through the open repo engine to **identical content hashes**, and `proof.inputs` equalled what this work sent in all four. It does **not** hold for the other 13, which say so themselves. |
 | `/paper/1`…`/paper/7` match the repo | **HOLDS** | All seven parts sha256-identical to `assets/whitepaper.part[1-7].md`. `/paper/full` 253 kB; a request for a part beyond the last one 404s correctly and names the part count. |
 | Unpaid `/api/*` returns 402 on all 22 | **HOLDS** | All 22 probed; all 402 with both rails and the full input schema. |
 | `routingNotice` / `howToFix` fire where they should and stay silent otherwise | **HOLDS** | 36/36 refusals carried `howToFix`; 7/9 misroutes carried `routingNotice`; 0/10 correct calls carried either. |
@@ -298,7 +298,7 @@ is null and the judge is told their hypothetical book is already liquidated. The
 
 ## What could not be broken
 
-Stated plainly, because it is the larger half of the picture. I could not:
+Stated plainly, because it is the larger half of the picture. this work could not:
 
 - produce a codeHash mismatch, or a file-manifest mismatch, from either repo copy;
 - make a content hash fail to reproduce on any deterministic service, including with `snark:true`;

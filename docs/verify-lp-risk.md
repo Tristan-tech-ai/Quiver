@@ -26,8 +26,8 @@ the cheapest thing in the service to prove.**
 | the exact value itself | **needs no circuit and no engine change.** `expectedDivergence.volatility` and `horizonPeriods` are published verbatim and unrounded (verified live, and they are in `proof.inputs` too), so `v = σ²T` and `expm1(−v/8)` are recoverable outside the engine — `src/util/lpClosedForm.js`. `codeHash` measured before and after: `q1-e1fa99d08887d6cc` both times. **Not** from `totalVariance`, which is rounded to 6dp and loses 1.12e-6 pp, eight times the quadrature envelope |
 | new circuit | `zk/circuits/lpbracket.circom` — 932 R1CS · 1,776 Plonk · 13 public · domain 2,048 |
 | gate LP0 — prove / verify / refuse / EVM | **PASSED**, 991 ms prove, 13/13 signals refused, 8/8 dishonest witnesses refused, 278,051 gas <!--gas:gateLP0-bracket#acceptGas~2%--> accept / 573 gas <!--gas:gateLP0-bracket#rejectGas--> reject (one sample each; see §the gas figure below) |
-| gate LP1 — sweep against the real engine | **PASSED**, 562 certified of 600, worst case uses **96.3%** of my derived bound |
-| gate LP2 — the closed form and its real cost | **PASSED**, and it caught a broken parser of mine before it shipped a zero |
+| gate LP1 — sweep against the real engine | **PASSED**, 562 certified of 600, worst case uses **96.3%** of this work’s derived bound |
+| gate LP2 — the closed form and its real cost | **PASSED**, and it caught a broken parser made here before it shipped a zero |
 | engine `codeHash` | `q1-e1fa99d08887d6cc`, unmoved; `src/engine/` untouched |
 | `npm test` | **386**, unmoved, 0 fail |
 | DEFECT FOUND — **fixed on 30 July, outside the engine** | the engine's own boundedness self-check **failed on live inputs** at σ²T ≥ **116.0687**. §6 said it needed an engine change; it did not. See `FIX_LPRISK_BOUNDEDNESS.md` and `npm run gate:lb` |
@@ -95,7 +95,7 @@ factors of `SCALE` in `liquidation.circom` — eliminates `ŝ` entirely and comp
   most of them back on the bound.
 - Its tolerance is genuinely harder to derive. **My first derivation was exceeded on 451 of 4,000
   live-engine ratios, worst ratio 1.821.** That near-2.0 shape is this project's documented signature
-  for a scale error, and it was: I kept only the `L̂` half-step through the square and dropped the `r̂`
+  for a scale error, and it was: this work kept only the `L̂` half-step through the square and dropped the `r̂`
   half-step through the other square, which is the same order. **My second derivation was worse — 1,011
   of 4,000, worst 2.154** — because it also missed that the published convention here is
   `2|R| ≤ TOLERANCE`, so the tolerance is twice the residual bound, and that `L̂` is computed *from* the
@@ -316,7 +316,7 @@ the same wall `portfolio-gate` hit at 3,970 of 4,096, which a sibling session ha
 `.r1cs` artifacts rather than from circom's console summary, because circom prints both
 `linear constraints` and `non-linear constraints` and a regex for the first matches the second.
 
-It also caught a defect of mine. My inlined header parser skipped 20 bytes from `nWires` to
+It also caught a defect made here. My inlined header parser skipped 20 bytes from `nWires` to
 `nConstraints` where the correct distance is 24, and read a zero out of the middle of `nLabels`. The
 gate went red on the cross-check against `divergence.r1cs` (known independently to be 463) — and the
 row *below* it, "the two provable statements fit the ceiling", had passed **green on zeros**, which is

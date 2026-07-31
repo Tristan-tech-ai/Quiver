@@ -351,14 +351,14 @@ diagnosable instead of re-investigated from zero.
 Copied to `judging/Quiver/` at the same relative paths:
 `src/adapters/ibc-checkpoint.js`, `gates/gateD3c-dydx-checkpoint.mjs`, `gates/gateD3c-revert.mjs`.
 
-**They cannot run there yet, and this is not something I should have fixed unilaterally.** The mirror
+**They cannot run there yet, and this is not something this work should have fixed unilaterally.** The mirror
 was last synced **2026-07-27 17:08** — a full day before *any* of the Phase-D attestation work. It
 contains **no** `dydx-attest.js`, **no** `ics23.js`, **no** `ethproof.js`, **no** `hyperliquid-attest.js`,
-**no** `univ3anchor.js`, and had **no `gates/` directory at all** (I created it). `ibc-checkpoint.js`
+**no** `univ3anchor.js`, and had **no `gates/` directory at all** (this work created it). `ibc-checkpoint.js`
 imports `./ics23.js` and `./dydx-attest.js`, both absent.
 
-I did **not** copy those files across, because `dydx-attest.js` and `ics23.js` are being actively edited
-by another agent right now and mirroring a mid-edit file is worse than not mirroring. I also did **not**
+this work did **not** copy those files across, because `dydx-attest.js` and `ics23.js` are being actively edited
+by another agent right now and mirroring a mid-edit file is worse than not mirroring. this work also did **not**
 add `gate:d3c` scripts to the mirror's `package.json` — a script that cannot run is a false claim in a
 public repo.
 

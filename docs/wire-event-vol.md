@@ -169,7 +169,7 @@ The encoding bound is **reached**, not respected from a distance — which is wh
 rather than a number nobody measured. The buyer envelope is 24.4x wider and **the whole of the
 difference is a promise `ncdf.circom` makes that this engine does not need**: the ratio is
 `(12 + 0.5·φ_max)/0.5`. Tightening it means tightening `TOLC`, which is a property of the circuit, not
-of this service. Reporting 4.1% as though it were slack I chose would be the dishonest version of that
+of this service. Reporting 4.1% as though it were slack this work chose would be the dishonest version of that
 sentence.
 
 #### And `TOLC` is not the band, which makes that expression conservative for two reasons that cancel

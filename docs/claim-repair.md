@@ -308,7 +308,7 @@ Three things, all minor, all recorded because the standing instruction is to dis
    sites were strengthened rather than rewritten.
 
 Also worth recording: the brief said the 16 checks *"have never been shown able to fail"*. Confirmed
-exactly. And `unmeasured-claims.md` §1.6 concluded *"I cannot resolve which is right, and that is the
+exactly. And `unmeasured-claims.md` §1.6 concluded *"this work cannot resolve which is right, and that is the
 finding"* — it **is** resolvable, from commit timestamps that were already in the repository; what is
 not resolvable is deploy 3's darkness.
 

@@ -39,7 +39,7 @@ $ node node_modules/snarkjs/build/cli.cjs plonk setup build/portfoliogate4.r1cs 
 ```
 
 The domain is 8,192, so the file needed is **2^13**, not 2^14. snarkjs sizes with
-`cirPower = log2(n-1) + 1` where its `log2` is a **floor**; I first wrote `Math.ceil` and got 2^14 /
+`cirPower = log2(n-1) + 1` where its `log2` is a **floor**; this work first wrote `Math.ceil` and got 2^14 /
 domain 16,384 — one clean power out, exactly the shape a wrong exponent has. The gate now checks the
 derived domain both holds the circuit and that half of it would not.
 
@@ -58,9 +58,9 @@ So the brief was right that this is a download and not a structural wall, and ri
 It was wrong about which file is needed: **2^13 at 9.08 MiB suffices**, and 2^14 is one power more
 than the problem requires.
 
-**I did not fetch it.** Two reasons, and the second is the one that matters:
+**this work did not fetch it.** Two reasons, and the second is the one that matters:
 
-1. Downloading a file is not something I can authorise on an agent's instruction — that needs Tristan
+1. Downloading a file is not something this work can authorise on an agent's instruction — that needs Tristan
    in the loop. The exact command is at the end of this document if he wants it.
 2. **It became unnecessary.** A 2^13 ceremony buys leg number four. The service accepts an unbounded
    number of legs and its own tests exercise eleven. Buying one leg against a gap of eight, at the
@@ -251,9 +251,9 @@ ranking, reverted** because the proof no longer matches its signals.
 ## 8. What is not verified
 
 - **The 2^13 build itself.** No 4-leg zkey was produced, because the ceremony file was not downloaded.
-  The 5,295 / 8,192 / 2^13 figures are measured; proving time at domain 8,192 is not, and I have not
+  The 5,295 / 8,192 / 2^13 figures are measured; proving time at domain 8,192 is not, and this work has not
   extrapolated it. `domain-scaling.mjs` fits an exponent from three points and labels anything past the
-  file on disk as extrapolation; I have not added a fourth claim on top of that.
+  file on disk as extrapolation; this work has not added a fourth claim on top of that.
 - **Book completeness**, in either shape. See §4.
 - **The refusal sweep is synthetic.** 200 books per size from a seeded generator over a realistic price
   ladder — not the live venue universe. `gateB8-1` is the gate that samples the real engine.
@@ -273,7 +273,7 @@ curl -o zk/build/hez_final_13.ptau \
 
 `build-circuit.mjs` hardcodes `hez_final_12.ptau` and a 4,096 ceiling, so it would need a parameter
 before it could consume that file. That is a deliberate refusal in its own comment — "fetch a larger
-powers-of-tau file deliberately, not as a side effect of a build" — and I have left it intact.
+powers-of-tau file deliberately, not as a side effect of a build" — and this work has left it intact.
 
 ---
 

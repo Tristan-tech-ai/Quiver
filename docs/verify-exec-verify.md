@@ -376,7 +376,7 @@ half that has to be finished before the other half has anything to attach to.
 
 ## Files
 
-New, all mine, none of them touching a sibling's circuit or gate:
+New, all this work’s, none of them touching a sibling's circuit or gate:
 
 - `zk/circuits/execadverse.circom` — the benchmark plus the fill, the exact shortfall and the headline
 - `zk/scripts/gateB5-3-execadverse.mjs` — prove / verify / refuse, 13 dishonest witnesses

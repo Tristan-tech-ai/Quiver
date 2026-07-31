@@ -129,7 +129,7 @@ The distinction is the honest answer to the section's own question. **The source
 nothing built from them is.** No reader can re-derive the four refutations from what is published — which is
 the defect §13 is about, and is *not* the same sentence as "the sources are lost".
 
-### The compiled row got this wrong twice more, both of them mine
+### The compiled row got this wrong twice more, both of them this work’s
 
 **First it said `0 of 38`, and the rule behind it was flat:**
 

@@ -3,8 +3,8 @@
 `zk/circuits/lpbracket.circom` and `zk/circuits/lpexpectation.circom` were built two days ago and
 served nobody. One of them is now wired to a caller. The other cannot be, and the reason is a number.
 
-Every figure below was computed in this session. Where an existing artifact disagrees with what I
-measured, the disagreement is stated rather than smoothed — there are two of those, and one of them is
+Every figure below was computed in this session. Where an existing artifact disagrees with what was
+measured here, the disagreement is stated rather than smoothed — there are two of those, and one of them is
 a published gate number that should not be read the way its field name invites.
 
 ---
@@ -103,7 +103,7 @@ dropped weight, and 71.92% of that ceiling is where it sits.
 3. The brief says it collapses to `2.4425e-15` when the window widens. Widening it (holding the 0.03
    step) gives `1.893832e-12` at `|z| ≤ 7`, then `2.997602e-15` at `|z| ≤ 8`, `2.664535e-15` at
    `|z| ≤ 10`, `2.886580e-15` at `|z| ≤ 12`. That is a double-rounding floor of a few ulps, not a
-   specific value; `2.4425e-15` is in the same band but is not what my sweep produced.
+   specific value; `2.4425e-15` is in the same band but is not what this work’s sweep produced.
 
 ### The closed form does NOT always reproduce the served digit
 
@@ -429,7 +429,7 @@ comment; **no served byte and no contentHash moves**) and in this document. It a
 endpoints because `σ(v) = √(v/T)` is monotone. Over 882 calls to the real engine (798 proved, 84 with no
 breakeven, 0 refused, 0 diverged):
 
-- the encoder's bound is **≥ mine on 798 of 798**, looser by at most 6.287e-2 relative — so it is
+- the encoder's bound is **≥ this work’s on 798 of 798**, looser by at most 6.287e-2 relative — so it is
   conservative, and sound;
 - against the **tighter derived bound** the worst honest case uses **99.7963%**, with **0 violations**.
 

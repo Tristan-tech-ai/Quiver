@@ -89,7 +89,7 @@ Each was found by running the gate, not by reading the code.
 
 `PHASE_D_HARD_CASES.md` reports that four of §5's five hard-case claims are wrong on a load-bearing
 detail. Building D4 on §5 as written would have encoded a falsehood, so the claims that change the
-register were re-measured here rather than inherited. All measurements below are mine, on 28 July
+register were re-measured here rather than inherited. All measurements below are this work’s, on 28 July
 2026, from this host.
 
 ### dYdX funding is in the store. It was a key-name error.
@@ -109,7 +109,7 @@ is identical to the one §4.2 already verified for oracle price, and `src/adapte
 checks that shape.
 
 The exact reconstruction (`mean(premium samples, sint32 ppm) / 8 / 1e6`, five snapshots) is
-`PHASE_D_HARD_CASES.md`'s measurement and I did not repeat it. What I verified is the part that moves
+`PHASE_D_HARD_CASES.md`'s measurement and this work did not repeat it. What this work verified is the part that moves
 the register: the key exists and carries a two-op ICS-23 proof.
 
 **This contradicts a sibling module in the same repo.** `src/adapters/dydx-attest.js` exports
@@ -134,7 +134,7 @@ Measured with **no credentials of any kind**:
 | `market/holders` | `token-scan` | 404 | | the endpoint does not exist |
 | `portfolio/dex-history` | `loop-digest` | **401** `50103` | | genuinely credential-locked |
 
-Asset `0x4ae46a…` on `eip155:196`. I called `decimals()` on that contract on X Layer and it returned
+Asset `0x4ae46a…` on `eip155:196`. this work called `decimals()` on that contract on X Layer and it returned
 **6**, so `100` is **$0.0001** and `200` is **$0.0002**. Control: `www.okx.com/api/v5/market/candles`
 returned 200 with no credential, so `chart-press`'s CEX branch was never keyed. No payment was
 executed and none should be.
@@ -152,7 +152,7 @@ should trust the categories of.
 | service | was | is | measurement that moved it |
 |---|---|---|---|
 | `poly-desk` | none | **possible-unbuilt** | it reads exactly `positions(wallet)` and `activity(wallet, 40)`, which are Conditional Tokens storage on Polygon. `eth_getProof` on `0x4D97DCd9…6045` at `polygon-bor-rpc.publicnode.com`: account proof 9 nodes / 3,847 B, storage proof 7 nodes / 3,307 B, **about 7.2 KB**. `polygon-rpc.com` did not answer. This is `lp-desk` with a different contract address. |
-| `protocol-pulse` | none | **partial** | TVL is recomputable from chain state for a measured subset (Aave v3 Ethereum, 1.0010x DefiLlama, that agent's measurement not mine). Measured here: `api.llama.fi/tvl/aave` returns the scalar in **18 bytes** against **10,173,949** for `/protocol/aave`. |
+| `protocol-pulse` | none | **partial** | TVL is recomputable from chain state for a measured subset (Aave v3 Ethereum, 1.0010x DefiLlama, that agent's measurement not this work’s). Measured here: `api.llama.fi/tvl/aave` returns the scalar in **18 bytes** against **10,173,949** for `/protocol/aave`. |
 
 `poly-fill` stays in `none`: it walks the **resting** book, which never touches a chain. That half of
 §5 is right, and the split between the two Polymarket services is the thing §5 missed by treating them

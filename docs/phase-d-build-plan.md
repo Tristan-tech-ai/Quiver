@@ -10,7 +10,7 @@ is the harder half of a claim we have already partly made.
 
 ## The thing that changed when the numbers sat next to each other
 
-The plan I was carrying had a `QuiverPerpInputAttestor` on HyperEVM whose job was to read a precompile
+The plan this work was carrying had a `QuiverPerpInputAttestor` on HyperEVM whose job was to read a precompile
 and record the answer. Writing it down next to the gas figures killed it.
 
 A precompile read costs **3,237 gas** in a `STATICCALL` and **nothing at all** off chain, because
@@ -123,7 +123,7 @@ something no dYdX RPC controls.**
 ### Where an independent checkpoint could come from, best first
 
 1. **An IBC light client of dYdX running on another Cosmos chain.** This is the strongest idea in this
-   document and it is not mine to claim as novel; it is what IBC is. Any chain with an open connection
+   document and it is not this work’s to claim as novel; it is what IBC is. Any chain with an open connection
    to dYdX maintains dYdX consensus states on chain, updated and validated by *that* chain's own
    validators. Reading one gives a validator-set hash whose integrity rests on a different set of
    people entirely. **Establish first**: which chains hold live dYdX clients, how far back their stored
@@ -177,7 +177,7 @@ honesty burden moves into the envelope wording.
 - **No new service.** Adding an endpoint changes the service list and triggers `agent update`. Whatever
   A and B produce attaches to existing envelopes as sibling fields.
 - **Every on-chain transaction is confirmed per action.** A0 is a deployment from a real wallet. It is
-  cheap and it is still not mine to send.
+  cheap and it is still not this work’s to send.
 - **Any deploy that changes what a caller sees carries a changelog entry in the same deploy**, not
   after it.
 - **Every gate proves it can fail by a scripted revert.** No exceptions, including for the ones that

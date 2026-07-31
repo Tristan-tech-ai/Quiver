@@ -126,7 +126,7 @@ survive that. The `exec-verify` adversary's Poseidon-committed variant (1,764 R1
 every input private, on the existing ptau) is the only artifact produced this round in which a SNARK is
 doing something a direct check cannot, and it is in a temp directory.
 
-I did not myself measure the ~5,011-gas direct Solidity check. That number is the adversary's.
+this work did not directly measure the ~5,011-gas direct Solidity check. That number is the adversary's.
 
 ---
 
@@ -191,12 +191,12 @@ The adversary showed that last claim's *stated reason* false too: three legs in 
 full parity, at 1,953 R1CS → 3,795 Plonk in domain 4,096 on the on-disk file, once the argmin moves out
 of the batched circuit. N=4 batched is refused at 5,060 > 4,096, so that bound is real.
 
-**A defect I confirmed myself.** `zk/circuits/portfoliogate4.circom` line 220 reads
+**A defect this work confirmed directly.** `zk/circuits/portfoliogate4.circom` line 220 reads
 `// Result: 1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 — 126 gates of slack.` — the
 N=3 figures, inside the N=4 circuit, which measures 2,736 R1CS and needs domain 8,192 under Plonk. `diff`
 against `portfoliogate.circom` shows the **only** differing line is 222, `PortfolioNearest(3,` → `(4,`.
 This is exactly the defect class `circuit-facts.mjs` was written to kill. (The adversary also reported a
-literal `"N = 3 legs"` string there; I grepped and could not find one. Only the `Result:` line is stale.)
+literal `"N = 3 legs"` string there; this work grepped and could not find one. Only the `Result:` line is stale.)
 
 ### 4.2 exec-verify
 
@@ -223,7 +223,7 @@ working.
 
 **The adversary's four surviving hits.**
 
-1. *Cost accounting is noise.* See §5.1 — this is the finding I extended and it is now much worse than
+1. *Cost accounting is noise.* See §5.1 — this is the finding this work extended and it is now much worse than
    the adversary reported.
 2. *The headline is free; the echo signals are the cost.* Seven of the fifteen public signals are
    closed-form in the other eight (`feeTolerance ≡ 1e9`, a constant; `bpsTolerance ≡ outHat`, a literal
@@ -256,7 +256,7 @@ trades already fit `hez_final_12` (2 × 1,797 < 4,096). Never tried here.
 
 ### 4.3 lp-risk — the closed form, verified independently
 
-This is the row where the most work turned out to be unnecessary, so I verified it myself rather than
+This is the row where the most work turned out to be unnecessary, so this work verified it directly rather than
 taking the adversary's word.
 
 **The identity.** `2√r/(1+r) = sech(ln r / 2)`. With `a = √v/2` the argument is `az − a²`; shifting
@@ -265,7 +265,7 @@ taking the adversary's word.
 
 > **E[IL](v) = exp(−v/8) − 1**, where `v = σ²T`.
 
-**My own measurement, own quadrature, own code.** I reimplemented the engine's grid from its source
+**My own measurement, own quadrature, own code.** this work reimplemented the engine's grid from its source
 shape (`z_i = −6 + 0.03i`, `i = 0..400`) and compared to the closed form over 20,001 log-spaced `v` in
 [1e-8, 1e4]:
 
@@ -320,11 +320,11 @@ solve. The full service call is 245,624 calls: 163,608 `exp` + 82,016 `sqrt`, de
 reported elsewhere as "roughly 80,000 transcendental evaluations" is 204 × 401 = 81,804 quadrature
 *points* and **undercounts evaluations by 3×**.
 
-**One prediction I could not confirm.** The adversary claimed the boundedness-defect threshold the
-investigator measured at v = 116.0687404 is "predicted analytically" by `−8·ln(5e-7)`. I computed
+**One prediction this work could not confirm.** The adversary claimed the boundedness-defect threshold the
+investigator measured at v = 116.0687404 is "predicted analytically" by `−8·ln(5e-7)`. this work computed
 `−8·ln(5e-7) = 116.0692619`. That is a gap of **5.2e-4**, not agreement. The mechanism is right in shape
 — the check trips where `round(E[IL]·100, 4)` reaches −100 — but the closed form does not reproduce the
-measured threshold to the digit, and I am recording that as an unconfirmed prediction rather than a
+measured threshold to the digit, and this work is recording that as an unconfirmed prediction rather than a
 confirmation.
 
 **The defect underneath it is real and confirmed by the investigator's measurement:** `lpRisk`'s own
@@ -341,7 +341,7 @@ is the −100% floor, but a caller asking v = 300 gets a refusal the current eng
 
 **The defeat of the premise.** The engine does not compute `erf`. It computes Hart (1968):
 `N(−z) = e^{−z²/2}·b(z)/d(z)`. A ratio is a multiply (`c·d = e·b`), two polynomials are Horner, and the
-one exponential factors over the binary expansion of its argument. I counted the circuit's own table:
+one exponential factors over the binary expansion of its argument. this work counted the circuit's own table:
 **exactly 192 mux constant assignments across 12 `Mux4` groups** — 12 groups × 16 = 192. The wall was
 fixed-point representation, and `ncdf` at S=44 was built *first* at 2,555 R1CS → 4,810 Plonk and
 **refused** against the 4,096 ceiling; S=40 is a measurement, not a preference.
@@ -434,7 +434,7 @@ correctly, so line 3 contradicts the code beneath it, in the file the review cal
 
 ### 5.1 Every gas figure in the four docs disagrees with the artifact that produced it
 
-I compared each gas number quoted in the four `VERIFY_*.md` docs against the JSON artifact on disk right
+this work compared each gas number quoted in the four `VERIFY_*.md` docs against the JSON artifact on disk right
 now. Seven for seven.
 
 | quantity | the doc says | artifact on disk | artifact written |
@@ -473,9 +473,9 @@ Four refutations, each of which deletes or redirects a substantial amount of shi
 been attacked**. The four investigators each recorded their own failed checks honestly; the four
 adversaries did too, but there is no third pass. Specifically unexamined:
 
-- The closed form `E[IL] = exp(−v/8) − 1` I verified independently and it holds. **The `lpclosed2.circom`
-  that proves it, I did not run** — its 1,847 R1CS, 269,961 gas and 6,385 bytes are the adversary's
-  measurements, not mine, and the circuit is in a temp directory.
+- The closed form `E[IL] = exp(−v/8) − 1` this work verified independently and it holds. **The `lpclosed2.circom`
+  that proves it, this work did not run** — its 1,847 R1CS, 269,961 gas and 6,385 bytes are the adversary's
+  measurements, not this work’s, and the circuit is in a temp directory.
 - The Groth16 4/5/6-leg builds, the `xamin`/`xacommit` circuits, the two-instance `LegPrice` circuit, the
   ~5,011-gas direct Solidity check, and the 62-grid-step witness window all rest on single-run
   measurements by the party that benefits from them.
@@ -484,7 +484,7 @@ adversaries did too, but there is no third pass. Specifically unexamined:
   (= 42 at T=304), landing ~22 grid steps past their ±2 tolerance. **They did not fix it.**
 - The same adversary's Monte Carlo third method was 16 standard errors off from a weak LCG + Box-Muller
   and they discounted it entirely — correctly, but it means the closed form has **two** independent
-  confirmations (their Gauss-Hermite rule, my trapezoid reimplementation), not three.
+  confirmations (their Gauss-Hermite rule, this work’s trapezoid reimplementation), not three.
 
 ---
 
@@ -576,7 +576,7 @@ These are the ones that most deserve the register, because each was stated as a 
 21. **The engine's published note that the leading-order E[IL] "diverges from the exact expectation."**
     It is that expectation's logarithm. A live claim defect in a served field's documentation, worth
     fixing independently of any circuit.
-22. **"−8·ln(5e-7) predicts the boundedness threshold."** I computed 116.0692619 against the measured
+22. **"−8·ln(5e-7) predicts the boundedness threshold."** this work computed 116.0692619 against the measured
     116.0687404 — a 5.2e-4 gap. **Recorded here as an unconfirmed prediction**, contrary to how the
     adversary reported it.
 
@@ -622,7 +622,7 @@ Recorded because the disease, not the instance, is the thing.
 34. **`parity.circom` and `greekssigned.circom` headers still state more than those circuits deliver.**
     Both defects demonstrated with real accepted proofs. Neither patched.
 35. **The `options-risk` work is not committed anywhere, and its own report says otherwise.** This is the
-    one item on this list I upgraded from "process footnote" to "act on it today", because it was measured
+    one item on this list this work upgraded from "process footnote" to "act on it today", because it was measured
     and it is worse than reported. The `options-risk` agent recorded that all 17 of its paths "landed
     inside a sibling's commit `8901f04`" and chose not to split them because a `reset --soft` would move
     HEAD under three live agents. Measured now:
@@ -640,12 +640,12 @@ Recorded because the disease, not the instance, is the thing.
     only (as `3d68d12`, same subject line) — which was the right repair for `exec-verify` and silently
     un-committed `options-risk`. **So the entire `ncdf` deliverable — circuit, generator, zkey, verifier,
     gate and five probes — currently exists only in the index and working tree of a repo with no version
-    control discipline between four agents.** One `git reset --hard` or `git checkout .` loses it. I did
+    control discipline between four agents.** One `git reset --hard` or `git checkout .` loses it. this work did
     not commit it: staging 18 files belonging to another session under this one’s message is precisely the accident that
     created this state.
 
     The coordination rule that came out of all this — commit with an explicit pathspec, never a bare
-    commit, while the tree is shared — is written down in no enforceable place. I used
+    commit, while the tree is shared — is written down in no enforceable place. this work used
     `git commit --only -- <path>` for this document.
 36. **The 5 skipped `npm test` cases were never examined** by anyone, in any round.
 37. **The three LP1 encoder refusals** were characterised from their reason string, not individually
@@ -703,8 +703,8 @@ it believes the opposite. `git log --all -- zk/circuits/ncdf.circom` returns **z
 commit its author thought it landed in, `8901f04`, is orphaned — not an ancestor of HEAD, unreachable from
 any ref, because `exec-verify` correctly soft-reset it to un-swallow a sibling's files and re-committed
 only its own paths. All 18 `ncdf` files are staged and uncommitted right now. A `git reset --hard`
-destroys the circuit, the generator, the zkey, the exported verifier, the gate and five probes. I did not
-commit them myself: staging 18 files belonging to another session under this one’s message is the exact accident that
+destroys the circuit, the generator, the zkey, the exported verifier, the gate and five probes. this work did not
+commit them directly: staging 18 files belonging to another session under this one’s message is the exact accident that
 created this state, and the author should own the message. See §6.4 item 35 for the measurements.
 
 **1. Rescue the adversary artifacts, or accept that four refutations are unreproducible.** This gates

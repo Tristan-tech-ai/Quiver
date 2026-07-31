@@ -564,7 +564,7 @@ Seven things measured in this session that appear in no prior document.
    shipped-vs-Poseidon — and this one is measured in one batch by construction.
 5. **`gen-variant.mjs`'s include depth was not a parameter**, so regenerating a committed circuit
    differed on three lines and no more. It is a parameter now (`VINC`), which turns "identical except
-   for three lines I decided to forgive" into a byte comparison. A diff that forgives lines can be made
+   for three lines this work decided to forgive" into a byte comparison. A diff that forgives lines can be made
    to forgive the wrong ones.
 6. **An exported Plonk verifier's *source length* is ceremony-dependent; its zkey's *size* is not.**
    Measured on `lpexpectation` at 2^17: 242,434,916 zkey bytes both times, 33,253 vs **33,249** `.sol`
@@ -581,7 +581,7 @@ Five defects found in the rescued material, four unpatched, each recorded:
    evidence, and because editing an artifact to make it agree with a re-run is the wrong repair.
 7. **`lp/gate-lpclosed.mjs` crashes and prints a field element as a magnitude.** Both defects are the
    ones its own author recorded as fixed in `gate2`. Kept unpatched, with `gate-lpclosed2.mjs` and
-   `gate-lpclosed-evm.mjs` as the repairs, because a report saying "three of my checks failed before
+   `gate-lpclosed-evm.mjs` as the repairs, because a report saying "three of this work’s checks failed before
    they passed" is worth more with the failing versions on disk.
 8. **`exec/advgas.mjs` stalls**, as its author found when they replaced it with `advgas2.mjs`. Both kept.
 9. **`r1cs-probe.mjs` dereferenced `process.argv[1]` unconditionally**, so importing the parser from a

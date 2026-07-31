@@ -180,7 +180,7 @@ junctioned in** — no other file copied, no path patched:
   pinned fixtures and the six proving keys under `assets/zk/` all resolve at HEAD.
 * `import('./src/app.js')` in the clone resolves, so the service still starts from what was committed.
 
-The clone also settled a question that should not be settled by reasoning: **is `gate:n`'s red mine?**
+The clone also settled a question that should not be settled by reasoning: **is `gate:n`'s red this work’s?**
 `npm run gate:n` in the dev tree fails two §8 checks. Swapping only `src/util/snark.js` between this commit
 and its parent inside the clone left the failure set **identical** — 21 pass, 2 fail either way — and the §8
 checks read `Quiver/zk/build/*.r1cs` and the register, neither of which this commit touches. What they

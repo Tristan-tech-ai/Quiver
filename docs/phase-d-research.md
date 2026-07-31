@@ -10,7 +10,7 @@ three are worse than the roadmap implies. The one that works is a fourth approac
 not mention: **for the two venues that are themselves blockchains, the exact inputs Quiver consumes
 are readable from the venue's own consensus state, and a contract can read them.**
 
-I built the gate for it. It passes, and both halves work: it accepts honest inputs and refuses
+this work built the gate for it. It passes, and both halves work: it accepts honest inputs and refuses
 fabricated ones.
 
 ---
@@ -215,7 +215,7 @@ attestation key has been extracted for under $1000 on one generation and forged 
 current patched hardware. On-chain verification is practical for TDX and impractical for Nitro. Cost
 is about $45/month flat regardless of call volume, which is the one genuinely attractive property.
 
-**Latency: not measured, and I am not going to invent it.** There is no published AWS benchmark for
+**Latency: not measured, and this work is not going to invent it.** There is no published AWS benchmark for
 `NSM_GetAttestationDoc`. A figure of "47.81 ms p50" circulates attributed to arXiv 2606.22560; that
 paper was fetched and contains no empirical evaluation at all. Adjacent measurements (vsock RTT p50
 80 µs on `c6i.2xlarge`; enclave-to-host RTT 700 to 900 µs) disagree by 10x. Single-digit milliseconds
@@ -230,13 +230,13 @@ away revocation and freshness.
 
 ### 3.3 zkTLS
 
-I expected to rule this out on ciphersuite grounds and **the measurement refuted me**, which is worth
+this work expected to rule this out on ciphersuite grounds and **the measurement refuted me**, which is worth
 recording because the wrong version nearly reached this page.
 
 TLSNotary's source (`crates/tls/core/src/suites/mod.rs`, `ALL_CIPHER_SUITES`, verified at the
 `v0.1.0-alpha.15` tag) compiles in exactly two suites, both TLS 1.2, both AES-128-GCM; everything
 else including all three TLS 1.3 suites is commented out. Every one of Quiver's thirteen upstream
-hosts negotiates TLS 1.3 by default. That looked like a clean structural kill. So I forced
+hosts negotiates TLS 1.3 by default. That looked like a clean structural kill. So this work forced
 `minVersion = maxVersion = TLSv1.2` with the cipher list restricted to exactly those two suites:
 
 **All 13 of 13 hosts accepted the connection.** Hyperliquid, dYdX, Deribit, DefiLlama, all three
@@ -249,7 +249,7 @@ What rules it out is everything else.
 unilaterally sign an arbitrary transcript, and prover-plus-notary collusion forges anything.
 TLSNotary states it themselves: "A notary is just a verifier you didn't run yourself", and zkTLS
 proofs are designated-verifier, so a contract "cannot re-witness the session". Every shipping vendor
-I checked verifies on chain with `ecrecover` against an allowlisted attestor set: Reclaim
+this work checked verifies on chain with `ecrecover` against an allowlisted attestor set: Reclaim
 (`Claims.sol`, ecrecover per witness), Primus (`require(signatures.length == 1)`, one ecrecover
 against an allowlist), zkP2P (M-of-N ECDSA). **Not one verifies a TLS session or a SNARK on chain.**
 On-chain verification is cheap precisely because the chain is checking a trusted signer.
@@ -274,8 +274,8 @@ session plus about 40 KB per 1 KB of incoming data. Applied to the measured size
 zkPass publishes near-identical figures for their own MPC mode and calls a 100 KB response
 "impractical for regular use", which is why they default to a proxy. Two independent sources agreeing
 on the order of magnitude is good evidence. Note the published latency benchmarks show full-reveal
-MPC flat at about 14.5 s from 1 KB to 51 KB, which is in tension with the FAQ's bandwidth model; I
-could not reconcile them and **nobody has published a benchmark past 51 KB**. Seven of Quiver's
+MPC flat at about 14.5 s from 1 KB to 51 KB, which is in tension with the FAQ's bandwidth model; the two
+could not be reconciled here and **nobody has published a benchmark past 51 KB**. Seven of Quiver's
 thirteen calls are larger than any measurement that exists.
 
 **The industry already voted.** zkP2P/Peer settled real money on Base with proxy-based zkTLS, then
@@ -287,7 +287,7 @@ Otherwise, we must trust the Attestor."
 **Two practical hazards on top.** A TLSNotary ClientHello advertising two suites and max version 1.2
 is a JA3/JA4 fingerprint no real browser produces, and eleven of the thirteen hosts sit behind
 Cloudflare or CloudFront, which fingerprint on exactly that. Proxy mode originates from datacenter
-IPs, which those CDNs pre-flag. Neither is fatal, both are unmeasured, and I found no vendor
+IPs, which those CDNs pre-flag. Neither is fatal, both are unmeasured, and this work found no vendor
 documentation addressing either.
 
 **Verdict.** Not blocked on protocol. Blocked on a trusted notary you must operate yourself, on
@@ -319,10 +319,10 @@ schema returns a derived consensus price with `bid == ask == price`, explicitly 
 The relationship with Polymarket runs the other way: Chainlink and Pyth feed into its resolution.
 
 Two access facts belong in any plan that leans on these. Chainlink Data Streams has **no free tier**,
-from $150/month per feed, credentials HMAC. Pyth Core's unauthenticated Hermes endpoint, the one my
+from $150/month per feed, credentials HMAC. Pyth Core's unauthenticated Hermes endpoint, the one this work’s
 probe used successfully today with no key, **is being retired within weeks** and the quorum shrinks
 from 13-of-19 Wormhole guardians to a 3-of-5 router set; Starter is $500/month. The two official Pyth
-sources disagree on the date (docs say 2026-08-18, the blog says 2026-07-31) and I could not resolve
+sources disagree on the date (docs say 2026-08-18, the blog says 2026-07-31) and this work could not resolve
 which is current. **RedStone's public gateway is currently the only credential-free source of
 third-party-verifiable signed prices**, which makes it a dependency risk rather than a stable
 assumption.
@@ -409,8 +409,8 @@ And `portfolio-gate`'s account book is covered too. `position(user, perp)` retur
 Leverage matched exactly on all three. `entryPx` is recoverable as `entryNtl / szi` and agrees to
 about 1e-5 (ETH: 1874.07 derived against 1874.09 reported).
 
-**A contract can read this, not just an RPC client.** That distinction is the whole point, and I
-proved it rather than assuming it, using an `eth_call` state override that plants bytecode
+**A contract can read this, not just an RPC client.** That distinction is the whole point, and it was
+proved rather than assumed, using an `eth_call` state override that plants bytecode
 performing a `STATICCALL` into the precompile:
 
 ```
@@ -420,7 +420,7 @@ performing a `STATICCALL` into the precompile:
 It returned 633620, byte-identical to the direct read, meaning BTC mark 63,362. **Cost: 3,285 gas**
 above an identical-calldata no-op, at a HyperEVM gas price of 0.124 gwei.
 
-**What is not there.** No funding precompile exists. I scanned `0x800` through `0x830` and matched
+**What is not there.** No funding precompile exists. this work scanned `0x800` through `0x830` and matched
 every returned word against the live funding rate (0.0000125) and open interest at six scale factors;
 nothing matched. The notional **margin tier table** is also absent: `perpAssetInfo` gives
 `marginTableId` (56 for BTC) but no precompile returns the table, and `perp-gate` prefers tiers over
@@ -431,7 +431,7 @@ so this value cannot be exported off HyperEVM as a proof. **Verification must ha
 ### 4.2 dYdX: the inputs are Merkle-provable against a validator-signed header
 
 dYdX v4 runs unmodified CometBFT. The gRPC query path returns data with no proof
-(`proofOps=NONE`, measured). The **raw store** path returns ICS-23 proofs. I located the real key
+(`proofOps=NONE`, measured). The **raw store** path returns ICS-23 proofs. this work located the real key
 format by decoding the neighbour leaves out of a non-existence proof, which is a trick worth keeping:
 a miss names the surrounding real keys.
 
@@ -447,11 +447,11 @@ The unsigned indexer response Quiver actually reads, fetched at the same time, s
 
 The proof ops are `ics23:iavl` then `ics23:simple`, rooting the leaf into the store and the store into
 `app_hash`, which sits in a CometBFT header carrying validator signatures (17 of 31 slots signed at
-the height I checked, 31 validators in the set). Verifying it off chain needs an ICS-23 verifier plus
+the height this work checked, 31 validators in the set). Verifying it off chain needs an ICS-23 verifier plus
 a light client. dYdX's own documentation never mentions proofs anywhere; the capability is a
 byproduct of running standard CometBFT.
 
-**What is not there.** `nextFundingRate` was not located in either store and I did not find it, so
+**What is not there.** `nextFundingRate` was not located in either store and this work did not find it, so
 funding is unverified for dYdX as well as Hyperliquid. And dYdX documents the hard limit explicitly:
 the orderbook is in-memory per node, "not written to the blockchain or stored in the application
 state", so no book depth is ever provable.
@@ -522,7 +522,7 @@ data before anyone writes Solidity.
 
 ## 5. The hard cases, stated plainly
 
-These have no clean answer and I did not find one.
+These have no clean answer and this work did not find one.
 
 | source | services | why nothing works |
 |---|---|---|
@@ -698,10 +698,10 @@ nothing here should move the build hash.
 | `map-services.mjs` | the service-to-host table, parsed from source rather than written by hand |
 
 **Evidence that is thin, said plainly.** Nitro attestation-generation latency has no published
-benchmark and I did not measure it. The per-CVE mitigation status of the microarchitectural SGX and
+benchmark and this work did not measure it. The per-CVE mitigation status of the microarchitectural SGX and
 SEV attacks (Plundervolt, LVI, SGAxe, ÆPIC, Downfall, CacheWarp) was not verified; the physical
 attacks, Foreshadow and SGX.Fail were. Pyth's retirement date has two conflicting official sources.
-TLSNotary's bandwidth model and its latency benchmarks are in tension and I could not reconcile them.
+TLSNotary's bandwidth model and its latency benchmarks are in tension and this work could not reconcile them.
 No vendor publishes a measured EVM gas figure for zkTLS verification. dYdX's funding rate was not
 located in any store, which means not found rather than not there.
 
@@ -1000,4 +1000,4 @@ red; the bound is not padded to prevent that. Funding remains **not found** rath
 104,932 scalings failing to match is strong, but it is a search, not a proof of non-existence.
 `marginTiers` is unattested and 36 assets actually use it. And the position path (`0x…0800`) is
 decoded and exercised but was **not** re-verified against a live multi-leg book in this build — 4.1's
-5-leg check is the only evidence for it, and it is not mine.
+5-leg check is the only evidence for it, and it is not this work’s.

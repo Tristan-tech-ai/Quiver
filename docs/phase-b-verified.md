@@ -539,7 +539,18 @@ are marked so, because a resolved gap is still worth recording as having been op
 6. **Every refusal sweep is synthetic.** 200 seeded books per size for portfolio-gate over a chosen price
    ladder, not the live venue universe. `gateB8-1` is the gate that samples the real engine and **was not
    re-run against the wider bounds**.
-7. **Gas is one sample per row, everywhere** — and §5.1 shows the direction of the error. Every ratio
+7. **Gas is one sample per row, everywhere** — **no longer true of the flagship figure, and the
+   remaining error has a direction and a size.** Measured 31 July 2026 from
+   `probe-direct-vs-snark-gas.json`, which carries a `spread` block: the Plonk accept gas is **12
+   samples**, min **273,693**, median **274,427**, max **276,715**, a spread of **3,022 gas = 1.1%** of
+   the minimum. The direct Solidity check is `deterministicAcrossTwoRuns`.
+   **What is still open is which of those twelve gets published.** `snark.acceptGas` is the **minimum**,
+   and that is the number the documents quote and build the headline ratio from: 273,693 / 2,050 =
+   **133.51×**, where the same ratio on the median is **133.87×**. Quoting the minimum makes the snark
+   look **0.27% cheaper** than the middle of its own distribution — small, in the flattering direction,
+   and not stated at the point of use. The citation does carry a `~2%` tolerance and `spread.gas` is
+   published elsewhere, so nothing here is hidden; it is a choice of estimator that no line explains.
+   Every ratio
    built on these figures (the 10.2× at 11 legs, the 3.19× batched-vs-per-leg, the "+0.9% marginal", the
    "8,000 gas cheaper" closed form) carries at least the measured 1.26% spread plus a 7,500-gas cold/warm
    gap, and in one case a 3,854-gas observed range.
@@ -700,7 +711,13 @@ Recorded because the disease, not the instance, is the thing.
     0.05%`, and `lpDesk REFUSES rather than reporting noise when there are too few swaps`. The suite
     total of 386 counts them; 381 is what runs without an RPC.
 37. **The three LP1 encoder refusals** were characterised from their reason string, not individually
-    verified.
+    verified. **Still true, and the artifact is why.** Checked 31 July 2026:
+    `build/gateLP1-bracket-sweep.json` records `certified: 562` of `samples: 600`,
+    `refusedByEncoder: 3`, and `refusalReasons: {"g(lo) > 0 does not survive the grid": 3}` — a count
+    against a single string. **The artifact does not record WHICH three samples were refused**, so there
+    is nothing to re-derive them from without re-running the sweep with per-case output the gate does not
+    currently emit. Verifying them individually is a change to the gate, not a reading of its output, and
+    it is left open rather than closed by restating the same string a second time.
 38. **Groth16's operational cost is unmeasured.** It needs a per-circuit phase-2 ceremony where Plonk's
     setup is universal; the contributions made this session are single-contributor and worthless as
     trust. Every Groth16 gas advantage above carries that unpriced.

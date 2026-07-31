@@ -632,8 +632,14 @@ Recorded because the disease, not the instance, is the thing.
     15-line subset gave the verdict for the B5 family; the other ~33 gates have **no portability
     verdict**. And the flag meant to shrink the gates, `QUIVER_GATE_PORTABILITY_PROBE`, is mentioned in
     exactly one file — itself. **It is dead, which is why the gate never finishes.**
-31. **`execadverse` and `portfolioleg` are absent from that gate's `CIRCUITS` list.** Left unedited to
-    avoid racing concurrent agents in a tree with no version control.
+31. **`execadverse` and `portfolioleg` are absent from that gate's `CIRCUITS` list.** ~~Left unedited
+    to avoid racing concurrent agents in a tree with no version control.~~ **CLOSED, and by removing the
+    list rather than by adding two entries to it.** Measured 31 July 2026: `gate-clone-portability.mjs`
+    no longer keeps a `CIRCUITS` list at all — line 63 is `readdirSync(CIRCUIT_DIR)` and line 198 sets
+    `MIN_CIRCUITS = 22` as a ratchet so the discovered set cannot silently shrink. It discovers **22
+    circuits**, both `execadverse` and `portfolioleg` are in that set, and neither appears in the
+    named-exclusions table. A list short by exactly the entries that would have gone red was the original
+    defect; the fix was to stop keeping one.
 32. **No EVM gate runs from the Quiver mirror** — **and the reason is narrower than this said.**
     Measured 31 July 2026: `solc` **is declared** in `Quiver/zk/package.json` as `"solc": "^0.8.26"`,
     and the dev tree resolves that same spec to **0.8.26**. So a clone that runs `npm install` in
@@ -651,7 +657,14 @@ Recorded because the disease, not the instance, is the thing.
     so set-exactness is 2N-1 hashes and no circuit adds anything.
 34. **`parity.circom` and `greekssigned.circom` headers still state more than those circuits deliver.**
     Both defects demonstrated with real accepted proofs. Neither patched.
-35. **The `options-risk` work is not committed anywhere, and its own report says otherwise.** This is the
+35. **The `options-risk` work is not committed anywhere, and its own report says otherwise.**
+    **CLOSED.** Measured at HEAD on 31 July 2026 with `git ls-files --error-unmatch`, one path at a
+    time rather than as a group: `src/engine/optionsRisk.js` **tracked**, `test/optionsrisk.test.mjs`
+    **tracked**, `zk/circuits/greeks.circom` **tracked**, and the engine is present in the served tree.
+    The service also emits a proof for `options-risk` on the live container as of the 30 July deploys.
+    Left below is the original account of how it went uncommitted, because the failure mode — work
+    landing inside a sibling's commit and a `reset --soft` being declined under three live agents — is
+    the part worth keeping. This is the
     one item on this list this work upgraded from "process footnote" to "act on it today", because it was measured
     and it is worse than reported. The `options-risk` agent recorded that all 17 of its paths "landed
     inside a sibling's commit `8901f04`" and chose not to split them because a `reset --soft` would move
@@ -694,7 +707,21 @@ Recorded because the disease, not the instance, is the thing.
 39. **Two named-but-unmeasured optimisations for `ncdf`:** `G = 5` or `6` would remove two or three
     `MulShift` blocks (blocked only by `circomlib` shipping `mux1..mux4`, a library fact not a
     mathematical one), and computing `z²..z⁷` once would make both Horner chains free linear
-    combinations — an *estimated* ~7·(S+1) R1CS per instance. Neither measured.
+    combinations — an *estimated* ~7·(S+1) R1CS per instance.
+    **PART MEASURED 31 July 2026, and the block count was understated.** The generator's own parameters
+    give it exactly: `S = 40`, `WINT = 5`, so `WBITS = 45`, and `NG = ceil(WBITS / G)` is the number
+    of groups, one `Mux` and one `MulShift` each. At `G = 4` that is **12 blocks**. At `G = 5` it is
+    **9**, and at `G = 6` it is **8** — so the saving is **3 and 4 blocks**, not "two or three". The
+    library obstruction is confirmed in the same read: the emitter writes `Mux4()` literally, and
+    `circomlib` ships `mux1` through `mux4`, so `G = 5` and `G = 6` need a component that does not
+    exist.
+    **The per-block R1CS cost is still not measured, and deliberately so.** The only `G` below 4 that
+    `circomlib` supports is 3, and measuring it would mean editing the emitter's hardcoded `Mux4()` —
+    while `gen-ncdf-circom.mjs` writes its output straight over `zk/circuits/ncdf.circom`, the live
+    circuit `options-risk` and `event-vol` both prove against. Running the generator with different
+    parameters silently replaces a served circuit. That is a real hazard worth naming on its own, and it
+    is why the marginal was left unmeasured rather than obtained by overwriting something the service
+    depends on. The `z²..z⁷` estimate is untouched and remains an estimate.
 40. **`lpexpectation`'s 36,613 R1CS is an honest floor, not a total.** The two Taylor-pinned seeds are
     numerical measurements (9 terms → 1.25e-13; 10 terms + 9 squarings → 7.74e-13) and were never written
     as constraints. With the closed form this is moot, but the figure was quoted as a cost.

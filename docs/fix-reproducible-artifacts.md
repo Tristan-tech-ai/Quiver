@@ -632,7 +632,7 @@ existed. The sequence, in order:
 | + circom and the zk dependencies | **still fails** — `zk/build/hez_final_12.ptau` was in no commit |
 | + the ceremony file | **55 of 55 assertions pass**, all 8 byte-identity pins among them |
 | …but `portfolio/probe1` | **crashes** — the service tree's `node_modules` is missing, and probes 1–3 build witnesses through the service's own encoder, which reaches `ethers` |
-| + the service dependencies | `probe1` runs, and the gate goes **red on one row**: the manifest catching my own edit to `repro.mjs` made after the last manifest write |
+| + the service dependencies | `probe1` runs, and the gate goes **red on one row**: the manifest catching this repository’s own edit to `repro.mjs` made after the last manifest write |
 | fresh clone of `1761b7d`, all three supplied, a local 2^13 in the work directory | **62 of 62 pass**, **9 byte-identity pins**, `gate:z-revert` red in all four modes it then had |
 
 That last row read "61 of 61" until 30 July. It was the same miscount §6 records, written down a second

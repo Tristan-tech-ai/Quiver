@@ -68,7 +68,7 @@ non-reproducible from the repository.** That is decision #1 in section 8.
 | adversarial passes run against the *adversaries* | **0 of 4** | nobody has attacked the new claims |
 | commits containing `zk/circuits/ncdf.circom` | **0** — 18 files staged and uncommitted | `git log --all -- <path>`; the commit its author named is orphaned. §6.4 item 35 |
 
-Every constraint count in sections 3 and 4 was read by a parser I wrote in this session that uses
+Every constraint count in sections 3 and 4 was read by a parser written for this report that uses
 neither `snarkjs` nor `circuit-facts.mjs`, straight out of the `.r1cs` section-1 header and the Plonk
 zkey section-2 header. It carries a non-vacuity guard that throws on a zero count, because the `lp-risk`
 investigator's own parser skipped 20 bytes from `nWires` to `nConstraints` where **24** are needed, read
@@ -119,7 +119,7 @@ private, the statement is a closed-form predicate over data the verifier already
 buys no succinctness and no privacy — it buys third-party certification of arithmetic, and it pays about
 55× the gas of just checking the predicate.
 
-That conclusion generalises, and I measured the generalisation. **All three circuits on the live paid
+That conclusion generalises, and the generalisation was measured. **All three circuits on the live paid
 path — `liquidation`, `kelly`, `concentration` — have `nPrvIn = 0`.** So does every new circuit built
 this round. Whatever these proofs are worth, it is not succinctness, and the commercial story has to
 survive that. The `exec-verify` adversary's Poseidon-committed variant (1,764 R1CS, 2 public signals,
@@ -622,7 +622,7 @@ Recorded because the disease, not the instance, is the thing.
 34. **`parity.circom` and `greekssigned.circom` headers still state more than those circuits deliver.**
     Both defects demonstrated with real accepted proofs. Neither patched.
 35. **The `options-risk` work is not committed anywhere, and its own report says otherwise.** This is the
-    one item on this list I upgraded from "process footnote" to "act on it today", because I measured it
+    one item on this list I upgraded from "process footnote" to "act on it today", because it was measured
     and it is worse than reported. The `options-risk` agent recorded that all 17 of its paths "landed
     inside a sibling's commit `8901f04`" and chose not to split them because a `reset --soft` would move
     HEAD under three live agents. Measured now:
@@ -641,7 +641,7 @@ Recorded because the disease, not the instance, is the thing.
     un-committed `options-risk`. **So the entire `ncdf` deliverable — circuit, generator, zkey, verifier,
     gate and five probes — currently exists only in the index and working tree of a repo with no version
     control discipline between four agents.** One `git reset --hard` or `git checkout .` loses it. I did
-    not commit it: staging 18 files that are not mine under my own message is precisely the accident that
+    not commit it: staging 18 files belonging to another session under this one’s message is precisely the accident that
     created this state.
 
     The coordination rule that came out of all this — commit with an explicit pathspec, never a bare
@@ -704,7 +704,7 @@ commit its author thought it landed in, `8901f04`, is orphaned — not an ancest
 any ref, because `exec-verify` correctly soft-reset it to un-swallow a sibling's files and re-committed
 only its own paths. All 18 `ncdf` files are staged and uncommitted right now. A `git reset --hard`
 destroys the circuit, the generator, the zkey, the exported verifier, the gate and five probes. I did not
-commit them myself: staging 18 files that are not mine under my own message is the exact accident that
+commit them myself: staging 18 files belonging to another session under this one’s message is the exact accident that
 created this state, and the author should own the message. See §6.4 item 35 for the measurements.
 
 **1. Rescue the adversary artifacts, or accept that four refutations are unreproducible.** This gates

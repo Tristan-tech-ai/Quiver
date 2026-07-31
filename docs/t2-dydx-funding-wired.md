@@ -130,7 +130,7 @@ Two smaller corrections, both in the direction of *narrower* claims than the doc
 
 ---
 
-## 3. The bound I got wrong, and how the gate caught it
+## 3. The bound this report got wrong, and how the gate caught it
 
 Worth recording, because the first version of the new test passed my calibration and was still wrong.
 

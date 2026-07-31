@@ -227,7 +227,7 @@ condition under which Jensen would bite hardest. Under per-sample clamping, WLFI
 samples each contribute a clamped value below the constant, and the hour's average cannot be exactly
 1.25e-5. It was exactly 1.25e-5, in every one of the 252 snapshots.
 
-**5.4 The two aggregates, computed directly.** For the completed hour 14:00 UTC, using my own 252
+**5.4 The two aggregates, computed directly.** For the completed hour 14:00 UTC, using the independent 252
 five-second samples, compute both candidates and compare to what the venue published:
 
 | coin | published P | published rate | `g8(mean(samples))` | `mean(g8(samples))` |

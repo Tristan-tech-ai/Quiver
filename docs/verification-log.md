@@ -17,7 +17,7 @@ the wire rather than after decoding:
 HTTP compresses before TLS encrypts, so an MPC-TLS cost model pays for the compressed stream. The
 "seven times any benchmark" claim is retracted.
 
-**My own first probe of this was wrong and is worth recording.** I measured with Node's `fetch` and
+**The first probe of this was wrong and is worth recording.** It measured with Node's `fetch` and
 `arrayBuffer()`, which reported 372,321 bytes for BOTH requests, and would have led me to conclude the
 server was not compressing at all. Node's fetch decompresses transparently, so `arrayBuffer()` returns
 the decoded size whatever the encoding. The `content-encoding: gzip` header was right there in the
@@ -190,8 +190,8 @@ So every pinned attestation of market parameters false-refused, and the refusal 
 had lost the data rather than like we had asked the wrong node. After the change, BTC, ETH and SOL all
 prove at two-day depth with primary still publicnode, so the fallback is doing the work.
 
-**Two of my own explanations died on measurement, and saying so is the point.** When `gate:d3` went red
-after the change I wrote that the change had caused it, on one pre-change run passing against two
+**Two proposed explanations died on measurement, and saying so is the point.** When `gate:d3` went red
+after the change, this log recorded that the change had caused it, on one pre-change run passing against two
 post-change runs failing. That is a three-sample claim of causation.
 
 - *Latency*: dead. `anchor.primary` IS `providers[0]`, and `proveMarket` at tip runs 342 to 746 ms.

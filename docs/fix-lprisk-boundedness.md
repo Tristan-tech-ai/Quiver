@@ -251,7 +251,7 @@ land without the register being rewritten. `gates/gateN-revert.mjs` step 2 had t
 the reachable staleness reversed sign, because the page can no longer claim a fixed defect is live, only
 that a live defect is fixed.
 
-## 9. The residue, and what I did not do
+## 9. The residue, and what was deliberately left undone
 
 - **`src/engine/lpRisk.js:206` still contains the defect.** This layer corrects the *verdict* a caller
   receives; it does not correct the engine. Anyone importing `lpRisk` directly — `test/lprisk.test.mjs`,

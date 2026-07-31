@@ -280,7 +280,7 @@ That artifact publishes `nonDecreasingSteps: 0` over 20,001 log-spaced `v` in `[
 counts steps where the value INCREASES. Asking for STRICT decrease over the same range finds **2,673 of
 20,000 steps flat**. Reading `0` as "strictly monotone" is an overclaim.
 
-Uniqueness survives, and the reason had to be checked rather than asserted — my own second draft
+Uniqueness survives, and the reason had to be checked rather than asserted — a second draft
 assumed every flat step sat at exactly −1 and found 49 that did not:
 
 | measurement | value |
@@ -308,7 +308,7 @@ saturated anywhere a root can sit.
 
 ---
 
-## 6. The scripted revert found two holes in my own gate
+## 6. The scripted revert found two holes in the gate itself
 
 Seven reverts, each required to make gate LP go red. Two did not, and both were real gaps:
 
@@ -431,7 +431,7 @@ breakeven, 0 refused, 0 diverged):
 
 - the encoder's bound is **≥ mine on 798 of 798**, looser by at most 6.287e-2 relative — so it is
   conservative, and sound;
-- against **my own tighter bound** the worst honest case uses **99.7963%**, with **0 violations**.
+- against the **tighter derived bound** the worst honest case uses **99.7963%**, with **0 violations**.
 
 That ~0.2% of headroom is not a near-miss, and it should not be read as one. `findBracket` deliberately
 keeps the **widest** bracket that still qualifies, so the engine's root may legitimately sit at a bracket

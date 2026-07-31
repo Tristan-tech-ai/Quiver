@@ -387,7 +387,7 @@ Each was first set from a hopeful assumption, and each was wrong.
   pass rate floors at **0.575**, while pooling five snapshots 5 s apart lifts the floor to **0.838**.
   Pooling over time is what makes the test stable; a bigger single snapshot is not.
 * **`T10.1`, the oracle identification.** A four-round probe suggested 100%, so the bar went to 0.95
-  — the same error as calling one block a measurement, committed against my own threshold. Over 18
+  — the same error as calling one block a measurement, committed against this report’s own threshold. Over 18
   rounds the pooled rate is **97.31%** and the per-round rate is bimodal: 15 rounds at exactly 1.000,
   three at 0.737 / 0.842 / 0.846 when a market-wide oracle refresh straddles the window. The test now
   pools three rounds with the bar at 0.80, against a wrong register that would score near zero.

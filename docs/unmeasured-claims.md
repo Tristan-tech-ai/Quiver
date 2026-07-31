@@ -600,7 +600,7 @@ one.
 
 ---
 
-# 3. What I could not check, and why
+# 3. What could not be checked, and why
 
 The part of this sweep that could be wrong.
 

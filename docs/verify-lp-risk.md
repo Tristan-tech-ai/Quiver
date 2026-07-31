@@ -18,7 +18,7 @@ the cheapest thing in the service to prove.**
 | "roughly 80,000 transcendental evaluations" | **UNDERCOUNTS BY 3×** — 81,804 quadrature *points*, but **245,624** calls to `exp`/`sqrt` |
 | "needs a rounded BigInt integer square root" | **REFUTED as a blocker** — 7 lines, already in `gateB4-1`, already green on 4,000 ratios |
 | in-circuit cost of that square root | **194 R1CS constraints**, 41.9% of `divergence.circom`'s 463 — compiled and read from artifacts |
-| stating the identity on the squared quantity instead | **works, and is not the cheaper option** — 446 R1CS vs 463, but a 120-bit residual bound instead of 41-bit, and **my first two tolerance derivations were both exceeded** |
+| stating the identity on the squared quantity instead | **works, and is not the cheaper option** — 446 R1CS vs 463, but a 120-bit residual bound instead of 41-bit, and **the first two tolerance derivations were both exceeded** |
 | "no identity restates the quadrature" | **REFUTED** — the grid is geometric; 802 exponentials collapse to **2** plus a multiply chain, worst gap **5.218e-15** over 4,000 v |
 | "no identity restates the bisection" | **REFUTED** — a bracket certificate, **1,776 Plonk gates**, built and gated below |
 | what actually blocks the quadrature | **the ceremony file.** 36,613 R1CS at 81 nodes, **8.94× hez_final_12**; needs 2^16..2^17 |
@@ -269,7 +269,7 @@ Stride 8 is the row that matters for discipline: its worst gap is 2.845e-8, comf
 5e-7 half-step, and 3 of 3,000 rounded figures differ anyway. **A gap under half a published step is
 not the same claim as rounding to the same figure.** The guard has to compare rounded values.
 
-### Two things I got wrong here, both caught by measurement
+### Two figures this report published wrong, both caught by measurement
 
 **The chain step.** My first fixed-point restatement used `p = exp(0.015·√v)` — the *full*-grid ratio —
 with an 81-node *sub*-grid. It read −0.8587 where the engine reads −0.1175 at v = 1, a consistent ≈23×

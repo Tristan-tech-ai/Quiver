@@ -1,4 +1,4 @@
-# Tier 3, re-examined: I was wrong about why it is blocked, and it is now unblocked
+# Tier 3, re-examined: the stated reason for the block was wrong, and it is now unblocked
 
 **28 July 2026. Research, repo-only. Nothing built here is served, deployed, or on chain, and nothing
 touches `src/engine/`, so `q1-e1fa99d08887d6cc` does not move.**
@@ -52,7 +52,7 @@ worst relative residual on identity B was **0.61**, which is sixty percent and c
 
 Two causes, and the first was mine:
 
-**A scaling error.** The identity needs `V·100·S⁴` on the left and I wrote `S³`. The sweep reported a
+**A scaling error.** The identity needs `V·100·S⁴` on the left and the circuit had `S³`. The sweep reported a
 relative residual of exactly **2.0**, which is the signature of one side being negligible against the
 other — a factor-of-1e9 error, never rounding. Fixed, and worth recording as the shape to recognise:
 a residual near 2.0 is a scale bug, a residual near 1.0 is a bound that is too tight.

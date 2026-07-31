@@ -296,7 +296,7 @@ is null and the judge is told their hypothetical book is already liquidated. The
 
 ---
 
-## What I could not break
+## What could not be broken
 
 Stated plainly, because it is the larger half of the picture. I could not:
 

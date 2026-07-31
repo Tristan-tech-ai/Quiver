@@ -7,7 +7,7 @@ to an adversary told to break it. This document is the single read across all fi
 
 This report consolidates work I did not do. That makes it exactly the kind of document that has
 already shipped false claims here — a figure copied from a hand-off report into a document, where no
-gate can reach it. So every figure carries its source, and the list of what I measured myself is
+gate can reach it. So every figure carries its source, and the list of what was measured directly is
 closed:
 
 **Measured by me, this session, in this tree:** the proof-emitting set and the handler counts; the
@@ -42,7 +42,7 @@ Nothing in the fifth row was wired. Two services were wired this cycle: **option
 ## 2. The count, measured
 
 Measured by re-running preflight's own `EMITS_ZK` regex over the live handler arrays — never a second
-derivation of my own, which is the failure mode that shipped a 64-grid-step encoder:
+derivation written here, which is the failure mode that shipped a 64-grid-step encoder:
 
 ```
 handlers total 31 = http 22 + mcp 9
@@ -129,7 +129,7 @@ The lp-risk session compiled a closed-form probe circuit at 3,023 constraints an
 are **refuted**.
 
 3,023 is an **R1CS** count. 4,096 is the **Plonk domain size** `hez_final_12` supports. Different
-units. **I measured the only R1CS→Plonk expansion that exists in this tree, from the zkey header
+units. **The only R1CS→Plonk expansion that exists in this tree was measured, from the zkey header
 myself:**
 
 ```
@@ -256,7 +256,7 @@ its artifact holds 274,752 — neither published figure is in the repo. Plonk ve
 1.22% spread (~3,500 gas), so **every marginal-gas claim smaller than that is noise.** I quote no gas
 figure in this document and computed none.
 
-### 4.8 Everything in §1 that is not in my provenance list
+### 4.8 Everything in §1 that is not in the provenance list
 
 Every figure in the table's *What was done* and *Adversary* cells is attributed and was not
 re-measured here. I did not re-run gateLP-bracket-snark, gateB7-6, gateB7-7, gateAT, gateG, gateIF,
@@ -389,7 +389,7 @@ npm test                          386 tests · 381 pass · 0 fail · 5 skipped
 diff -rq src/engine ../../Quiver/src/engine    byte-identical
 codeHash (src/engine/proof.js)    q1-e1fa99d08887d6cc   — unmoved
 live GET /build                   q1-e1fa99d08887d6cc · fileCount 37   — the deployed engine agrees
-gates/preflight.mjs:387 pin       14 entries / 7 services — matches what I measured
+gates/preflight.mjs:387 pin       14 entries / 7 services — matches what was measured
 ```
 
 `src/engine/` was not touched by this document. Two closed items, both verified by me and both
@@ -413,7 +413,7 @@ loads; and the stale duplicate `src/util/mcp.js` was removed from HEAD in `ddcc4
    wired" — the changelog's nine missing entries are what turn a single sample into a conclusion, and
    the two agree.
 5. **Nothing was deployed.** No `railway up`. The paper was not touched.
-6. **I published one figure I had not measured, and it was wrong within four minutes.** §7 first read
+6. **One figure was published without being measured, and it was wrong within four minutes.** §7 first read
    "262 once this file's two copies land" — arithmetic, not a measurement. The re-run returned **263**:
    a sibling landed a document while I was writing. The figure is corrected above, the mistake is left
    here, and it is the cheapest possible demonstration of decision 9 — a count nobody can hold still

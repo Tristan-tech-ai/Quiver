@@ -5,7 +5,7 @@
 writing, not recalled).
 
 The roadmap states Phase D as three approaches, in order of expected cheapness: signed venue data,
-TEE attestation, zkTLS. I measured all three against the sources Quiver actually reads. Two of the
+TEE attestation, zkTLS. All three were measured against the sources Quiver actually reads. Two of the
 three are worse than the roadmap implies. The one that works is a fourth approach the roadmap does
 not mention: **for the two venues that are themselves blockchains, the exact inputs Quiver consumes
 are readable from the venue's own consensus state, and a contract can read them.**
@@ -329,7 +329,7 @@ assumption.
 
 ### 3.5 Multi-source consensus with divergence bounds
 
-Cheap, requires nothing new, and has a hard floor that I measured rather than estimated. Nine
+Cheap, requires nothing new, and has a hard floor that was measured rather than estimated. Nine
 independent BTC/USD sources, four concurrent rounds:
 
 | source | mean | vs median |

@@ -3,7 +3,7 @@
 **28 July 2026. Research, repo-only. Nothing here is served, deployed, or on chain. Nothing touches
 `src/engine/` or any adapter, so `q1-e1fa99d08887d6cc` does not move.**
 
-`PHASE_D_RESEARCH.md` §5 lists five sources as having no answer. I measured all five rather than
+`PHASE_D_RESEARCH.md` §5 lists five sources as having no answer. All five were measured rather than
 inheriting the claims. **Four of the five statements are wrong on a load-bearing detail**, and one of
 those four is not merely unblocked but already reconstructible today, exactly, from a proof the repo
 can already verify.
@@ -242,7 +242,7 @@ substantial (CTF Exchange 15,007 bytes of bytecode, NegRisk exchange 21,037 byte
 self-authenticating for order existence, and Polymarket would be serving something it already holds.
 
 **Evidence quality, stated plainly.** The claim that those orders are EIP-712 signed comes from
-Polymarket's published CLOB documentation, not from anything I measured. I called
+Polymarket's published CLOB documentation, not from anything measured here. The endpoint called
 `DOMAIN_SEPARATOR()` and `domainSeparator()` on both exchange contracts and **both reverted**, so I
 could not confirm a public domain-separator getter. The inference is strong (an on-chain fill
 requires a verifiable maker authorisation) but it is an inference.

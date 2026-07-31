@@ -304,7 +304,7 @@ script's business.
 ## 6. The thing worth taking from today
 
 **Two of the ten entries were fixed by other sessions between being written and being checked**, and the
-gate caught both by going red on my own prose:
+gate caught both by going red on this document's own prose:
 
 - `execadverse` was wired into the prover while §10 was being written, so §10's opening sentence — "not one
   of them is reachable from a served answer" — was false within the hour. The entry was corrected and the

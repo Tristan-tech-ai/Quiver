@@ -245,7 +245,7 @@ by construction: the false thing is the English quantifier.
 ## 4. Every claim nobody measured
 
 Tristan's standing instruction: an unmeasured claim is worse than an admitted gap, because a false claim
-in the README passed every gate for days. This is the complete list, including my own.
+in the README passed every gate for days. This is the complete list, including the ones introduced by this round's own work.
 
 ### Unmeasured in the six repair reports
 

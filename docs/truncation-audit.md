@@ -286,7 +286,7 @@ portfolio-gate present: false
 Three separate false statements, all derived from a 404, none of them flagged as an error. The
 correct index lives at `/`.
 
-*[self-inflicted]* When I re-probed the **correct** path, my own array-shaped parser printed
+*[measurement artefact]* On a re-probe of the **correct** path, an array-shaped parser printed
 `COUNT: 0` and `portfolio-gate present: false` **again** — because `/`'s `services` node is an
 **object keyed by route** (`"POST /api/portfolio-gate": "…"`), not an array. Two independent
 defects, either one sufficient to produce the same wrong answer. Read correctly: **22 entries**,
@@ -314,7 +314,7 @@ The signal is alive and correctly directed — "no notice" means fixed, not feat
 
 *[self-inflicted]* My first attempt probed `chart_press` and `macro_sentry` over MCP and got
 `routingNotice: 0` for both. Both responses were 343 bytes: `unknown tool`. **Only 9 of the 22
-services are MCP tools.** I had probed two tools that do not exist and read the resulting absence as
+services are MCP tools.** The probe had asked for two tools that do not exist and read the resulting absence as
 a clean bill of health — the identical error to §2.2, made one step after documenting it.
 
 **Still unverified:** `chart-press` and `macro-sentry` in production. They are HTTP-only, and

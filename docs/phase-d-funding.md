@@ -139,7 +139,7 @@ Because an impact price is a book walk, `impact_bid <= best_bid` and `impact_ask
 
 and in particular, if `best_bid <= oracle <= best_ask` then **premium is exactly zero**.
 
-I measured how often that fires, with both precompiles read **at the same pinned block** so there is
+How often that fires was measured, with both precompiles read **at the same pinned block** so there is
 no timing gap at all (block 41,674,042, 24 assets):
 
 | | measured |

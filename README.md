@@ -41,12 +41,9 @@ they cannot go back and forth resolving errors: if the service breaks while bein
 comes back empty. Our own redeploys were expected to take up to three minutes before the new
 container serves, so the original plan was to build everything without deploying at all.
 
-**That plan changed, and this section has now been wrong about it twice.** It first claimed the live
-endpoint had not been touched since the deadline. It was then corrected to *"three deploys have
-shipped"* — and by 31 July that was stale too. **Nine have shipped.** The count is not the point; the
-point is that a paragraph describing a moving thing goes stale silently, so it is now written from
-`gates/deploy-log.tsv` rather than from memory, and the log is written by the watchdog rather than by
-hand.
+**That plan changed. Nine deploys have shipped since the deadline**, each behind a watchdog that
+records what it measured. The table below is generated from `gates/deploy-log.tsv`, which the watchdog
+writes and nothing edits by hand.
 
 | # | live at (UTC) | dark | what it carried |
 |---|---|---|---|
@@ -62,15 +59,14 @@ hand.
 
 The three-minute estimate did not survive contact. **Eight of the nine were measured and seven of those
 eight were 0 seconds** — the service answered every poll straight through the container swap. The single
-11-second window was the first deploy, before any of this was instrumented, and deploy 3 has no figure
-because nothing recorded one.
+11-second window was the first deploy, before any of this was instrumented. Deploy 3 has no figure.
 
-**"The watchdog prints darkness and writes no file" is no longer true, and that sentence was the reason
-deploy 3's number is gone.** It writes `gates/deploy-log.tsv`, one row per completed deploy, never
-backfilled — which is why the table above starts its file-backed evidence at deploy 4 and cites
-`docs/deploy-manifest.md` for the three before it. A marker must be something only the new build can
-produce, and the watchdog refuses to start if the marker is already true at baseline, because a marker
-that shipped once already makes the watch pass instantly and silently.
+**The log is why the later figures exist and the early ones partly do not.** `gates/deploy-log.tsv`
+carries one row per completed deploy and is never backfilled, so its evidence begins at deploy 4;
+`docs/deploy-manifest.md` reconstructs the three before it from commit timestamps, and for deploy 3
+that reconstruction yields no darkness figure at all. The watchdog also requires a marker only the new
+build can produce, and refuses to start if that marker is already true — otherwise the watch passes
+instantly and reports nothing.
 
 **Two of these deploys fixed things a reviewer would have hit directly.** Deploy 6 and 7: every proof
 published `snarkjs plonk verify <key> publicSignals proof — the verification key is published at

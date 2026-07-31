@@ -980,7 +980,24 @@ caller supplies rather than at a `d1` derived from `(F, K, T, σ)`. Each would h
 
 ## 11. Two shipped circuit headers claim more than the circuits prove, and both over-claims were demonstrated with accepted proofs
 
-**Status: OPEN, unpatched, and each is a change with its own gate.**
+**Status: FIXED 31 July 2026 — both headers patched, comments only, no artifact moved.**
+
+`parity.circom` no longer claims it "ties a call to a put at the same strike, so a price that drifts on
+one side and not the other fails here". The header now says what the algebra says: for any N with
+N(−x) = 1 − N(x), which this repository's `ncdf` has by construction, the CDF cancels out of
+C − P = df·(F − K), so parity is **not a check on the price level at all**. The Abramowitz-Stegun
+counterexample stays with it — a book wrong by $0.004763 on a $2,688 call whose parity witness verifies.
+Its second sentence, that the residue "stays until erf is provable", is gone too: it named a blocker that
+does not exist, since `ncdf.circom` computes the CDF and the engine never computed `erf`.
+
+`greekssigned.circom` no longer calls `d1 − d2 = σ√T` "proven here as a by-product". `dDiff` appears in
+one constraint with nothing tying it to σ or T, so the header now states it is an **input the circuit
+trusts**, and keeps the exponent attack that demonstrated it: `vannaE` 11→10 with `dDiffE` 9→10 yields
+an accepted proof asserting a vanna ten times the engine's.
+
+Checked rather than assumed: both recompile to identical constraint counts, `parity` **1,153** and
+`greekssigned` **1,952**, so no artifact, no proof and no served surface is affected. Neither circuit is
+wired, so no deploy is involved.
 
 **What is wrong.** `zk/circuits/parity.circom`'s header says:
 
@@ -1016,7 +1033,22 @@ front of a buyer, which is the reason both circuits are named here before either
 
 ## 12. Three constants inside the trust root contradict the code beneath them
 
-**Status: OPEN, unpatched. Each is a comment, and each is the kind of comment a reader would act on.**
+**Status: two of three FIXED 31 July 2026. Each is a comment, and each is the kind of comment a reader
+would act on — which is why they were fixed rather than annotated.**
+
+`gen-ncdf-circom.mjs` line 3 said the circuit needs "208 exponential constants". It needs **192**, in 12
+`Mux4` groups of 16. 208 is the total — 192 exponentials plus the 15 Hart coefficients plus `SQRT2PI` —
+attributed to the exponentials alone, and the emitted circuit's own line 130 and the generator's
+`console.log` both already printed 192. The line now carries the count and the arithmetic.
+
+`portfoliogate4.circom` line 220 said "1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 —
+126 gates of slack". Every one of those figures belongs to `portfoliogate`, the **N = 3** circuit:
+1,989 + 64 = **2,053 R1CS** and **3,970 Plonk**, both re-measured. The N = 4 circuit is **2,736 R1CS /
+5,295 Plonk** and `snarkjs` refuses the smaller ceremony outright — "circuit too big for this power of
+tau ceremony. 5295 > 2**12". There was never 126 gates of slack at N = 4; there was a **1,199-gate
+overflow**. Comment-only: it recompiles to 2,652 + 84 = 2,736, matching the committed artifact.
+
+The third is below and is unchanged.
 
 - **`zk/circuits/portfoliogate4.circom:220`** reads
   `// Result: 1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 — 126 gates of slack.` Those

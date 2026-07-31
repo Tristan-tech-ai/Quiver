@@ -23,8 +23,17 @@ include "../node_modules/circomlib/circuits/comparators.circom";
 //   E   theta·730·T = −vega·100·σ      |theta|·730·T = vega·100·σ        ·   s_theta = 1
 //
 // d1 − d2 = σ·√T is positive always, which is why D's left side needs no sign of its own beyond
-// vanna's, and it is also identity A from the same family — proven here as a by-product rather than
-// as a separate statement.
+// vanna's.
+//
+// IT IS NOT PROVEN HERE, AND THIS HEADER USED TO SAY IT WAS — "identity A from the same family, proven
+// here as a by-product rather than as a separate statement". Measured: `dDiff` appears in exactly one
+// constraint and nothing ties it to σ or to T. A compensating power of ten in two alignment exponents
+// leaves every mantissa identical, so moving `vannaE` 11→10 and `dDiffE` 9→10 yields an ACCEPTED proof
+// asserting a vanna ten times the engine's and a d1 − d2 one tenth of σ√T. That was demonstrated with a
+// real accepted Plonk proof.
+//
+// `dDiff` is therefore an INPUT this circuit trusts, not a quantity it certifies. Anything that needs
+// d1 − d2 = σ√T has to get it from somewhere else.
 //
 // r = 0 IS A RESTRICTION AND IT IS STATED. At r ≠ 0 identity E gains a `+ 2·T·r·price` term, which
 // makes the right side a sum of two quantities with opposite signs and needs a comparison rather than

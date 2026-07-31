@@ -10,13 +10,24 @@ include "../node_modules/circomlib/circuits/comparators.circom";
 //
 // These are the only two of the eight that reach the PRICE rather than the greeks. Every other
 // identity in this family relates derivatives to each other and would be satisfied by a service whose
-// price level was uniformly wrong. Parity is not: it ties a call to a put at the same strike, so a
-// price that drifts on one side and not the other fails here.
+// price level was uniformly wrong.
 //
-// It reaches the price and it does not reach far enough to close the gap. Parity constrains the
-// DIFFERENCE C − P. Both prices could be wrong by the same amount and still satisfy it, and the
-// absolute level rests on N(d2), which nothing here evaluates. That residue is unchanged and stays
-// until erf is provable.
+// PARITY DOES NOT FIX THAT, AND THIS HEADER USED TO SAY IT DID. It claimed parity "ties a call to a put
+// at the same strike, so a price that drifts on one side and not the other fails here". It cannot. In
+// Black-76 the put is not an independent quotation: for ANY N with N(−x) = 1 − N(x) — which every
+// tail-plus-branch implementation has, and which this repository's `ncdf` has by construction, returning
+// `x <= 0 ? c : 1 - c` — the CDF cancels out of C − P = df·(F − K) algebraically. Two lines of algebra,
+// and it was checked by hand. A whole book repriced with Abramowitz-Stegun 7.1.26, wrong by $0.004763 on
+// a $2,688 call, produces a parity witness that VERIFIES.
+//
+// So parity is not a weak check on the price level. It is not a check on the price level at all. What it
+// constrains is the DIFFERENCE C − P: both prices can be wrong by the same amount and satisfy it, and the
+// absolute level rests on N(d2).
+//
+// The second sentence that was here is also gone: it said the residue "stays until erf is provable".
+// `ncdf.circom` computes the CDF as of 30 July 2026, and the engine never computed `erf` in the first
+// place, so the sentence named a blocker that did not exist. What is true is narrower: nothing in THIS
+// circuit evaluates N(d2), so this circuit does not reach the absolute level.
 //
 // ── WHY THIS IS A SEPARATE CIRCUIT ──
 // The other six take one option. These take two, a call and a put at one strike, plus the discount

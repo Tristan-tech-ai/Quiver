@@ -667,7 +667,24 @@ Recorded because the disease, not the instance, is the thing.
     eighth deterministic service and is answered rather than missing — its response publishes every leaf,
     so set-exactness is 2N-1 hashes and no circuit adds anything.
 34. **`parity.circom` and `greekssigned.circom` headers still state more than those circuits deliver.**
-    Both defects demonstrated with real accepted proofs. Neither patched.
+    Both defects demonstrated with real accepted proofs. **PATCHED 31 July 2026 — the headers were fixed,
+    not the claim softened.** Three false sentences are gone.
+    `parity.circom` claimed it "ties a call to a put at the same strike, so a price that drifts on one
+    side and not the other fails here". It cannot: for any N with N(−x) = 1 − N(x), which this
+    repository's `ncdf` has by construction, the CDF cancels out of C − P = df·(F − K) algebraically. The
+    header now says parity is not a check on the price level **at all**, and carries the
+    Abramowitz-Stegun counterexample — a book wrong by $0.004763 on a $2,688 call whose parity witness
+    verifies.
+    Its second sentence said the residue "stays until erf is provable", naming a blocker that does not
+    exist: `ncdf.circom` computes the CDF and the engine never computed `erf`. Replaced with the narrow
+    truth, that nothing in THAT circuit evaluates N(d2).
+    `greekssigned.circom` called `d1 − d2 = σ√T` "proven here as a by-product". `dDiff` appears in one
+    constraint and nothing ties it to σ or T; the header now states it is an **input the circuit trusts**,
+    and keeps the exponent attack that proved it — `vannaE` 11→10 with `dDiffE` 9→10 gives an accepted
+    proof asserting a vanna ten times the engine's.
+    **Comments only: both circuits recompile to identical constraint counts, `parity` 1,153 and
+    `greekssigned` 1,952, so no artifact and no proof is affected. Neither circuit is wired, so no deploy
+    is involved.**
 35. **The `options-risk` work is not committed anywhere, and its own report says otherwise.**
     **CLOSED.** Measured at HEAD on 31 July 2026 with `git ls-files --error-unmatch`, one path at a
     time rather than as a group: `src/engine/optionsRisk.js` **tracked**, `test/optionsrisk.test.mjs`

@@ -52,7 +52,7 @@ non-reproducible from the repository.** That is decision #1 in section 8.
 
 | measured today | result | measured how |
 |---|---|---|
-| services a caller can obtain a proof from | **3 of 22** — `perp-gate`, `size-gate`, `treasury-risk` | `node gates/preflight.mjs`, which enumerates both handler arrays and prints the proof-emitting set: `http:perp-gate, http:size-gate, http:treasury-risk, mcp:perp_gate, mcp:size_gate, mcp:treasury_risk` |
+| services a caller can obtain a proof from | **3 of 22 when this was written (29 July)** — `perp-gate`, `size-gate`, `treasury-risk`. **7 of 8 deterministic services as of 31 July**, measured against the deployed container; see the changelog | `node gates/preflight.mjs`, which enumerates both handler arrays and prints the proof-emitting set: `http:perp-gate, http:size-gate, http:treasury-risk, mcp:perp_gate, mcp:size_gate, mcp:treasury_risk` |
 | services in the registry | **22** | `SERVICES.length` from `src/services.js` |
 | handlers that build no proof | 25 of 31 | preflight, both surfaces (22 HTTP + 9 MCP) |
 | `node gates/preflight.mjs` | **24 PASS, 1 FAIL, exit 1** | the one red is the unpublished-changelog check, which is a pre-deploy gate and not a defect |

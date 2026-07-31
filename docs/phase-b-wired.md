@@ -11,7 +11,7 @@ That number was one. It is now three. Everything below is measured.
 | the gap, reproduced before touching anything | `src/util/snark.js` opened *"Succinct proofs for the liquidation identity"* and held one circuit |
 | encoders already working, on the wrong side | 3 files under `zk/scripts/lib/`, each proven by a gate that built its own witness |
 | engines reachable for a proof, before | 1 of 22 — `perp-gate` |
-| engines reachable for a proof, after | 3 of 22 — `perp-gate`, `size-gate`, `treasury-risk` |
+| engines reachable for a proof, after | 3 of 22 at the time of this phase — `perp-gate`, `size-gate`, `treasury-risk`; **7 of 8 deterministic services by 31 July** |
 | worst honest bet's use of the Kelly bound | **99.998%** of it, over 18,540 bets against the real engine |
 | worst honest book's use of the Herfindahl bound | **94.671%** of it, over 8,000 books against the real engine |
 | cases exceeding either bound | 0 |

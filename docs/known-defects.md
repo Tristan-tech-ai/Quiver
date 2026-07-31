@@ -490,6 +490,15 @@ assumes: across twelve proofs of that identical statement the verify figure move
 identical gas on a second run because it touches no precompile and its control flow does not depend on a
 proof scalar. The left column is a sample; the right one is a value.
 
+**And it is the cheapest of the twelve, which is worth saying where the ratio is read rather than only
+in the artifact.** `snark.acceptGas` is the first sample and also the **minimum**; the median is
+274,427 <!--gas:probe-direct-vs-snark-gas#snark.acceptGasMedian--> and the maximum is
+276,715 <!--gas:probe-direct-vs-snark-gas#snark.acceptGasMax-->. So the 133.5× above is the ratio on the
+best case; on the median the same comparison is **133.87×**. The gap is 0.27%, which changes no
+conclusion here — the point of the row is that a pairing check costs two orders of magnitude more than
+the predicate, and it does either way — but it runs in our favour, and an unstated estimator that runs
+one way is the shape of thing this register exists to catch.
+
 The comparison is generous to the proof in two further ways, both left in deliberately. Execution gas
 excludes calldata, where the proof carries twenty-four extra words —
 13,532 gas <!--gas:gateB9-2-widening-evm#single.calldataGas~2%--> of calldata for a single-proof

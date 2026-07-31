@@ -227,7 +227,18 @@ const artifact = {
   proveMs,
   snark: {
     verifier: vKey,
+    // WHICH OF THE TWELVE THIS IS, said out loud.
+    //
+    // `acceptGas` is the FIRST sample, and the first sample is also the minimum of the twelve below.
+    // Every document that quotes a Plonk gas figure quotes this field, and the headline ratio against the
+    // direct Solidity check is built from it: 273,693 / 2,050 = 133.51x, where the same ratio on the
+    // median is 133.87x. That is 0.27% in our own favour, which is small, one-directional, and was
+    // nowhere stated at the point of use. The number is kept — it is a real measurement of a real call —
+    // but it is now labelled, and the median is published beside it so a reader can pick.
     acceptGas: Number(snarkAccept.gas),
+    acceptGasEstimator: 'first sample, which is also the minimum of the spread below — see acceptGasMedian',
+    acceptGasMedian: spread.median,
+    acceptGasMax: spread.max,
     refuseGasOneGridStep: Number(snarkRefuse.gas),
     deployedBytes: V.evm.deployedBytecode.object.length / 2,
     acceptedHonest: snarkTrue,

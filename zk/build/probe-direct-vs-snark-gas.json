@@ -15,6 +15,9 @@
   "snark": {
     "verifier": "PlonkVerifier",
     "acceptGas": 273693,
+    "acceptGasEstimator": "first sample, which is also the minimum of the spread below — see acceptGasMedian",
+    "acceptGasMedian": 274427,
+    "acceptGasMax": 276715,
     "refuseGasOneGridStep": 275149,
     "deployedBytes": 7270,
     "acceptedHonest": true,

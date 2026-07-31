@@ -496,7 +496,16 @@ are marked so, because a resolved gap is still worth recording as having been op
 
 ### 6.1 Genuinely unmeasured, and it matters commercially
 
-1. **Book completeness — the input problem, unsolved in every shape.** Nothing binds submitted legs,
+1. **Book completeness — the input problem, unsolved in every shape.** **Still open, and now
+   quantified rather than asserted.** The register in `src/util/inputClaims.js` was checked against live
+   PAID answers on 31 July: **2 services can attest their inputs today** (`perp-gate` via HyperEVM
+   precompiles, `portfolio-gate` via dYdX ICS-23 store proofs), **3 could** because they read chain state
+   and a block `stateRoot` already commits to it (`lp-desk`, `calldata-x`, `poly-desk`), **1 is partial**
+   (`protocol-pulse`), **8 have no mechanism at all**, and **8 need none** because they compute from
+   caller inputs only. `gate:d4`, the negative gate that services which cannot attest must not claim they
+   can, is **32 of 32**. The eight with no mechanism read venue APIs that commit to nothing a third party
+   can check, and no amount of circuit work reaches them: that is a TEE or zkTLS problem, and it is the
+   honest end of this road. Nothing binds submitted legs,
    pool reserves, realized fills, or option surfaces to an actual account or venue. `portfoliogate`'s
    legs are public inputs, so a prover who omits the genuinely-nearest leg gets a true statement about
    the legs it did submit. Per-leg proving loses nothing in soundness and neither shape solves it. This
@@ -536,7 +545,14 @@ are marked so, because a resolved gap is still worth recording as having been op
    bps width — but the sampled fill range (−50 to +400 bps of mid) is the investigator's *choice*, not an
    observed distribution. 405 of 3,595 pools sit past the 2^62 amount width and are refused; **what
    fraction of real Uniswap pools that is, nobody measured.**
-6. **Every refusal sweep is synthetic.** 200 seeded books per size for portfolio-gate over a chosen price
+6. **Every refusal sweep is synthetic.** **Still true and still the right thing to say, with one
+   correction to its scope made 31 July 2026:** the LP1 encoder refusals are no longer characterised only
+   by a reason string. `gateLP1-bracket-sweep.mjs` now records each refused case with the inputs that
+   produced it, and the three were re-derived independently against the encoder's own arithmetic —
+   `eLoHat + feeHat` is exactly 1,000,000,000 in all three, which is not *greater than* `SCALE`. That
+   makes those three reproducible rather than synthetic. Every other sweep on this page still draws its
+   books from a seeded generator over a chosen range, and a distribution nobody observed cannot tell you
+   what fraction of real books would be refused. 200 seeded books per size for portfolio-gate over a chosen price
    ladder, not the live venue universe. `gateB8-1` is the gate that samples the real engine and **was not
    re-run against the wider bounds**.
 7. **Gas is one sample per row, everywhere** — **no longer true of the flagship figure, and the
@@ -582,29 +598,66 @@ These are the ones that most deserve the register, because each was stated as a 
     machine run high, which is the same direction item 7 warns about. **Item 8 of §6.1 stays open** —
     this is one machine, and nothing here is portable to other hardware. It is also ONE circuit at ONE
     domain and must not be quoted as a scaling law.
-12. **"Three legs in one domain could not afford full bit-width parity."** False — 1,953 R1CS → 3,795
-    Plonk in domain 4,096 on the on-disk file.
+12. **"Three legs in one domain could not afford full bit-width parity."** False, and **re-measured
+    31 July 2026 because both figures here had drifted.** `portfoliogate.r1cs` on disk is **2,053 R1CS**,
+    and `snarkjs` puts it at **3,970 Plonk** in domain 4,096 — not the 1,953 and 3,795 written here. The
+    substance is unchanged and is the point: three legs with full bit-width parity **do** fit the ceremony
+    already on disk. The two stale numbers are the same pair `portfoliogate4.circom` line 220 was quoting
+    inside the N = 4 circuit, which is item 16.
 13. **"2 × 3,740 = 7,480 Plonk against a 4,096 ceiling."** An inference, and wrong in a load-bearing
     direction: the real single-circuit cost is 8,302 lazily / 7,758 derived. It straddles 2^13, so acting
     on 7,480 would have fetched power 13 and failed. The correct operation was to add proofs, not
-    constraints.
+    constraints. **The lesson generalised on 31 July 2026 and is now enforced rather than remembered:**
+    two more figures in this repository were arrived at by exactly this move, reading one count as though
+    it predicted another. `probe-lpclosed-cost.json` compared an **R1CS** count against a **Plonk** domain
+    ceiling to conclude a circuit "fits `hez_final_12` with room to spare" — measured, the R1CS→Plonk
+    inflation across four of this repo's own zkeys is **1.86× to 1.95×**, and that circuit is 3,854 R1CS →
+    **7,471 Plonk**, needing 2^13. And item 16 above quoted the N = 3 circuit's figures inside the N = 4
+    circuit. Size a ceremony from the Plonk count in a zkey header; nothing else predicts it.
 14. **"No identity restates the bisection or the quadrature."** Both false. The quadrature has an exact
     closed form, verified above by two independent implementations.
-15. **`gen-ncdf-circom.mjs` line 3: "208 exponential constants."** 192. Confirmed by counting the
+15. **`gen-ncdf-circom.mjs` line 3: "208 exponential constants."** **FIXED IN SOURCE 31 July 2026** —
+    the line now says 192 and carries the arithmetic: 192 exponentials in 12 `Mux4` groups of 16, plus the
+    15 Hart coefficients, plus `SQRT2PI`, is where 208 came from, and it was the total attributed to the
+    exponentials alone. 192. Confirmed by counting the
     circuit.
-16. **`portfoliogate4.circom` line 220 asserts N=3's results inside the N=4 circuit.** Confirmed by
+16. **`portfoliogate4.circom` line 220 asserts N=3's results inside the N=4 circuit.** **FIXED IN
+    SOURCE 31 July 2026.** The line read "1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 —
+    126 gates of slack", and every one of those figures is `portfoliogate`'s: 1,989 + 64 = **2,053 R1CS**
+    and **3,970 Plonk**, both re-measured. The N = 4 circuit is **2,736 R1CS / 5,295 Plonk**, and `snarkjs`
+    refuses the smaller ceremony outright — "circuit too big for this power of tau ceremony. 5295 > 2**12".
+    There was never 126 gates of slack at N = 4; there was a **1,199-gate overflow**. Comment-only: the
+    circuit recompiles to 2,652 + 84 = 2,736, matching the committed artifact. Confirmed by
     `diff`: the only differing line is the parameter.
 17. **All seven gas figures in §5.1.** Each stated as measured; each disagrees with the artifact.
 18. **"15/15 and 10/10 public-signal perturbations refused"** as evidence about a specific circuit. It is
     evidence about Plonk's public-input binding, true for every circuit in the repo. Measured: three
     perturbed tuples **prove and verify**.
 19. **"The shortfall is certified exactly, no rounding argument to have with a counterparty."** Exact
-    internally; ±7.0e-9 tokens against the served figure.
-20. **"Finer than published, always."** Refused by the investigator's own gate — the soundness window
-    exceeds the 0.01 bps publication step on 5 of 3,596 trades.
+    internally; ±7.0e-9 tokens against the served figure. **Confirmed 31 July 2026 from
+    `gateB5-4-execadverse-sweep.json` rather than from the sentence:** `shortfall.worstGapTokens` is
+    **6.999999691004177e-9**, so the ±7.0e-9 written here is the artifact's own number rounded and not an
+    estimate. `diverged` is **0** over 3,596 kept trades, and the worst case uses **45.6%** of its
+    allowance (`worstAllowanceTokens` 1.5348795126729455e-8). "Exactly" is still the wrong word for a
+    figure carrying a ±7e-9 band, which is why this entry exists; what is now measured is that the band is
+    real, small, and never breached in the sweep.
+20. **"Finer than published, always."** **MEASURED.** Refused by the investigator's own gate — and **confirmed
+    against the artifact 31 July 2026, figure by figure.** `soundnessWindow` in
+    `gateB5-4-execadverse-sweep.json` reads `tradesOverPublishedStep` **5**, `keptTrades` **3596**,
+    `publishedPrecisionBps` **0.01**: so "5 of 3,596" is exact. The widest window is
+    `headlineBpsWidest` **0.0217 bps**, about 2.2× the published step, on a fill of 0.00059783. "Always"
+    is false on 5 draws in 3,596 and the gate is the thing that says so.
 21. **The engine's published note that the leading-order E[IL] "diverges from the exact expectation."**
-    It is that expectation's logarithm. A live claim defect in a served field's documentation, worth
-    fixing independently of any circuit.
+    It is that expectation's logarithm. A live claim defect in a served field's documentation.
+    **FIXED 31 July 2026, outside the engine, with no hash moved.** `E[IL] = expm1(-v/8)`, so
+    `ln(1 + E[IL]) = -v/8` identically — checked at v = 0.1, 1, 5 and 20 to the last printed digit. The
+    sentence is produced inside `src/engine/lpRisk.js` and sits in the contentHash preimage, so correcting
+    it at source would move `q1-e1fa99d08887d6cc` and every published `lp-risk` contentHash. It is
+    corrected as a `divergence` sibling that `attachSibling()` writes beside the hashed part: contentHash
+    `148aea5a11d9e379…` **before and after**, `excludedFromContentHash` now `["divergence"]`.
+    It had to be applied **twice** — `src/mcp.js` carries its own copy of the `lp-risk` path, so the first
+    edit reached only the HTTP handler while the MCP surface silently kept the old behaviour. This changes
+    a served response, so it is row 1 of `docs/pending-deploys.md` and is **not live yet**.
 22. **"−8·ln(5e-7) predicts the boundedness threshold."** this work computed 116.0692619 against the measured
     116.0687404 — a 5.2e-4 gap. **Recorded here as an unconfirmed prediction**, contrary to how the
     adversary reported it.

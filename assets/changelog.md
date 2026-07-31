@@ -12,56 +12,47 @@ that is the contract with anyone checking our claims.
 
 ---
 
-## 31 July 2026 — lp-risk now proves its headline, not only the breakeven beneath it
+## 31 July 2026 — the headline circuit is built and correct, and it does not run on this container
 
-**A second circuit reaches the same service, and it certifies the number a caller actually reads.**
-`lpbracket` proves the breakeven volatility. `lpclosed` proves the expected divergence at the top of the
-answer: **E[IL](v) = exp(−v/8) − 1**, evaluated inside the circuit rather than asserted.
+**The honest version of this entry is that it was written twice.** It first said `lp-risk` now proves its
+headline. It does not, and the reason is worth more than the feature.
 
-**Why that is provable at all.** The engine computes the expectation with a 401-point trapezoid, and a
-quadrature is not something a circuit restates cheaply: `lpexpectation.circom` is 36,613 R1CS. But the
-integral has an exact closed form. IL(r) = 2√r/(1+r) − 1 is sech(ln r / 2), and under the martingale
-lognormal the engine assumes, its expectation is E[√r] = exp(−v/8). Substituting z = w + a with
-a = √v/2 leaves sech(a·w) against a pdf that gains cosh(a·w), and their product is 1. Two lines, checkable
-by hand, and checked against an independent fine midpoint rule at v = 0.5, 1, 5, 20, 50, 100 and 200:
-agreement to 1.3e-13 or better. So the trapezoid is the approximation and the closed form is the answer,
-and certifying it costs **3,854 R1CS** instead of 36,613.
+**What is true.** `lpclosed` certifies E[IL](v) = exp(−v/8) − 1, the number at the top of the answer, where
+`lpbracket` certifies the breakeven beneath it. The maths is exact: IL(r) = 2√r/(1+r) − 1 is sech(ln r / 2),
+and under the martingale lognormal its expectation is E[√r] = exp(−v/8), checked against an independent
+fine midpoint rule at v = 0.5, 1, 5, 20, 50, 100 and 200 to 1.3e-13 or better. Certifying the closed form
+costs **3,854 R1CS / 7,471 Plonk** instead of the 36,613 the quadrature would. It is the first circuit here
+that needs `hez_final_13`, domain 8,192, since snarkjs refuses the smaller ceremony outright. Locally it
+proves in **2.7 seconds**, verifies against its published key, and refuses a tampered signal.
 
-**It is the first circuit here that does not fit `hez_final_12`.** 3,854 R1CS becomes **7,471 Plonk**, and
-snarkjs refuses the smaller ceremony in as many words: *"circuit too big for this power of tau ceremony.
-7471 > 2^12"*. It is built against **`hez_final_13`**, domain 8,192 — a public download, which moves no
-hash and is the only reason the circuit can exist.
+**What is not true is that a caller can get one.** On the deployed container the prover exits with code
+`null` — a kill signal rather than an error — every time. `lpbracket` at 7.1 MB and `kelly` both still
+prove there, so it is this circuit's **16.6 MB zkey at domain 8,192 against the container's memory**, not
+the wiring.
 
-**It is fail-closed, and that is the part that matters.** The circuit certifies the closed form; the
-response publishes a trapezoid of the same integral, rounded to four decimals. Those are not the same
-computation, and on a grid concentrated near v ≈ 1.13, where the trapezoid's truncation error peaks at
-1.4191e-7 percentage points, they can print a different last digit. So the proof is attached **only** when
-the certified value rounds to the figure the response actually served. Swept over 4,000 (σ, T) pairs a
-caller can send — σ from 0.01 to 0.9, horizons 1 to 365 — it withheld on **none of them**.
+**So it is withdrawn from the served paths rather than left reporting an error, and that choice is the
+point.** The prover worker is **shared**. A crash on every `lp-risk` call is not a private failure: it
+endangers the proofs that do work. A feature that degrades its neighbours is worse than a feature that is
+absent, and the absent version is honest about itself.
 
-**Nothing a caller already relies on moves.** The proof arrives as its own sibling, and the exclusion list
-is derived from insertion order, so it lands outside the hash automatically: the same call with and without
-it returns contentHash `ea18edac…` both times, and `proof.excludedFromContentHash` reads
-`["snark","headlineSnark","divergence"]`. The engine is untouched, `q1-e1fa99d08887d6cc` is unmoved, and
-Appendix C still reproduces byte-for-byte.
+Kept: the circuit, its artifacts, `zk/scripts/gateLPC-closed-form.mjs`, `src/util/lpClosedSnark.js` and
+`src/util/lpClosedForm.js`. Nothing about the mathematics was wrong, and
+`docs/pending-deploys.md` records what serving it would take. Everything a caller already had is unchanged:
+contentHash `ea18edac…`, `q1-e1fa99d08887d6cc` unmoved, `lpbracket` still building and verifying live.
 
-Measured end to end through the production worker before shipping: witness built, **proved in about 2.7
-seconds**, four public signals, verifies against the published key, and a tampered signal is rejected.
+**Two defects were found on the way, both by testing the deployed container rather than the code.** The
+first shipped the proof unreachable: a second proof for one answer is stored as `<hash>:lpclosed`, and
+`/proof/:contentHash` validated 64 hex characters and nothing else, so it answered `bad_content_hash` to
+the exact URL the response had just published. That route now accepts an optional `:<circuit>` suffix
+matched against known circuit names, and **that fix stays** — it is what a second proof will need whenever
+one can be served. The second is the memory limit above. Every local check passed both times: encoder,
+worker, prove, verify, tamper refusal, preflight 37/37, `npm test` 386/381/0/5. None of them is the
+container.
 
-**And the first deploy of it shipped the proof unreachable, which is worth writing down.** A second proof
-for one answer needs a second key, so it is stored as `<hash>:lpclosed` beside the first. The
-`/proof/:contentHash` route validated 64 hex characters and nothing else, so it answered
-`bad_content_hash` to the exact URL the response had just told the caller to fetch. The proof was built,
-stored, and unreachable. It was found by retrieving it from the deployed container rather than from the
-store, which is the only place the difference shows. The route now accepts an optional `:<circuit>`
-suffix, matched against the known circuit names rather than taken as free text.
-
-**One mistake on the way, recorded because nothing shipped from it.** The first wiring used a string
-`replace` on `env.snark = snark;`, which takes the first match — and both served files carry two, the
-earlier belonging to `options-risk`. The proof was attached to the wrong service. The test caught it, both
-files were restored from the committed mirror, and the second attempt locates the `lp-risk` handler first
-and asserts no other handler opens before the anchor.
-
+**One mistake in the wiring itself, recorded because nothing shipped from it.** The first attempt used a
+string `replace` on `env.snark = snark;`, which takes the first match, and both served files carry two —
+the earlier belongs to `options-risk`. The proof was attached to the wrong service. A test caught it before
+any commit.
 ## 31 July 2026 — every one of the 22 answers correctly when asked correctly, and the input-attestation census is confirmed against the paid service
 
 **Verification only, nothing changed.** The earlier sweep left six services returning HTTP 400. Every one of

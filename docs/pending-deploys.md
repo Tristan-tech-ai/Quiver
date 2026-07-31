@@ -15,7 +15,13 @@ the next one.
 
 | # | fix | why it needs a deploy | risk if it waits | landed in |
 |---|---|---|---|---|
-| 1 | `lp-risk` serves a `divergence` sibling correcting `expectedDivergence.note` | it adds a field to a served response, so the live container will not carry it until shipped | low. The wrong sentence stays live: it calls the leading-order term a divergence from the exact expectation when it is that expectation’s **logarithm**. A reader may distrust a figure that is exact | 31 Jul 2026 |
+| — | *(none)* | | | |
+
+## Built, correct, and blocked on a resource rather than on code
+
+| what | state | what serving it needs |
+|---|---|---|
+| `lpclosed`, the headline proof for `lp-risk` | circuit, artifacts, gate and encoder all committed; proves in 2.7 s and verifies locally | **more container memory.** A 16.6 MB zkey at Plonk domain 8,192 kills the prover on the deployed host (exit code null, a signal) while `lpbracket` at 7.1 MB and `kelly` prove there fine. Withdrawn from the served paths because the worker is shared and a crash per request endangers the proofs that do work |
 
 ## Not pending, and why
 

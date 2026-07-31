@@ -1025,27 +1025,18 @@ export const SERVICES = [
         });
         if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
         env.snark = snark;
-        // THE SECOND PROOF, for the headline rather than the breakeven beneath it. Attached as its own
-        // sibling so the content hash cannot move: the exclusion list is derived from insertion order and
-        // both `snark` and this sit outside it, measured before wiring and again after.
+        // lpclosed IS NOT SERVED, and this is where it would go.
         //
-        // Fail-closed by construction. `encodeLpClosed` refuses unless the certified closed form rounds to
-        // the four decimals the response actually served, so a proof is never placed beside a number it
-        // disagrees with. Over 4,000 (sigma, T) pairs a caller can send it refused none of them.
-        const closed = encodeLpClosed(env.expectedDivergence);
-        if (closed.refused) {
-          env.headlineSnark = { protocol: 'plonk', circuit: 'lpclosed', status: 'unavailable', reason: closed.refused };
-        } else {
-          buildLpClosedInBackground(env.proof.contentHash, env.expectedDivergence);
-          env.headlineSnark = {
-            protocol: 'plonk', circuit: 'lpclosed', status: 'building',
-            retrieveAt: `/proof/${env.proof.contentHash}:lpclosed`,
-            verificationKey: '/proof/vk/lpclosed',
-            certifiedExpectedIlPct: closed.exactPct,
-            proves: LPCLOSED_CLAIMS.proves,
-            doesNotProve: LPCLOSED_CLAIMS.doesNotProve,
-          };
-        }
+        // The circuit certifies this service's headline and it is correct: 3,854 R1CS, 7,471 Plonk under
+        // hez_final_13, proved and verified in 2.7 s on a development machine, tamper refused. It does not
+        // prove on the deployed container. The worker exits with code null — a kill signal, not an error —
+        // while lpbracket at 7.1 MB and kelly both still prove there, so it is this circuit's 16.6 MB zkey
+        // at domain 8,192 against the container's memory rather than anything about the wiring.
+        //
+        // It is withdrawn rather than reported unavailable because the prover worker is SHARED: a crash per
+        // request is not a private failure, it endangers the proofs that do work. The circuit, its
+        // artifacts, zk/scripts/gateLPC-closed-form.mjs and src/util/lpClosedSnark.js all stay, and
+        // docs/pending-deploys.md records what serving it would take.
       }
       // A CORRECTION TO A SERVED SENTENCE, ATTACHED OUTSIDE THE ENGINE SO NO HASH MOVES.
       //

@@ -10,7 +10,7 @@
 //
 // The generator is deliberately dumb: no float arithmetic anywhere, one code path, and the parameters
 // at the top are the only thing to change.
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -439,7 +439,42 @@ function emit(C, P) {
 const C = constants(P);
 const src = emit(C, P);
 mkdirSync(path.join(ZK, 'build'), { recursive: true });
-writeFileSync(path.join(ZK, 'circuits', 'ncdf.circom'), src, 'utf8');
+
+// THIS SCRIPT OVERWRITES A LIVE CIRCUIT, AND USED TO DO IT SILENTLY.
+//
+// `circuits/ncdf.circom` is what `options-risk` and `event-vol` both prove against on the deployed
+// service. Running this generator with an edited parameter — a different `S`, a different `G` while
+// probing the Mux question in §39 of the defect register — replaced that circuit with no warning and no
+// diff. The next `npm test` would still pass, because the tests exercise the ENGINE; only a rebuild and a
+// re-prove would notice, and by then the working tree has a circuit nobody chose to change.
+//
+// So: if the emitted source differs from what is already on disk, refuse unless the caller says so. This
+// is not a lock on the file, it is a lock on doing it BY ACCIDENT.
+//
+//   node scripts/gen-ncdf-circom.mjs            regenerate, refuse if the result would differ
+//   node scripts/gen-ncdf-circom.mjs --force    regenerate and overwrite, deliberately
+//   node scripts/gen-ncdf-circom.mjs --out <p>  write somewhere else entirely, for a probe
+const FORCE = process.argv.includes('--force');
+const OUT_ARG = process.argv.includes('--out') ? process.argv[process.argv.indexOf('--out') + 1] : null;
+const CIRCUIT_PATH = OUT_ARG ? path.resolve(OUT_ARG) : path.join(ZK, 'circuits', 'ncdf.circom');
+
+if (!OUT_ARG && existsSync(CIRCUIT_PATH)) {
+  const onDisk = readFileSync(CIRCUIT_PATH, 'utf8');
+  if (onDisk !== src && !FORCE) {
+    const a = onDisk.split('\n').length;
+    const b = src.split('\n').length;
+    console.error('REFUSING to overwrite a circuit the live service proves against.');
+    console.error(`  ${path.relative(ZK, CIRCUIT_PATH)} on disk is ${a} lines; this run would write ${b}.`);
+    console.error(`  parameters here: S=${C.S} G=${C.G} WINT=${C.WINT} -> WBITS=${C.WBITS}, NG=${C.NG} groups`);
+    console.error('  options-risk and event-vol both prove against this circuit, and npm test would NOT');
+    console.error('  catch the swap, because the suite exercises the engine rather than the circuit.');
+    console.error('');
+    console.error('  --force   overwrite deliberately');
+    console.error('  --out <p> write elsewhere, which is what a parameter probe wants');
+    process.exit(2);
+  }
+}
+writeFileSync(CIRCUIT_PATH, src, 'utf8');
 writeFileSync(path.join(ZK, 'build', 'ncdf-consts.json'), JSON.stringify({
   params: P,
   S: C.S, G: C.G, WINT: C.WINT, WBITS: C.WBITS, NG: C.NG,

@@ -7,6 +7,7 @@ import { buildInBackground, buildKellyInBackground, buildConcentrationInBackgrou
 // way the five older ones are — the MCP handler is a separate array and has been the forgotten site
 // four times on this project, so the two claims cannot be allowed to live in two files.
 import { lpBracketSnark } from './util/lpBracket.js';
+import { withDivergenceDisclosure } from './util/inputClaims.js';
 // event-vol's encoder, imported here as well as inside snark.js so the handler can publish WHY a proof
 // is unavailable in the same response rather than making the caller poll /proof/<hash> to find out.
 // The four older handlers each rebuild that reason inline; one call answers it for this one.
@@ -1023,6 +1024,26 @@ export const SERVICES = [
         });
         if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
         env.snark = snark;
+      }
+      // A CORRECTION TO A SERVED SENTENCE, ATTACHED OUTSIDE THE ENGINE SO NO HASH MOVES.
+      //
+      // expectedDivergence.note says the leading-order -sigma^2*T/8 "diverges from the exact
+      // expectation". It does not diverge from it: it IS its logarithm. E[IL] = expm1(-v/8), so
+      // ln(1 + E[IL]) = -v/8 identically, checked at v = 0.1, 1, 5 and 20 to the last printed digit.
+      // What grows with v is the gap between a quantity and its own logarithm, which is arithmetic
+      // rather than approximation error, and calling that divergence invites a reader to distrust a
+      // figure that is exact.
+      //
+      // The sentence itself lives in src/engine/lpRisk.js and is inside the contentHash preimage, so
+      // editing it would move the engine build hash and every published lp-risk hash. It is corrected
+      // HERE instead, as a sibling attachSibling() writes beside the hashed part and refuses to touch.
+      if (env.expectedDivergence) {
+        return withDivergenceDisclosure(env, {
+          correctsField: 'expectedDivergence.note',
+          says: 'the leading-order term diverges from the exact expectation',
+          precisely: 'It is that expectation’s logarithm. E[IL] = expm1(-v/8), so ln(1 + E[IL]) = -v/8 exactly, for every v. The two do not diverge; one is the log of the other, and what widens with v is the ordinary gap between a quantity and its logarithm.',
+          whyNotFixedAtSource: 'The sentence is produced inside src/engine/lpRisk.js and sits in the contentHash preimage. Editing it would move the engine codeHash q1-e1fa99d08887d6cc and every published lp-risk contentHash, which this service has undertaken not to do while judging runs. This sibling is excluded from the hash.',
+        }, { service: 'lp-risk' });
       }
       return env;
     },

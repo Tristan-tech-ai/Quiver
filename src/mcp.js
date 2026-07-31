@@ -46,6 +46,7 @@ import { sealContentHashRecipe } from './util/recipe.js';
 // Same wrapper the paid HTTP surface uses for lp-risk, imported rather than restated so the free and
 // paid surfaces cannot drift into two verdicts about one call. See src/util/lpBoundedness.js.
 import { lpRiskEnvelope } from './util/lpBoundedness.js';
+import { withDivergenceDisclosure } from './util/inputClaims.js';
 // And the same `snark` block builder the paid surface uses, for the same reason: one claim, one file.
 import { lpBracketSnark } from './util/lpBracket.js';
 // And options-risk's, same arrangement: one claim, one file, both surfaces.
@@ -516,6 +517,17 @@ const TOOLS = [
         });
         if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
         env.snark = snark;
+      }
+      // Same correction the HTTP handler attaches, and it has to be here too because this file
+      // carries its own copy of the lp-risk path. That duplication is what let the proof VERIFY sentence
+      // drift once already; the sibling is attached outside the engine so no hash moves.
+      if (env.expectedDivergence) {
+        return withDivergenceDisclosure(env, {
+          correctsField: 'expectedDivergence.note',
+          says: 'the leading-order term diverges from the exact expectation',
+          precisely: 'It is that expectation’s logarithm. E[IL] = expm1(-v/8), so ln(1 + E[IL]) = -v/8 exactly, for every v. The two do not diverge; one is the log of the other, and what widens with v is the ordinary gap between a quantity and its logarithm.',
+          whyNotFixedAtSource: 'The sentence is produced inside src/engine/lpRisk.js and sits in the contentHash preimage. Editing it would move the engine codeHash q1-e1fa99d08887d6cc and every published lp-risk contentHash, which this service has undertaken not to do while judging runs. This sibling is excluded from the hash.',
+        }, { service: 'lp-risk' });
       }
       return env;
     },

@@ -1,6 +1,10 @@
 // Emit circuits/ncdf.circom, constants and all.
 //
-// The circuit needs 208 exponential constants and 15 polynomial coefficients as field literals. circom
+// The circuit needs 192 exponential constants and 15 polynomial coefficients as field literals. circom
+// (this line said 208 exponentials until 31 July 2026, and 208 is the TOTAL: 192 exponentials in 12
+//  Mux4 groups of 16, plus the 15 Hart coefficients, plus SQRT2PI. Counted in the emitted circuit, which
+//  carries 192 `.c[i] <==` assignments and 12 `Mux4()` components, and line 130 of that circuit and this
+//  generator's own console.log both already said 192.)
 // cannot compute e^x at compile time, so they have to be written into the source — and a table written
 // by hand, or copied from a double, is the trust root of the whole circuit and the easiest place for a
 // silent defect. So it is GENERATED here from an exact-integer Taylor series at 200 fractional bits,

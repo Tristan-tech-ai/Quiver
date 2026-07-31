@@ -217,6 +217,13 @@ template PortfolioNearest(N, SCALE, NB_M, NB_Q, NB_P, NB_MMR, NB_TOL, NB_X) {
 // NB_X   = 100   DERIVED: d and refHat are both < 2^50, so each cross product is < 2^100, and the
 //                difference of two of them, once pinned non-negative, is < 2^100.
 //
-// Result: 1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 — 126 gates of slack.
+// Result: 2,736 R1CS, 5,295 Plonk, domain 8,192.
+//
+// CORRECTED 31 July 2026. This line read "1,989 non-linear + 64 linear R1CS, 3,970 Plonk, domain 4,096 —
+// 126 gates of slack", which is 2,053 constraints and is exactly `portfoliogate.r1cs` — the N = 3
+// circuit. The N = 4 circuit's own `.r1cs` header says 2,736, and `snarkjs` puts it at 5,295 Plonk and
+// refuses the smaller ceremony outright: "circuit too big for this power of tau ceremony. 5295 > 2**12".
+// So there was never 126 gates of slack at N = 4; there was a 1,199-gate overflow, and the figures that
+// said otherwise belonged to a different circuit. Measured against `hez_final_13`, which takes it.
 component main {public [mHat, qHat, p0Hat, s, mmrHat, pLiqHat, refHat, nearest]} =
     PortfolioNearest(4, 1000000000, 60, 55, 50, 30, 87, 100);

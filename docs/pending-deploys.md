@@ -15,7 +15,7 @@ the next one.
 
 | # | fix | why it needs a deploy | risk if it waits | landed in |
 |---|---|---|---|---|
-| — | *(none)* | | | |
+| 1 | `lp-risk` serves a `divergence` sibling correcting `expectedDivergence.note` | it adds a field to a served response, so the live container will not carry it until shipped | low. The wrong sentence stays live: it calls the leading-order term a divergence from the exact expectation when it is that expectation’s **logarithm**. A reader may distrust a figure that is exact | 31 Jul 2026 |
 
 ## Not pending, and why
 

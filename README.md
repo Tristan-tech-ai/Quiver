@@ -41,9 +41,11 @@ they cannot go back and forth resolving errors: if the service breaks while bein
 comes back empty. Our own redeploys were expected to take up to three minutes before the new
 container serves, so the original plan was to build everything without deploying at all.
 
-**That plan changed. Nine deploys have shipped since the deadline**, each behind a watchdog that
-records what it measured. The table below is generated from `gates/deploy-log.tsv`, which the watchdog
-writes and nothing edits by hand.
+**That plan changed. Twelve deploys have shipped since the deadline**, and ten of them have a recorded
+darkness figure. The table below is the file-backed part, from `gates/deploy-log.tsv`, which the watchdog
+writes and nothing edits by hand; the three that predate the file are reconstructed in
+`docs/deploy-manifest.md`, and the two that have no figure at all are named as such rather than left to
+look measured.
 
 | # | live at (UTC) | dark | what it carried |
 |---|---|---|---|
@@ -56,6 +58,9 @@ writes and nothing edits by hand.
 | 7 | 30 Jul 13:47:33 | 0 s | the same fix reaching proofs that were **already stored** |
 | 8 | 30 Jul 22:32:01 | 0 s | **the X Layer payment rail, which could not be paid at all** |
 | 9 | 30 Jul 23:01:08 | 0 s | publishing the changelog for the above |
+| 10 | 31 Jul ~05:55 | **not measured** | the `lpclosed` headline circuit. The watchdog was running but its marker needle carried a space the served JSON does not (`"power": 13` against `"power":13`), so it never matched and wrote no row |
+| 11 | 31 Jul 06:15:16 | 0 s | `/proof/:contentHash` accepting a `:<circuit>` suffix, because the second proof had shipped unreachable |
+| 12 | 31 Jul ~06:23 | **not measured** | withdrawing `lpclosed` from the served paths. The watchdog refused to start: its marker was already true at baseline, which is the refusal working |
 
 The three-minute estimate did not survive contact. **Eight of the nine were measured and seven of those
 eight were 0 seconds** — the service answered every poll straight through the container swap. The single
@@ -101,7 +106,17 @@ twenty-two are observation services, and no proof of arithmetic reaches what the
 claiming** — that a number came from a venue. Two can attest their inputs today, three more could
 because they read chain state and a block `stateRoot` already commits to it, and eight have no
 mechanism at all. That last group is a TEE or zkTLS problem, not a proving problem, and it is the
-honest end of this road. `size-gate` is the second, chosen because it is the smallest: the discrete Kelly
+honest end of this road.
+
+**An eighth circuit exists, is correct, and is not served.** `lpclosed` certifies `lp-risk`'s headline —
+E[IL](v) = exp(−v/8) − 1, where `lpbracket` certifies the breakeven beneath it. The identity is exact,
+2√r/(1+r) − 1 being sech(ln r / 2) whose expectation under the martingale lognormal is exp(−v/8), and the
+circuit proves and verifies in 2.7 seconds on a development machine. On the deployed container the prover
+exits with a kill signal every time: a 16.6 MB proving key at Plonk domain 8,192 against the memory this
+host has, while `lpbracket` at 7.1 MB proves there without trouble. It is withdrawn from the served paths
+rather than left returning an error, because the prover worker is **shared** and a crash per request
+endangers the proofs that do work. The circuit, its artifacts and its gate are all in the repository, and
+`docs/pending-deploys.md` records what serving it would take. `size-gate` is the second, chosen because it is the smallest: the discrete Kelly
 criterion `f* = (p(b+1) − 1)/b` cross-multiplies to a single polynomial identity, where the
 liquidation identity needed a division cleared through three factors of SCALE.
 

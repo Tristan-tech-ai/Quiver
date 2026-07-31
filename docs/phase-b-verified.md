@@ -602,14 +602,26 @@ Recorded because the disease, not the instance, is the thing.
 
 ### 6.4 Infrastructure and process, unmeasured or unresolved
 
-30. **`gate-clone-portability.mjs` has never completed a full run.** It discovers 40 gates, spawns each
+30. **`gate-clone-portability.mjs` has never completed a full run**, and the reason is now exact
+    rather than suspected. Measured 31 July 2026: the gate **does** set
+    `QUIVER_GATE_PORTABILITY_PROBE: '1'` on every child it spawns (line 377, alongside a
+    `timeout: 300_000` per gate) — but a search across every gate in both trees finds the variable in
+    exactly **three** files: this gate, `gateN-known-defects.mjs` which asserts that it appears in only
+    one place, and the mirror's copy of gate N. **No spawned gate reads it.** The flag is not merely
+    dead, it is dead *while being set*, so nothing shrinks and the full 300-second cap applies to each of
+    the 40. It discovers 40 gates, spawns each
     with a 300 s cap and fully buffered output, so a full run is structurally hours. An 8.65-second
     15-line subset gave the verdict for the B5 family; the other ~33 gates have **no portability
     verdict**. And the flag meant to shrink the gates, `QUIVER_GATE_PORTABILITY_PROBE`, is mentioned in
     exactly one file — itself. **It is dead, which is why the gate never finishes.**
 31. **`execadverse` and `portfolioleg` are absent from that gate's `CIRCUITS` list.** Left unedited to
     avoid racing concurrent agents in a tree with no version control.
-32. **No EVM gate runs from the Quiver mirror** — `solc` is absent from `Quiver/zk/node_modules`, which is
+32. **No EVM gate runs from the Quiver mirror** — **and the reason is narrower than this said.**
+    Measured 31 July 2026: `solc` **is declared** in `Quiver/zk/package.json` as `"solc": "^0.8.26"`,
+    and the dev tree resolves that same spec to **0.8.26**. So a clone that runs `npm install` in
+    `zk/` gets it and the EVM gates can run. What is true is that the mirror's own working tree has an
+    unpopulated `node_modules`, which is a property of this desk rather than of the published
+    repository. The original wording — `solc` is absent from `Quiver/zk/node_modules`, which is
     correctly gitignored. Affects all 7 gates calling `evmRehearsal`, pre-existing, unrepaired.
 33. **Nothing built this round is wired.** ~~`preflight` confirms the proof-emitting set is still
     exactly `perp-gate`, `size-gate`, `treasury-risk`.~~ **CLOSED 30-31 July 2026.** Measured against the
@@ -647,7 +659,15 @@ Recorded because the disease, not the instance, is the thing.
     The coordination rule that came out of all this — commit with an explicit pathspec, never a bare
     commit, while the tree is shared — is written down in no enforceable place. this work used
     `git commit --only -- <path>` for this document.
-36. **The 5 skipped `npm test` cases were never examined** by anyone, in any round.
+36. **The 5 skipped `npm test` cases were never examined** by anyone, in any round. **MEASURED
+    31 July 2026 and they are fine.** All five are in `test/lpdesk.test.mjs` behind
+    `{ skip: !live }` where `live = process.env.LIVE_RPC === '1'`, so they need an RPC and nothing
+    else. Run with `LIVE_RPC=1`: **6 tests, 6 pass, 0 fail, 0 skipped.** They are not filler — two are
+    starred, and one of those exists specifically to catch a `feePpm` ×100 unit bug:
+    `★ fee charged equals the pool tier exactly`, `★ LP sweep invariants: fees fall with width`,
+    plus `poolMeta reads fee() ON-CHAIN`, `the address a doc called "WBTC/WETH 0.3%" is actually
+    0.05%`, and `lpDesk REFUSES rather than reporting noise when there are too few swaps`. The suite
+    total of 386 counts them; 381 is what runs without an RPC.
 37. **The three LP1 encoder refusals** were characterised from their reason string, not individually
     verified.
 38. **Groth16's operational cost is unmeasured.** It needs a per-circuit phase-2 ceremony where Plonk's

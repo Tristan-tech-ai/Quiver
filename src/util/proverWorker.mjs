@@ -53,6 +53,15 @@ const CIRCUITS = {
   // (163,608 exponentials and 82,016 roots for one served breakeven, measured). That inversion is the
   // point: a bisection result is certified by its bracket, and a bracket is six inequalities.
   lpbracket: { zkey: 'lpbracket_plonk.zkey', dir: 'lpbracket_js', wasm: 'lpbracket.wasm' },
+  // 16.6 MB and the first circuit here that does NOT fit hez_final_12. lp-risk's expected divergence is
+  // exp(-v/8) - 1 in closed form, and certifying it takes 3,854 R1CS which becomes 7,471 Plonk at the
+  // 1.94x inflation this repository measures across its own zkeys. snarkjs refuses the smaller ceremony
+  // in as many words: 'circuit too big for this power of tau ceremony. 7471 > 2**12'. So this one is
+  // built against hez_final_13, domain 8,192, and that download is the only reason it can exist.
+  //
+  // It proves the HEADLINE the engine serves, where lpbracket proves the breakeven beneath it. Both are
+  // lp-risk and they certify different sentences, which is why both are here.
+  lpclosed: { zkey: 'lpclosed_plonk.zkey', dir: 'lpclosed_js', wasm: 'lpclosed.wasm' },
 };
 // The default is `liquidation` and it is load-bearing rather than tidy: a message from an older
 // parent, or from any caller that has not been taught the field, must keep proving exactly the

@@ -31,6 +31,7 @@
 // full second. The prover now lives in a worker (proverWorker.mjs) along with the snarkjs import and
 // the 5.3 MB key, and this file keeps only integer encoding and a queue.
 import { readFileSync } from 'node:fs';
+import { encodeLpClosed, LPCLOSED_CLAIMS } from './lpClosedSnark.js';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -1630,6 +1631,58 @@ async function buildLpBracketOnce(contentHash, echoedInputs, result) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────────────────────────
+// THE HEADLINE, not the breakeven beneath it. Same service, different sentence.
+//
+// `buildLpBracketInBackground` certifies the breakeven volatility. This certifies the expected
+// divergence the caller reads at the top of the answer, which the engine computes with a 401-point
+// trapezoid and which has an exact closed form the trapezoid approximates: E[IL](v) = exp(-v/8) - 1.
+//
+// It is the first circuit on this host that does not fit `hez_final_12`. 3,854 R1CS becomes 7,471 Plonk
+// and snarkjs refuses the smaller ceremony outright, so it is built against `hez_final_13`, domain 8,192.
+//
+// FAIL CLOSED: `encodeLpClosed` returns a refusal unless the certified value rounds to the four decimals
+// the response actually served. A proof is never attached beside a figure it disagrees with.
+export function buildLpClosedInBackground(contentHash, expectedDivergence) {
+  if (!contentHash || !expectedDivergence) return;
+  const w = encodeLpClosed(expectedDivergence);
+  if (w.refused) { put(`${contentHash}:lpclosed`, { status: 'unavailable', error: w.refused }); return; }
+
+  if (queued >= MAX_QUEUED) {
+    put(`${contentHash}:lpclosed`, { status: 'unavailable', error: `prover busy — ${queued} proofs already queued; retry shortly` });
+    return;
+  }
+  put(`${contentHash}:lpclosed`, { status: 'building' });
+  queued++;
+  queue = queue.then(async () => {
+    const { proof, publicSignals } = await prove('lpclosed', w.witness);
+    await put(`${contentHash}:lpclosed`, {
+      status: 'ready', protocol: PROTOCOL,
+      circuit: 'lpclosed',
+      proof, publicSignals,
+      signalsAttestation: attestSignals(publicSignals),
+      encoded: Object.fromEntries(Object.entries(w.encoded).map(([k, v]) => [k, String(v)])),
+      // THE CERTIFIED FIGURE AT FULL PRECISION, next to the rounded one the response serves, so a reader
+      // can see the gap rather than take on trust that there is none.
+      certifiedExpectedIlPct: w.exactPct,
+      servedExpectedIlPct: w.servedPct,
+      gapToServedPct: Math.abs(w.exactPct - w.servedPct),
+      quadratureEnvelopePct: 1.4191207675651185e-7,
+      basis: 'IL(r) = 2*sqrt(r)/(1+r) - 1 is sech(ln(r)/2), and under the martingale lognormal ln r ~ N(-v/2, v) '
+        + 'its expectation is E[sqrt(r)] = exp(-v/8). Substitute z = w + a with a = sqrt(v)/2: the pdf gains '
+        + 'cosh(a*w) and the integrand carries sech(a*w), whose product is 1. Two lines, checkable by hand.',
+      reconstruct: 'The public signals are [residual, tolerance, vHat, lHat]. v = vHat/1e9 and the certified '
+        + '1 + E[IL] is lHat/1e9, so the expected divergence is (lHat/1e9 - 1)*100 percent. The circuit asserts '
+        + '|y_16 - lHat*1e9| <= tolerance at the 1e18 working scale, where y_16 is exp(-v/8) built inside it.',
+      proves: LPCLOSED_CLAIMS.proves,
+      doesNotProve: LPCLOSED_CLAIMS.doesNotProve,
+      verify: verifyInstruction('lpclosed'),
+    });
+  })
+    .catch((e2) => put(`${contentHash}:lpclosed`, { status: 'failed', error: String(e2 && e2.message || e2).slice(0, 200) }))
+    .finally(() => { queued--; });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────────────────────────
 // THE SEVENTH IDENTITY — the same normal CDF, for `options-risk`, and the first that pins SIX
 // published fields off ONE circuit instance rather than one.
 //
@@ -1718,7 +1771,7 @@ async function buildOptionsRiskNcdfOnce(contentHash, echoedInputs, result) {
 // The verification keys, one per circuit. `liquidation` keeps reading `vk_plonk.json` under that
 // exact name — it is the file `/proof/vk` has served since this service had proofs, and renaming it
 // would break a published URL for a cosmetic gain.
-const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json', ncdf: 'ncdf_vk.json', lpbracket: 'lpbracket_vk.json' };
+const VK_FILES = { liquidation: 'vk_plonk.json', kelly: 'kelly_vk.json', concentration: 'concentration_vk.json', execadverse: 'execadverse_vk.json', ncdf: 'ncdf_vk.json', lpbracket: 'lpbracket_vk.json', lpclosed: 'lpclosed_vk.json' };
 export const CIRCUITS = Object.keys(VK_FILES);
 
 export function verificationKey(circuit = 'liquidation') {

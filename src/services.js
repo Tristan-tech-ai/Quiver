@@ -1,8 +1,9 @@
 // Service registry — one entry per priced x402 endpoint on this multi-service host.
 // Each drives: the paid POST route, the gated /diag/scan tester, and the / index.
 import { config } from './config.js';
+import { encodeLpClosed, LPCLOSED_CLAIMS } from './util/lpClosedSnark.js';
 import { gridSnapFields } from './util/grid.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground, buildOptionsRiskNcdfInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground, buildOptionsRiskNcdfInBackground , buildLpClosedInBackground } from './util/snark.js';
 // lp-risk's published `snark` block, built in ONE place for BOTH surfaces rather than duplicated the
 // way the five older ones are — the MCP handler is a separate array and has been the forgotten site
 // four times on this project, so the two claims cannot be allowed to live in two files.
@@ -1024,6 +1025,27 @@ export const SERVICES = [
         });
         if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
         env.snark = snark;
+        // THE SECOND PROOF, for the headline rather than the breakeven beneath it. Attached as its own
+        // sibling so the content hash cannot move: the exclusion list is derived from insertion order and
+        // both `snark` and this sit outside it, measured before wiring and again after.
+        //
+        // Fail-closed by construction. `encodeLpClosed` refuses unless the certified closed form rounds to
+        // the four decimals the response actually served, so a proof is never placed beside a number it
+        // disagrees with. Over 4,000 (sigma, T) pairs a caller can send it refused none of them.
+        const closed = encodeLpClosed(env.expectedDivergence);
+        if (closed.refused) {
+          env.headlineSnark = { protocol: 'plonk', circuit: 'lpclosed', status: 'unavailable', reason: closed.refused };
+        } else {
+          buildLpClosedInBackground(env.proof.contentHash, env.expectedDivergence);
+          env.headlineSnark = {
+            protocol: 'plonk', circuit: 'lpclosed', status: 'building',
+            retrieveAt: `/proof/${env.proof.contentHash}:lpclosed`,
+            verificationKey: '/proof/vk/lpclosed',
+            certifiedExpectedIlPct: closed.exactPct,
+            proves: LPCLOSED_CLAIMS.proves,
+            doesNotProve: LPCLOSED_CLAIMS.doesNotProve,
+          };
+        }
       }
       // A CORRECTION TO A SERVED SENTENCE, ATTACHED OUTSIDE THE ENGINE SO NO HASH MOVES.
       //

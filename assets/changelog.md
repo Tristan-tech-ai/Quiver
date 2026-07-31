@@ -12,6 +12,48 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 31 July 2026 — lp-risk now proves its headline, not only the breakeven beneath it
+
+**A second circuit reaches the same service, and it certifies the number a caller actually reads.**
+`lpbracket` proves the breakeven volatility. `lpclosed` proves the expected divergence at the top of the
+answer: **E[IL](v) = exp(−v/8) − 1**, evaluated inside the circuit rather than asserted.
+
+**Why that is provable at all.** The engine computes the expectation with a 401-point trapezoid, and a
+quadrature is not something a circuit restates cheaply: `lpexpectation.circom` is 36,613 R1CS. But the
+integral has an exact closed form. IL(r) = 2√r/(1+r) − 1 is sech(ln r / 2), and under the martingale
+lognormal the engine assumes, its expectation is E[√r] = exp(−v/8). Substituting z = w + a with
+a = √v/2 leaves sech(a·w) against a pdf that gains cosh(a·w), and their product is 1. Two lines, checkable
+by hand, and checked against an independent fine midpoint rule at v = 0.5, 1, 5, 20, 50, 100 and 200:
+agreement to 1.3e-13 or better. So the trapezoid is the approximation and the closed form is the answer,
+and certifying it costs **3,854 R1CS** instead of 36,613.
+
+**It is the first circuit here that does not fit `hez_final_12`.** 3,854 R1CS becomes **7,471 Plonk**, and
+snarkjs refuses the smaller ceremony in as many words: *"circuit too big for this power of tau ceremony.
+7471 > 2^12"*. It is built against **`hez_final_13`**, domain 8,192 — a public download, which moves no
+hash and is the only reason the circuit can exist.
+
+**It is fail-closed, and that is the part that matters.** The circuit certifies the closed form; the
+response publishes a trapezoid of the same integral, rounded to four decimals. Those are not the same
+computation, and on a grid concentrated near v ≈ 1.13, where the trapezoid's truncation error peaks at
+1.4191e-7 percentage points, they can print a different last digit. So the proof is attached **only** when
+the certified value rounds to the figure the response actually served. Swept over 4,000 (σ, T) pairs a
+caller can send — σ from 0.01 to 0.9, horizons 1 to 365 — it withheld on **none of them**.
+
+**Nothing a caller already relies on moves.** The proof arrives as its own sibling, and the exclusion list
+is derived from insertion order, so it lands outside the hash automatically: the same call with and without
+it returns contentHash `ea18edac…` both times, and `proof.excludedFromContentHash` reads
+`["snark","headlineSnark","divergence"]`. The engine is untouched, `q1-e1fa99d08887d6cc` is unmoved, and
+Appendix C still reproduces byte-for-byte.
+
+Measured end to end through the production worker before shipping: witness built, **proved in about 2.7
+seconds**, four public signals, verifies against the published key, and a tampered signal is rejected.
+
+**One mistake on the way, recorded because nothing shipped from it.** The first wiring used a string
+`replace` on `env.snark = snark;`, which takes the first match — and both served files carry two, the
+earlier belonging to `options-risk`. The proof was attached to the wrong service. The test caught it, both
+files were restored from the committed mirror, and the second attempt locates the `lp-risk` handler first
+and asserts no other handler opens before the anchor.
+
 ## 31 July 2026 — every one of the 22 answers correctly when asked correctly, and the input-attestation census is confirmed against the paid service
 
 **Verification only, nothing changed.** The earlier sweep left six services returning HTTP 400. Every one of

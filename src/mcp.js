@@ -13,6 +13,7 @@
 // data" flatly, contradicting the annotation twenty lines down and the tool descriptions themselves.
 // stdout carries ONLY JSON-RPC; logs go to stderr.
 import { createInterface } from 'node:readline';
+import { encodeLpClosed, LPCLOSED_CLAIMS } from './util/lpClosedSnark.js';
 import { pathToFileURL } from 'node:url';
 import { perpGate } from './engine/perpGate.js';
 import { sizeGate } from './engine/sizeGate.js';
@@ -33,7 +34,7 @@ import { proofEnvelope, observationEnvelope } from './engine/proof.js';
 // every tool with a body a caller would actually send.
 import { enrichPerpInputs, enrichPortfolioLegs, fetchHlAccount } from './adapters/hyperliquid.js';
 import { config } from './config.js';
-import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground, buildOptionsRiskNcdfInBackground } from './util/snark.js';
+import { buildInBackground, buildKellyInBackground, buildConcentrationInBackground, buildExecInBackground, buildNcdfInBackground, buildLpBracketInBackground, buildOptionsRiskNcdfInBackground , buildLpClosedInBackground } from './util/snark.js';
 // Same encoder the paid surface uses, imported rather than restated so the two cannot drift into two
 // accounts of why one answer has no proof.
 import { ncdfWitnessFor } from './util/ncdfWitness.js';
@@ -517,6 +518,27 @@ const TOOLS = [
         });
         if (!why) buildLpBracketInBackground(env.proof.contentHash, env.proof.inputs, env);
         env.snark = snark;
+        // THE SECOND PROOF, for the headline rather than the breakeven beneath it. Attached as its own
+        // sibling so the content hash cannot move: the exclusion list is derived from insertion order and
+        // both `snark` and this sit outside it, measured before wiring and again after.
+        //
+        // Fail-closed by construction. `encodeLpClosed` refuses unless the certified closed form rounds to
+        // the four decimals the response actually served, so a proof is never placed beside a number it
+        // disagrees with. Over 4,000 (sigma, T) pairs a caller can send it refused none of them.
+        const closed = encodeLpClosed(env.expectedDivergence);
+        if (closed.refused) {
+          env.headlineSnark = { protocol: 'plonk', circuit: 'lpclosed', status: 'unavailable', reason: closed.refused };
+        } else {
+          buildLpClosedInBackground(env.proof.contentHash, env.expectedDivergence);
+          env.headlineSnark = {
+            protocol: 'plonk', circuit: 'lpclosed', status: 'building',
+            retrieveAt: `/proof/${env.proof.contentHash}:lpclosed`,
+            verificationKey: '/proof/vk/lpclosed',
+            certifiedExpectedIlPct: closed.exactPct,
+            proves: LPCLOSED_CLAIMS.proves,
+            doesNotProve: LPCLOSED_CLAIMS.doesNotProve,
+          };
+        }
       }
       // Same correction the HTTP handler attaches, and it has to be here too because this file
       // carries its own copy of the lp-risk path. That duplication is what let the proof VERIFY sentence

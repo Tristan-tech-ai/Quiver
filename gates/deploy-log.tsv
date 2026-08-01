@@ -10,3 +10,4 @@ startedUtc	liveUtc	darkSeconds	services	mcpTools	codeHash	marker
 2026-07-31T06:12:01.469Z	2026-07-31T06:15:16.442Z	0	22	9	q1-e1fa99d08887d6cc	get:/proof/abc:Known circuits
 2026-08-01T10:43:02.895Z	2026-08-01T10:45:24.924Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:delisted by OKX
 2026-08-01T11:06:38.873Z	2026-08-01T11:08:56.378Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:one character in a header crashed the container
+2026-08-01T11:20:05.010Z	2026-08-01T11:22:12.657Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:22 of 22 delivered and settled

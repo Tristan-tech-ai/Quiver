@@ -51,8 +51,45 @@ app.disable('x-powered-by');
 app.set('trust proxy', true);
 app.use(express.json({ limit: '16kb' }));
 
+// Rate limiting, split by cost. See config.rateCheapPerMinute for why this is two buckets and not one.
+//
+// CHEAP is anything that cannot reach an engine: the 402 challenge (an /api/* request carrying no
+// payment header gets one and stops), the public pages, the agent card, stored proofs, /build. Serving
+// those is a config read, so the only thing a tight limit achieves there is making a compliance sweep
+// look non-compliant.
+//
+// NORMAL keeps the old 60/minute for everything that does work: paid calls, /mcp, and the /diag probes
+// that run engines unpaid. A paid call is additionally self-limiting, because it costs the caller money.
+//
+// The two use separate buckets. Sharing one counter would let a burst of free challenges exhaust the
+// allowance a paying caller needs, which is the failure this split exists to prevent, only inverted.
+const carriesPayment = (req) => !!(req.get('payment-signature') || req.get('x-payment'));
+const isCheapRequest = (req) => {
+  if (req.method === 'OPTIONS') return true;
+  if (/^\/(diag|mcp)\b/.test(req.path)) return false;
+  if (req.path.startsWith('/api/')) return !carriesPayment(req);
+  return true;
+};
 app.use((req, res, next) => {
-  if (!rateLimit(req.ip || 'unknown', { perMinute: 60 })) return res.status(429).json({ error: 'rate_limited', note: 'max 60 requests/min per IP' });
+  const cheap = isCheapRequest(req);
+  const perMinute = cheap ? config.rateCheapPerMinute : config.ratePerMinute;
+  if (!rateLimit(`${req.ip || 'unknown'}|${cheap ? 'cheap' : 'normal'}`, { perMinute })) {
+    return res.status(429).json({ error: 'rate_limited', note: `max ${perMinute} requests/min per IP for this class of request` });
+  }
+  next();
+});
+
+// x402 v1 compatibility, restored after the migration to the official SDK removed it.
+//
+// The previous hand-rolled gate read `PAYMENT-SIGNATURE || X-PAYMENT`. The SDK reads only
+// `payment-signature`, so moving to it silently made every client that sends the v1 header unpayable:
+// they present a valid payment, the gate never sees it, and they get a 402 forever. Copying the header
+// across before the gate runs restores exactly what this service accepted before, and changes nothing
+// for a client that already sends the v2 name.
+app.use('/api', (req, _res, next) => {
+  if (!req.headers['payment-signature'] && req.headers['x-payment']) {
+    req.headers['payment-signature'] = req.headers['x-payment'];
+  }
   next();
 });
 

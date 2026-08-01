@@ -210,6 +210,44 @@ check('both non-chargeable codes are >= 400, which is what stops the SDK settlin
     /^[\x20-\x7E]*$/.test(NOT_CHARGED), JSON.stringify(NOT_CHARGED));
 }
 
+// ---- 5c. a compliance-sized sweep must not be throttled into looking non-compliant ----
+//
+// This is the one check here that is deliberately NOT paced. Everything else in this file waits between
+// requests to stay under the limiter; this one exists to prove the limiter no longer fires on the
+// challenge path at all. A reviewer probing 22 services on two verbs is 44 requests before they have
+// looked at the index, the agent card or the paper, and under the old single 60/minute bucket that
+// earned a 429. A 429 is not a 402, and OKX's review reads it as a service that does not answer.
+{
+  const N = 90; // comfortably past the old ceiling, and past what a thorough sweep would issue
+  const codes = await Promise.all(Array.from({ length: N }, () =>
+    fetch(`http://127.0.0.1:${PORT}/api/perp-gate`).then((r) => r.status).catch(() => 0)));
+  const throttled = codes.filter((c) => c === 429).length;
+  const challenged = codes.filter((c) => c === 402).length;
+  check(`${N} unpaid challenges in one burst are never throttled`, throttled === 0, `${throttled} of ${N} came back 429`);
+  check('and every one of them is the payment challenge', challenged === N, `${challenged} of ${N} were 402`);
+}
+
+// ---- 5d. x402 v1 clients can still present a payment ----
+//
+// The hand-rolled gate read `PAYMENT-SIGNATURE || X-PAYMENT`; the SDK reads only the first, so the
+// migration silently made v1 clients unpayable. A middleware copies the header across before the gate.
+//
+// What this can prove offline is that the alias reaches the same code path and is refused identically
+// when the payload is junk, which rules out the alias being dropped or, worse, being trusted. That a
+// GENUINE payment presented under the v1 name is accepted and settles is proven where it has to be,
+// with real money against the live service, and recorded in docs/paid-sweep-22-of-22.md.
+{
+  const junk = Buffer.from(JSON.stringify({ x402Version: 2, scheme: 'exact', network: 'eip155:196', payload: {} }), 'utf8').toString('base64');
+  const viaV1 = await get(`http://127.0.0.1:${PORT}/api/perp-gate`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-payment': junk }, body: JSON.stringify({ entry: 100, size: 1, leverage: 10 }),
+  });
+  const viaV2 = await get(`http://127.0.0.1:${PORT}/api/perp-gate`, {
+    method: 'POST', headers: { 'content-type': 'application/json', 'payment-signature': junk }, body: JSON.stringify({ entry: 100, size: 1, leverage: 10 }),
+  });
+  check('an invalid payment under the v1 header name is refused, not served', viaV1.status !== 200, `status ${viaV1.status}`);
+  check('the v1 header name reaches the same outcome as the v2 name', viaV1.status === viaV2.status, `v1 ${viaV1.status} vs v2 ${viaV2.status}`);
+}
+
 // ---- 6. BUG-011 is still enforced ----
 check('settleDecision: success with a tx hash settles', settleDecision({ success: true, transaction: '0xabc' }) === 'settled');
 check('settleDecision: success with NO tx hash retries, never settles', settleDecision({ success: true, transaction: null }) === 'retry');

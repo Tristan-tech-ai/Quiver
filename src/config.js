@@ -125,6 +125,18 @@ export const config = {
   adapter: env('DATA_ADAPTER', 'auto'), // cli | rest | auto
   onchainosBin: env('ONCHAINOS_BIN', 'C:\\Users\\Tristan\\.local\\bin\\onchainos.exe'),
 
+  // Rate limits, split by what a request actually costs us to serve.
+  //
+  // One global 60/minute bucket used to cover everything, including the 402 challenge. That is the
+  // wrong shape and it nearly cost the listing: an unpaid request cannot reach an engine, it reads
+  // config and returns a challenge, so throttling it protects nothing. What it does do is turn a
+  // thorough compliance sweep into a wall of 429s, and a 429 is not a 402. Measured on 1 August 2026:
+  // this project's own gate tripped it at 66 requests while probing 22 services on two verbs, and OKX's
+  // review is at least that thorough. A paid call is different: it runs an engine, and it is already
+  // rate-limited by costing the caller money.
+  rateCheapPerMinute: Number(env('RATE_CHEAP_PER_MIN', 600)),
+  ratePerMinute: Number(env('RATE_PER_MIN', 60)),
+
   // Engine bounds
   tapeLimit: Number(env('TAPE_LIMIT', 500)),
   upstreamTimeoutMs: Number(env('UPSTREAM_TIMEOUT_MS', 12000)),

@@ -12,6 +12,41 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 1 August 2026 (later still) — closing two ways this could have been delisted again
+
+Neither of these was reported by a caller. Both came out of reading OKX's own requirements against the
+service after it was relisted, which is a thing worth doing while nothing is on fire.
+
+**The rate limiter was shaped to fail a review.** One global bucket, 60 requests per minute per IP,
+applied ahead of everything, including the 402 challenge itself. A reviewer probing twenty-two services
+on two verbs issues forty-four requests before they have looked at the index, the agent card or the
+paper, and past sixty they stop receiving a payment challenge and start receiving `429`. **A 429 is not
+a 402**, and to an automated compliance check it reads as a service that does not answer. This is not a
+hypothesis: this project's own gate tripped it earlier the same day at sixty-six requests.
+
+The number was never the problem. Treating every request as equally expensive was. An unpaid request
+cannot reach an engine; it reads configuration and returns a challenge. So the limiter now has two
+buckets: **600 a minute for anything that cannot run an engine** (the challenge, the public pages, the
+agent card, stored proofs, `/build`) and the original **60 for everything that does** (paid calls,
+`/mcp`, and the `/diag` probes). Separate counters, so a burst of free challenges cannot eat the
+allowance a paying caller needs. A paid call is in any case self-limiting, because it costs the caller
+money.
+
+**And x402 v1 clients had quietly lost the ability to pay.** The hand-rolled gate this service ran until
+this morning read `PAYMENT-SIGNATURE` or `X-PAYMENT`. The official SDK reads only the first. So the
+migration, which fixed one compatibility problem, introduced another: a v1 client presents a perfectly
+valid payment, the gate never sees it, and it receives a 402 for ever. The v1 header is now copied
+across before the gate runs, which restores exactly what this service accepted before and changes
+nothing for a client already sending the v2 name.
+
+Both are locked in `gates/gateSDK-x402.mjs`. The burst check is the only one in that file that is
+deliberately unpaced, since being unthrottled is the whole claim, and it was verified in the direction
+that matters: forcing the cheap limit down to ten made eighty of ninety requests come back 429, so the
+check can fail. The v1 alias is asserted to reach the same refusal as the v2 name offline, and proven
+with a real payment against the live service.
+
+Nothing here moves `q1-e1fa99d08887d6cc`, the endpoint, the service list or any price.
+
 ## 1 August 2026 (later) — one character in a header crashed the container, and the first full paid sweep found it
 
 **The migration entry below is still true and this one is its correction.** Once the payment layer was

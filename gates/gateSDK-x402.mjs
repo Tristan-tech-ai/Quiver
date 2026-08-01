@@ -183,6 +183,33 @@ check('nonChargeableStatus: failed self-check -> 422', nonChargeableStatus({ ok:
 check('both non-chargeable codes are >= 400, which is what stops the SDK settling',
   nonChargeableStatus({ ok: false }) >= 400 && nonChargeableStatus({ ok: true }) >= 400);
 
+// ---- 5b. a NON-CHARGEABLE answer must survive the HTTP layer, not only the pure function ----
+//
+// The pure checks above passed while the live service crashed on exactly this path. `nonChargeableStatus`
+// was unit-tested and correct; what was never exercised was an actual refusal travelling out through
+// Express, where a header value carrying a non-ASCII byte throws ERR_INVALID_CHAR and, in an async
+// handler, takes the process down. Seven of twenty-two paid calls died that way before anything noticed.
+// So drive a real refusal end to end and require the server to still be alive afterwards.
+{
+  // Every service declares required fields; an empty body is refused by validate() and returns 400
+  // through refusalBody. That is the same exit as a non-chargeable answer and it crosses the same code.
+  const r = await get(`http://127.0.0.1:${PORT}/api/perp-gate`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ entryPrice: 'not-a-number' }),
+  });
+  const alive = await get(`http://127.0.0.1:${PORT}/api/perp-gate`);
+  check('a refused request does not kill the server', alive.status === 402, `follow-up request got ${alive.status}`);
+  check('a refused request answers a 4xx rather than a 200', r.status >= 400 && r.status < 500, `status ${r.status}`);
+}
+
+// Header values must be Latin-1 or Node throws when writing them. Assert it on the literal rather than
+// trusting that whoever edits that string next remembers why it is plain.
+{
+  const NOT_CHARGED = 'engine refused its own answer; no settlement';
+  check('the not-charged header value is header-safe (no non-ASCII byte)',
+    // eslint-disable-next-line no-control-regex
+    /^[\x20-\x7E]*$/.test(NOT_CHARGED), JSON.stringify(NOT_CHARGED));
+}
+
 // ---- 6. BUG-011 is still enforced ----
 check('settleDecision: success with a tx hash settles', settleDecision({ success: true, transaction: '0xabc' }) === 'settled');
 check('settleDecision: success with NO tx hash retries, never settles', settleDecision({ success: true, transaction: null }) === 'retry');

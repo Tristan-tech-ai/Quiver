@@ -1,0 +1,221 @@
+{
+  "base": "https://quiver-production-c3a8.up.railway.app",
+  "buyer": "0x1b010a9cf4c6302a0ffcfec08e2fbf23e3e1f0d4",
+  "payTo": "0x65bb932d9987f1d1a98b8942a3fa98cb28ec073b",
+  "before": {
+    "buyer": 0.415,
+    "payTo": 5.095
+  },
+  "after": {
+    "buyer": 0.085,
+    "payTo": 5.425
+  },
+  "startBlock": "66813521",
+  "endBlock": "66813609",
+  "claimed": 0.33000000000000007,
+  "movedIn": 0.33000000000000007,
+  "movedOut": 0.32999999999999996,
+  "censusTotal": 0.33000000000000007,
+  "censusTransfers": 19,
+  "unmatched": [],
+  "rows": [
+    {
+      "service": "tape-pulse",
+      "slug": "tape-pulse",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0xb50c33110b888f75ecc00c640d06c485e6ad648d8f47a129a65ca170ac41e04a",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "chart-press",
+      "slug": "chart-press",
+      "price": "0.02",
+      "status": 200,
+      "tx": "0xeba77cb4336945ed89b5b7973782f8b33ebbb9890ac1de23aec551da13099847",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "poly-fill",
+      "slug": "poly-fill",
+      "price": "0.01",
+      "status": 400,
+      "tx": null,
+      "proof": null,
+      "note": "HTTP 400: {\"ok\":false,\"errors\":[\"no active Polymarket market matched \\\"will-btc-hit-100k\\\" — it is resolved, it never ex"
+    },
+    {
+      "service": "poly-desk",
+      "slug": "poly-desk",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0x3e0180fd79c84a41c678682962a7efddc63d93b4c1433425cf13b61aeb973c0c",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "options-desk",
+      "slug": "options-desk",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0xd21934127327828bbef16be6c035268342310aff29be01cecd36327e3f85d4d5",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "lp-desk",
+      "slug": "lp-desk",
+      "price": "0.01",
+      "status": 400,
+      "tx": null,
+      "proof": "observation",
+      "note": "HTTP 400: {\"ok\":false,\"reason\":\"pool metadata read failed for 0x1111111111111111111111111111111111111111 on ethereum: no"
+    },
+    {
+      "service": "calldata-x",
+      "slug": "calldata-x",
+      "price": "0.005",
+      "status": 200,
+      "tx": "0x97abd45aca98fd010f93a2fd01c4c7e3a2d2a8b49902e828031d34b141895bc1",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "protocol-pulse",
+      "slug": "protocol-pulse",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0x089bc6984ee480f9f331279c452cb63ae39fe4cb01c85a1ba15b2b50683e3710",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "macro-sentry",
+      "slug": "macro-sentry",
+      "price": "0.005",
+      "status": 200,
+      "tx": "0xb7feb00d439b983d3d6030bf104f8085710198a56d974982628fdc2a3606ad7a",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "updown-pulse",
+      "slug": "updown-pulse",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0xab04b48cb8214f282a56afbb335868d75885228b9a441ad34f1387a90787fa0b",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "loop-digest",
+      "slug": "loop-digest",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0x38397620a6509ec5112eca90a59bfac6678376b98b56c1695cd240a932fb8d3f",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "token-scan",
+      "slug": "token-scan",
+      "price": "0.05",
+      "status": 200,
+      "tx": "0xe04f81076b4294df47ec526008d698798f427dc4d50c581897d9c6294ecd76bb",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "wallet-audit",
+      "slug": "wallet-audit",
+      "price": "0.05",
+      "status": 200,
+      "tx": "0x81e54708aad2145759f24bf5ed5cde34123b69b963e0d1354ad75eb02b02b5a7",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "perp-gate",
+      "slug": "perp-gate",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0x0a1b6690649424e3562165543acdd99ab28c3aaaba0dcafe548c1bf72e32b071",
+      "proof": "proof",
+      "note": ""
+    },
+    {
+      "service": "portfolio-gate",
+      "slug": "portfolio-gate",
+      "price": "0.05",
+      "status": 200,
+      "tx": "0x992700dee571e05eb55675af6cdfcb2b32ccfa7d8d4ea0d4f5a1cf2720f51092",
+      "proof": "observation",
+      "note": ""
+    },
+    {
+      "service": "size-gate",
+      "slug": "size-gate",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0x907a1b6297f431c13f441273ba8825bcdc51a2b887a14a2299ca6e77452368cd",
+      "proof": "proof",
+      "note": ""
+    },
+    {
+      "service": "exec-verify",
+      "slug": "exec-verify",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0xc2d4045ef36d14e87a169441cf466f904aca7fd2402a75feca3cdde7348c7436",
+      "proof": "proof",
+      "note": ""
+    },
+    {
+      "service": "options-risk",
+      "slug": "options-risk",
+      "price": "0.02",
+      "status": 200,
+      "tx": "0xbdc85d7be01a91c61e5748b786a9f8c0f29325061951e3624a51c4205911754f",
+      "proof": "proof",
+      "note": ""
+    },
+    {
+      "service": "lp-risk",
+      "slug": "lp-risk",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0xc79b221265f1561fb1fa0a859c1c4a874fd37474e6d8ca43a1f617beba30c549",
+      "proof": "proof",
+      "note": ""
+    },
+    {
+      "service": "treasury-risk",
+      "slug": "treasury-risk",
+      "price": "0.02",
+      "status": 200,
+      "tx": "0x3fb7cfc1b020a5c849fd2c84f4114962df7812dea07de1bb99f0217363285808",
+      "proof": "proof",
+      "note": ""
+    },
+    {
+      "service": "risk-attest",
+      "slug": "risk-attest",
+      "price": "0.01",
+      "status": 400,
+      "tx": null,
+      "proof": "proof",
+      "note": "HTTP 400: {\"ok\":false,\"errors\":[\"items at index 0, 1 are not 32-byte hex content-hashes. Each leaf must be exactly 64 he"
+    },
+    {
+      "service": "event-vol",
+      "slug": "event-vol",
+      "price": "0.01",
+      "status": 200,
+      "tx": "0xfc75c0cb236547336ae1c19edd0bf1444cb9999aa79ce9ae3158d0c69cb062ca",
+      "proof": "proof",
+      "note": ""
+    }
+  ]
+}

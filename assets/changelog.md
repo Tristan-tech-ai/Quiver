@@ -12,6 +12,56 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 1 August 2026 (later) — one character in a header crashed the container, and the first full paid sweep found it
+
+**The migration entry below is still true and this one is its correction.** Once the payment layer was
+live, all 22 services were bought with real money on X Layer. Fifteen were delivered and settled; the
+other **seven returned HTTP 502**, and the cause was a single character this service shipped hours
+earlier.
+
+The non-chargeable path set an informational header whose value contained an em dash. Node rejects any
+non-Latin-1 byte in a header value with `ERR_INVALID_CHAR`, the throw landed in an async Express handler
+with nothing to catch it, and it **killed the process**. So every service whose engine refused its own
+answer took the whole container down, and the next two requests behind it met the platform edge during a
+restart. That is why the failures came in clusters of three rather than scattered.
+
+**The billing side came through it exactly.** Fifteen calls claimed 0.295000 USD₮0; the buyer's balance
+fell by 0.295000, the operator's rose by 0.295000, and an independent scan of the token's transfer log
+over the sweep's own block range found fifteen transfers totalling 0.295000 with every receipt hash
+present on chain. **Nothing was charged for any of the seven that failed.** The direction of failure was
+the one a paid service should prefer, which is the only reason this reads as a defect rather than a
+theft.
+
+Two things changed, and the second matters more than the first. The header value is now plain ASCII.
+And it is written inside a guard, because an informational header must never be able to fail a paid
+call whatever a later edit puts in it. `gates/gateSDK-x402.mjs` now drives a real refusal through the
+HTTP layer and requires the server to still answer afterwards, which is the check that was missing: the
+status codes were unit-tested and correct the whole time, and no test ever sent a refusal through
+Express.
+
+**With that fixed, the sweep was run again and every service was bought.** Nineteen of the twenty-two
+delivered and settled on the first pass; the other three refused their request bodies with a 400, and
+were right to. Those bodies come from the routing fixtures, which exist to prove the signpost stays quiet
+on a correct call and are deliberately synthetic, so a made-up prediction market, a dummy pool address
+and two strings that are not content hashes are exactly what they are supposed to be. **None of the three
+was charged.** Re-run with inputs obtained rather than recalled — a Uniswap pool verified on chain before
+use, two content hashes taken from free MCP proofs minutes earlier, a market read from the venue's own
+open list — all three delivered and settled.
+
+**So the catalogue stands at 22 of 22 delivered and settled, and the money reconciles to the last
+decimal**: 0.360000 USD₮0 claimed by receipts, 0.360000 out of the buyer, 0.360000 into the operator
+wallet, with an independent scan of the token's transfer log over the sweep's own block range finding
+every receipt hash present and none missing. Seven of the delivered answers carried a zk proof, which is
+the count this paper publishes. The full record is in `hackathon/field-test/SWEEP22-SDK-RESULT.md`.
+
+The honest summary of the day is that the paid rail was verified end to end and the verification is what
+found this. A sweep that had only read the 402 challenge would have reported success.
+
+One last correction, and it is about the instrument again. The sweep's own proof counter read the
+`proof` key on every row rather than only on delivered ones, and a refusal body can carry one too, so it
+first reported eight proofs where seven were served. A counter that inflates on failure is the same shape
+as everything else this entry is about.
+
 ## 1 August 2026 — delisted by OKX, and the reason was not a bug in anything we could test
 
 **Quiver was delisted from OKX.AI at 09:31 UTC today.** The listing card said `Listing rejected`, `not

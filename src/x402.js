@@ -436,7 +436,17 @@ export function paid({ priceUsdt, description, inputSchema }) { // eslint-disabl
     // Not a delivered result — the status code is what stops the SDK from settling. See
     // nonChargeableStatus for why these are 400/422 rather than the 200 they used to be.
     if (!isChargeable(result)) {
-      res.set('X-QUIVER-NOT-CHARGED', 'engine refused its own answer — no settlement');
+      // ASCII ONLY, and inside a guard. Both halves of that were learned the expensive way: this line
+      // first carried an em dash, Node rejects any non-Latin-1 byte in a header VALUE with
+      // ERR_INVALID_CHAR, and the throw landed in an async handler with nothing to catch it — so it
+      // killed the process. Every service whose engine refused its own answer took the container down
+      // with it and the next two requests got a 502 from the platform edge while it restarted. Seven of
+      // twenty-two calls in the first full paid sweep failed that way.
+      //
+      // The guard is not belt-and-braces for the ASCII fix. It is the actual lesson: an informational
+      // header must never be able to fail a paid call, whatever ends up in it later.
+      try { res.set('X-QUIVER-NOT-CHARGED', 'engine refused its own answer; no settlement'); }
+      catch { /* a header we could not set is not a reason to lose the answer */ }
       return res.status(nonChargeableStatus(result)).json(result);
     }
 

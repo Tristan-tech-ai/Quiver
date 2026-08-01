@@ -11,3 +11,4 @@ startedUtc	liveUtc	darkSeconds	services	mcpTools	codeHash	marker
 2026-08-01T10:43:02.895Z	2026-08-01T10:45:24.924Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:delisted by OKX
 2026-08-01T11:06:38.873Z	2026-08-01T11:08:56.378Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:one character in a header crashed the container
 2026-08-01T11:20:05.010Z	2026-08-01T11:22:12.657Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:22 of 22 delivered and settled
+2026-08-01T11:31:09.969Z	2026-08-01T11:33:16.846Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:closing two ways this could have been delisted again

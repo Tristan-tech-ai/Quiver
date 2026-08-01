@@ -90,6 +90,9 @@
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1097.0",
     "@coinbase/x402": "^2.1.0",
+    "@okxweb3/x402-core": "^0.1.0",
+    "@okxweb3/x402-evm": "^0.2.1",
+    "@okxweb3/x402-express": "^0.1.1",
     "@resvg/resvg-js": "^2.6.2",
     "echarts": "^6.1.0",
     "ethers": "^6.17.0",

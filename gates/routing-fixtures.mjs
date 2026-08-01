@@ -14,6 +14,7 @@
 //
 // One entry per accepted INPUT FORM, not one per service, because "reachable" has to mean reachable
 // the way a caller would really write the call.
+//
 // WHAT `invalidFixtures()` PROMISES, AND THE TWO THINGS IT DOES NOT. It promises that every body below
 // is accepted by the validator of the service it names. That is the whole property the routing sweeps
 // need, and it is not the property a sweep that RUNS these bodies needs. Both gaps were paid for:

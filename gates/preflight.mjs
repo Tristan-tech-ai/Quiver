@@ -23,9 +23,9 @@ import { _internal, engineSourceFiles } from '../src/engine/proof.js';
 import { verifyInstruction } from '../src/util/snark.js';
 import { config } from '../src/config.js';
 import { keccak256, encodeAbiParameters, parseAbiParameters, stringToHex } from 'viem';
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
-import { dirname, join } from 'node:path';
+import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -546,6 +546,34 @@ check('no scripted-revert defect or abandoned backup is left in the working tree
       + (healLive
         ? ` — a revert script is RUNNING (${healLive}); this is in-flight, not wreckage. Wait for it to finish and re-run, do not deploy through it.`
         : ' — nothing is running, so this is an abandoned defect: run `node zk/scripts/revert-heal.mjs --heal` and re-run preflight.'));
+
+// The check above says "in the working tree" but only ever asked revert-heal, and revert-heal walks the
+// zk area. A `ncdf_vk.json.__reverted__` sat in `assets/zk/` through a green preflight and was caught by
+// a human reading `git status` before a commit — the claim was broader than the instrument. So sweep the
+// SHIPPED tree independently here. This does not replace the healer, which knows how to repair what it
+// finds; it just stops the deploy from believing a cleanliness report about a directory nobody looked in.
+{
+  // Skip by PATH, not by directory NAME. Skipping every folder called `zk` also skipped `assets/zk`,
+  // which is exactly where the stray that motivated this check was sitting — so the first version of it
+  // passed on a tree with a planted stray in it. Verified by planting one and watching it fail.
+  const strays = [];
+  const skip = new Set(['node_modules', '.git', '.vercel'].map((d) => join(ROOT, d)));
+  const walk = (dir) => {
+    let entries = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+    for (const e of entries) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) { if (!skip.has(full)) walk(full); continue; }
+      if (/\.__reverted__$|\.orig$|\.rej$/.test(e.name)) strays.push(relative(ROOT, full));
+    }
+  };
+  walk(ROOT);
+  check('no revert backup or merge leftover is anywhere in the shipped tree',
+    strays.length === 0,
+    strays.length === 0
+      ? 'swept the whole tree, not only the zk area'
+      : `${strays.join(', ')} — delete it, or move it out of the tree that ships`);
+}
 
 // ── the verification instruction we publish is executable ────────────────────────────────────────
 // Found by testing the deployed container as a buyer rather than by reading the code. Every proof used to

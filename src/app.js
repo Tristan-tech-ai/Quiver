@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from './config.js';
-import { paid } from './x402.js';
+import { paid, paymentGate, recurrenceProbe } from './x402.js';
 import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
@@ -659,6 +659,20 @@ app.use('/api', (req, res, next) => { res.set(API_CORS); if (req.method === 'OPT
 // GET and POST, so an unpaid probe of ANY method/body always gets the mandatory HTTP 402 challenge —
 // never a 404 (no route) or 400 (bad input). This is exactly what `onchainos agent x402-check` probes.
 // Business-input validation runs only AFTER payment is verified, inside the handler.
+//
+// That gate is now the OFFICIAL OKX Payment SDK's Express middleware rather than a hand-rolled one —
+// the delisting of 1 August 2026 named the absence of the SDK as its only reason. It is mounted ONCE
+// here, ahead of every paid route, and it owns the whole protocol: the 402 challenge, /verify, the
+// settle decision and the receipt headers. src/x402.js records what had to be preserved across the
+// change and how each piece was checked.
+//
+// Order is load-bearing. `recurrenceProbe` wraps `res.end` first so that the SDK, which captures
+// `res.end` when IT is mounted, ends up calling ours last — after settlement, when PAYMENT-RESPONSE
+// exists. Mount it the other way round and the counter fires before the receipt and starts counting
+// unsettled calls as revenue, which is precisely the BUG-011 defect this project already paid for once.
+app.use(recurrenceProbe());
+app.use(paymentGate(SERVICES));
+
 for (const s of SERVICES) {
   const handler = paid({
     priceUsdt: s.price,

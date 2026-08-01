@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T15:23:18.020Z",
+  "at": "2026-07-30T02:04:18.685Z",
   "passed": true,
   "circuit": "portfoliogate",
   "samples": 1500,
@@ -11,7 +11,7 @@
       "2": 204,
       "3": 144
     },
-    "ms": 953,
+    "ms": 1017,
     "boundViolations": 0,
     "calcRejections": 0,
     "orderingDisagreements": 0,
@@ -49,7 +49,7 @@
       "2": 210,
       "3": 149
     },
-    "ms": 945,
+    "ms": 969,
     "boundViolations": 0,
     "calcRejections": 0,
     "orderingDisagreements": 0,

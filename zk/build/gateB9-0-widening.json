@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-29T00:16:02.599Z",
+  "at": "2026-07-30T02:05:02.118Z",
   "passed": true,
   "timingRuns": 7,
   "sizes": [
@@ -10,15 +10,15 @@
       "plonk": 1664,
       "domain": 2048,
       "publicSignals": 1,
-      "proveMs": 794,
+      "proveMs": 704,
       "times": [
-        718,
-        733,
-        766,
-        794,
-        820,
-        849,
-        875
+        685,
+        689,
+        695,
+        704,
+        715,
+        719,
+        762
       ]
     },
     {
@@ -28,15 +28,15 @@
       "plonk": 2854,
       "domain": 4096,
       "publicSignals": 2,
-      "proveMs": 1603,
+      "proveMs": 1411,
       "times": [
-        1543,
-        1570,
-        1577,
-        1603,
-        1638,
-        1645,
-        1647
+        1373,
+        1386,
+        1399,
+        1411,
+        1411,
+        1441,
+        1502
       ]
     },
     {
@@ -46,15 +46,15 @@
       "plonk": 3328,
       "domain": 4096,
       "publicSignals": 2,
-      "proveMs": 1603,
+      "proveMs": 1397,
       "times": [
-        1585,
-        1592,
-        1601,
-        1603,
-        1608,
-        1638,
-        1683
+        1365,
+        1377,
+        1381,
+        1397,
+        1402,
+        1466,
+        1493
       ]
     }
   ],
@@ -66,15 +66,15 @@
       "plonk": 718,
       "domain": 1024,
       "publicSignals": 5,
-      "proveMs": 431,
+      "proveMs": 374,
       "times": [
-        426,
-        429,
-        430,
-        431,
-        434,
-        444,
-        451
+        349,
+        352,
+        366,
+        374,
+        377,
+        394,
+        431
       ]
     },
     {
@@ -84,15 +84,15 @@
       "plonk": 1190,
       "domain": 2048,
       "publicSignals": 1,
-      "proveMs": 864,
+      "proveMs": 698,
       "times": [
-        806,
-        825,
-        841,
-        864,
-        865,
-        867,
-        869
+        679,
+        680,
+        697,
+        698,
+        773,
+        778,
+        802
       ]
     },
     {
@@ -102,15 +102,15 @@
       "plonk": 1664,
       "domain": 2048,
       "publicSignals": 1,
-      "proveMs": 794,
+      "proveMs": 704,
       "times": [
-        718,
-        733,
-        766,
-        794,
-        820,
-        849,
-        875
+        685,
+        689,
+        695,
+        704,
+        715,
+        719,
+        762
       ]
     },
     {
@@ -120,15 +120,15 @@
       "plonk": 2854,
       "domain": 4096,
       "publicSignals": 2,
-      "proveMs": 1603,
+      "proveMs": 1411,
       "times": [
-        1543,
-        1570,
-        1577,
-        1603,
-        1638,
-        1645,
-        1647
+        1373,
+        1386,
+        1399,
+        1411,
+        1411,
+        1441,
+        1502
       ]
     },
     {
@@ -138,43 +138,43 @@
       "plonk": 3328,
       "domain": 4096,
       "publicSignals": 2,
-      "proveMs": 1603,
+      "proveMs": 1397,
       "times": [
-        1585,
-        1592,
-        1601,
-        1603,
-        1608,
-        1638,
-        1683
+        1365,
+        1377,
+        1381,
+        1397,
+        1402,
+        1466,
+        1493
       ]
     }
   ],
-  "domainExponent": 0.947507325532725,
+  "domainExponent": 0.9506109227609132,
   "provingBreakEven": [
     {
       "N": 2,
-      "batchMs": 794,
-      "separateLiveMs": 862,
-      "ratioVsLive": 0.9211136890951276,
-      "separatePackedMs": 1728,
-      "ratioVsPacked": 0.45949074074074076
+      "batchMs": 704,
+      "separateLiveMs": 748,
+      "ratioVsLive": 0.9411764705882353,
+      "separatePackedMs": 1396,
+      "ratioVsPacked": 0.504297994269341
     },
     {
       "N": 3,
-      "batchMs": 1603,
-      "separateLiveMs": 1293,
-      "ratioVsLive": 1.239752513534416,
-      "separatePackedMs": 2592,
-      "ratioVsPacked": 0.6184413580246914
+      "batchMs": 1411,
+      "separateLiveMs": 1122,
+      "ratioVsLive": 1.2575757575757576,
+      "separatePackedMs": 2094,
+      "ratioVsPacked": 0.6738299904489016
     },
     {
       "N": 4,
-      "batchMs": 1603,
-      "separateLiveMs": 1724,
-      "ratioVsLive": 0.929814385150812,
-      "separatePackedMs": 3456,
-      "ratioVsPacked": 0.46383101851851855
+      "batchMs": 1397,
+      "separateLiveMs": 1496,
+      "ratioVsLive": 0.9338235294117647,
+      "separatePackedMs": 2792,
+      "ratioVsPacked": 0.5003581661891118
     }
   ],
   "batch": [

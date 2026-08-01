@@ -12,6 +12,61 @@ that is the contract with anyone checking our claims.
 
 ---
 
+## 1 August 2026 — delisted by OKX, and the reason was not a bug in anything we could test
+
+**Quiver was delisted from OKX.AI at 09:31 UTC today.** The listing card said `Listing rejected`, `not
+listed`, and carried an empty reason field. The reason arrived by email instead: *"your service is not
+integrated with the official OKX Payment SDK, which prevents us from completing verification."*
+
+**Nothing was broken, and that is the uncomfortable part.** Measured within half an hour of the
+rejection: all 22 services still stored on chain with correct endpoints and fees; the endpoint answering
+`/` 200, `/.well-known/agent-card.json` 200 and a well-formed 402 on every paid route in under half a
+second; OKX's own `agent x402-check` passing **22 of 22**; `validate-listing` returning `pass:true` with
+zero findings. The last deploy had gone live 27 hours earlier and every watchdog-recorded deploy measured
+zero seconds of darkness. A hand-rolled implementation of the protocol, however correct, is not what the
+review verifies. It verifies the SDK.
+
+**So the payment layer now runs on `@okxweb3/x402-express` + `x402-core`, and the protocol belongs to
+them.** The 402 challenge, `/verify`, the settle decision and the receipt headers are the SDK's. What
+stayed ours is policy, and each piece was checked against the SDK's compiled source rather than its
+documentation:
+
+· **Both rails still appear in one challenge.** `RouteConfig.accepts` takes an array, so X Layer USD₮0
+and Base USDC are advertised together as before.
+· **The EIP-712 domain is unchanged and still verified against the chain.** Prices are handed over in the
+explicit `{asset, amount, extra}` form rather than as a dollar string, so no token registry gets the
+chance to resolve USD₮0 for us. Preflight rebuilds both domain separators from the live contracts and
+they match.
+· **A refusal is still free.** The SDK skips settlement entirely at `res.statusCode >= 400`, so the
+status code is now the mechanism. An answer the engine rejected returns 400 and one whose own self-check
+failed returns 422, where both used to return 200. **This is the single API change**: the response body
+is identical, only the status moved, and it moved so that a caller is not charged for an answer we will
+not stand behind.
+· **The BUG-011 rule survives.** A settlement reporting success with no transaction hash still never
+counts as settled, and the recurrence counter now reads the receipt the SDK writes rather than the
+attempt — the same rule that stopped seven unsettled calls being reported as traction in July.
+
+**Four defects were found on the way, all four by probing the running service.** The facilitator base URL
+was passed with its path already attached, so the SDK appended its own and earned a 403 that read exactly
+like bad credentials. `initialize()` reported success while the X Layer rail had no supported kinds at
+all, because one facilitator answering counts as success — readiness is now asserted per network. With
+the facilitator sync disabled the service answered 402 with an **empty `accepts`**, the precise failure
+that makes an ASP unpayable; with it enabled and the facilitator unreachable, every paid route answered
+**500**, which would break the one thing x402 actually mandates. Initialisation is therefore retried with
+backoff behind a fallback that keeps answering a correct, payable 402 and never serves the resource.
+
+**And two of the failures were in the instrument, not the service.** A new gate compared the challenge in
+the header against the mirror in the body with `JSON.stringify` and called them different because the SDK
+writes `amount` before `asset`; and it fired sixty-six requests into a service that rate-limits at sixty a
+minute, then read the 429 bodies as unpayable challenges. Both were fixed in the gate. The reason the
+empty-body challenge was caught at all is that two instruments looked at the same claim from different
+sides and disagreed.
+
+Unchanged for anyone already integrated: the endpoint, the header a client sends (`PAYMENT-SIGNATURE`,
+which is what the SDK reads too), all 22 prices, and the engine hash `q1-e1fa99d08887d6cc` — the payment
+layer sits outside `src/engine/`, so every published proof still reproduces. Suite 386/381/0/5, preflight
+37/37, and `gates/gateSDK-x402.mjs` asserts the challenge shape on both the SDK path and the fallback.
+
 ## 31 July 2026 — the headline circuit is built and correct, and it does not run on this container
 
 **The honest version of this entry is that it was written twice.** It first said `lp-risk` now proves its

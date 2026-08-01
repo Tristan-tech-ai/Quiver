@@ -1,5 +1,5 @@
 {
-  "at": "2026-07-28T12:49:48.530Z",
+  "at": "2026-07-30T02:04:05.655Z",
   "passed": true,
   "samples": 4000,
   "kept": 3970,
@@ -13,5 +13,5 @@
   },
   "plonkConstraints": 2255,
   "domainSize": 4096,
-  "proveMs": 1723
+  "proveMs": 1742
 }

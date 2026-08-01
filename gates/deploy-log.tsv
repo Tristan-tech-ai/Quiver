@@ -8,3 +8,4 @@ startedUtc	liveUtc	darkSeconds	services	mcpTools	codeHash	marker
 2026-07-30T22:29:44.000Z	2026-07-30T22:32:01.932Z	0	22	9	q1-e1fa99d08887d6cc	get:/api/lp-risk:USD₮0
 2026-07-30T22:59:02.102Z	2026-07-30T23:01:08.358Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:the input-attestation census is confirmed
 2026-07-31T06:12:01.469Z	2026-07-31T06:15:16.442Z	0	22	9	q1-e1fa99d08887d6cc	get:/proof/abc:Known circuits
+2026-08-01T10:43:02.895Z	2026-08-01T10:45:24.924Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:delisted by OKX

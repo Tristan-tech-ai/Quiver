@@ -47,6 +47,60 @@ with a real payment against the live service.
 
 Nothing here moves `q1-e1fa99d08887d6cc`, the endpoint, the service list or any price.
 
+## 9 August 2026 (later) — we counted our own buyer as somebody else's, and said so in the row called "Traction, honestly"
+
+**This is the correction that matters, because it is the only one this week that erred upward.**
+
+The paper reported that six payer addresses which are not ours had sent 44 payments totalling
+0.575 USD₮0, over the eight days to 27 July 2026, and named the block range it measured:
+65,711,861 to 66,403,061. A fresh census of the whole service life found only 39 external payments in
+total, across both rails. A window cannot exceed the lifetime that contains it, so one of the two was
+wrong and it was worth finding out which.
+
+**Re-scanning the paper's own range, with no gaps, the arithmetic falls out exactly:**
+
+| | addresses | payments | USD₮0 |
+| --- | --- | --- | --- |
+| genuinely external | 5 | 22 | 0.215000 |
+| our own field-test wallet `0x1b01…f0d4` | 1 | 22 | 0.360000 |
+| **published as external** | **6** | **44** | **0.575000** |
+
+The published figure was the sum. Our own buyer, the demo wallet for agent #6166 used in the two-rail
+field test, had been counted as a third party. It sent exactly half the payments and nearly two thirds
+of the value.
+
+**Corrected to what the chain says: eight external addresses, 39 payments, 0.360000 USD₮0 over the
+service's whole life.** Both places that carried the old figure now carry the new one and state what
+they used to say, because a row titled "Traction, honestly" that quietly improves its own number is
+worth less than one that shows the correction.
+
+**The roadmap in §11.4 was wrong in the other direction, and is corrected in the same pass.** It listed
+six engines as circuit candidates with `size-gate` as "the one to do next" and `options-risk` last, on
+the grounds that Black-76 greeks need `exp` and `erf` in-circuit and that this is "where this stops being
+arithmetic and becomes a research project". Five of the six are built. The pessimism about
+`options-risk` named the wrong function: the engine never computes `erf`, it computes Hart's rational
+approximation, where the ratio is a multiplication and the polynomial is Horner, leaving one
+transcendental `e^-w` that factors over the binary expansion of `w` in a way `erf` does not. Only
+`portfolio-gate` remains, for the reason first given: the earliest leg to liquidate is a minimum over
+legs, and proving a minimum means proving no other leg qualifies.
+
+**Table 11 was checked and left alone, and that is the useful part.** It reads T2 = 1, and the instinct
+was to raise it to seven. It is right at one. Emitting a Plonk proof and standing on T2 are different
+claims: a Plonk verifier embeds the verification key of a single circuit, and the deployment record
+lists one verifier and one registry, so six of the seven circuits are checkable against their published
+keys off chain while only the liquidation circuit has a contract on X Layer that checks it inside the
+EVM. The paragraph beneath the table now says so.
+
+**On method.** A token audit had already verified 333 hashes, addresses, URLs and counts in this paper
+and found four regressions. It could not see any of today's three, because all three are prose with a
+number inside. What found them was narrowing the document to the 210 sentences that assert a present
+count, checking those against measurements, and then reading the survivors. Two of the five things that
+sweep flagged were false alarms from its own regex, and one flagged claim turned out to be correct on
+inspection.
+
+Nothing in the engine moved: `q1-e1fa99d08887d6cc` is unchanged and every published proof still
+reproduces.
+
 ## 9 August 2026 — the paper was understating the service, and the PDF was older than the paper
 
 **Two corrections, and the second is the one worth reading.**

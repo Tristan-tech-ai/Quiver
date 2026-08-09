@@ -47,6 +47,44 @@ with a real payment against the live service.
 
 Nothing here moves `q1-e1fa99d08887d6cc`, the endpoint, the service list or any price.
 
+## 9 August 2026 — the paper was understating the service, and the PDF was older than the paper
+
+**Two corrections, and the second is the one worth reading.**
+
+**The paper said one of the twenty-two services carries a circuit, and that proofs are held in memory.**
+Both were true when Section 11.4 was written. Neither is true now: **seven** services return a Plonk proof
+(`perp-gate`, `size-gate`, `exec-verify`, `options-risk`, `lp-risk`, `treasury-risk`, `event-vol`), and
+proofs have been content-addressed objects in durable storage since Phase A, so a finished one outlives
+the process that built it. The item now records the number as it stands and says plainly that it used to
+be one, because a roadmap that quietly updates itself is worth less than one that shows its own movement.
+
+Both errors **understated** the service. That is worth saying out loud: a document is not more honest for
+erring downwards, it is just wrong in the direction that flatters the author's caution.
+
+**The PDF was rendered from a private copy of the HTML that nobody kept in step.** It was built at 15:34
+on 29 July from a snapshot taken at 15:23, while the served paper went on being edited until 19:15. The
+shipped PDF was three paragraphs behind, and one of those paragraphs still carried a claim the served
+paper had already corrected: that *every* output ships a not-advice disclosure, when it ships on ten of
+the thirteen observation services and on none of the nine risk engines.
+
+**The reason it drifted is duller and more useful than the drift.** `paper/render.cjs` resolved
+`playwright` from a directory with no `node_modules`, so it threw on every run. A build script that only
+works from an undocumented working directory is a build script that stops being run, and the artifact it
+produces quietly becomes a different document from the one on the site. It now resolves the dependency
+where this repo actually keeps it, and copies the served HTML immediately before rendering, so the two
+cannot diverge silently again.
+
+**On how this was found, because the method matters more than the fix.** An audit pulled 333
+mechanically checkable tokens out of the paper and verified them: every transaction hash resolves on
+chain, every address is what it claims to be, the engine hash is presented as current with its two
+predecessors marked as history, the suite counts match, and seventeen of nineteen URLs answer. That audit
+found four real regressions and produced seven false alarms of its own. It did **not** find either error
+above, because both are prose with a number inside it and the extractor only reads tokens. What found
+them was rendering the PDF and looking at page 41.
+
+Nothing in the engine moved: `q1-e1fa99d08887d6cc` is unchanged and every published proof still
+reproduces. The seven paper parts are regenerated and byte-identical to what is served.
+
 ## 7 August 2026 — the paper caught three things the SDK migration had quietly taken away
 
 **This entry exists because the whitepaper was audited against the live endpoint, and the endpoint lost.**

@@ -33,16 +33,5 @@
     "the value can be pasted in after reading the diff; writing it is the act of saying 'I read this",
     "and I meant it'."
   ],
-  "parts": {
-    "1": {
-      "sha256": "43f3f0df3d45d1efe8a79145fb02a1e06b221d05dedb52872bde3eae43d185ec",
-      "why": "TWO undeployed corrections now sit in this part and the manifest holds one anchor per part, so both are named here rather than letting the second ride on the first one's paperwork. (a) §1 contributions and §3.6 — two of the four stale suite figures, under '## 29 July 2026 — the paper said the suite was bigger than it is, in four places, and a gate now says so', still unshipped. (b) §2.3 now says where the elapsedMs field lives and why it is outside the content hash, and §3.5's 'every output that touches a trading decision carries a not-advice disclosure' is corrected to the measured 10 of 13 observation services and 0 of 9 risk engines.",
-      "changelog": "## 29 July 2026 — the paper named a field a caller could hold us to, and nine services did not carry it"
-    },
-    "4": {
-      "sha256": "d56ea24ef18a806db808d435113b9e2f2e0e36ff61c5dd4fa92a01f13a853204",
-      "why": "TWO undeployed corrections, as with part 1. (a) §6.1 and the Table 2 caption — the other two of the four stale suite figures, under '## 29 July 2026 — the paper said the suite was bigger than it is, in four places, and a gate now says so', still unshipped. (b) §8 limitation 9's 'Every output that touches a decision carries a not-advice disclosure' is corrected to the measured counts. WARNING: this part now has 85 bytes of headroom against the 55 kB packing budget, down from 173. The next prose added to §6-§8 moves §8 into part 5 while the part count stays at seven — run `npm run gate:y` before and after any edit here.",
-      "changelog": "## 29 July 2026 — the paper named a field a caller could hold us to, and nine services did not carry it"
-    }
-  }
+  "parts": {}
 }

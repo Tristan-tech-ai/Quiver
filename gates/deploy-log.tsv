@@ -13,3 +13,4 @@ startedUtc	liveUtc	darkSeconds	services	mcpTools	codeHash	marker
 2026-08-01T11:20:05.010Z	2026-08-01T11:22:12.657Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:22 of 22 delivered and settled
 2026-08-01T11:31:09.969Z	2026-08-01T11:33:16.846Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:closing two ways this could have been delisted again
 2026-08-09T06:33:57.249Z	2026-08-09T06:36:03.209Z	0	22	9	q1-e1fa99d08887d6cc	get:/changelog:the paper caught three things
+2026-08-09T06:55:21.179Z	2026-08-09T06:57:41.430Z	0	22	9	q1-e1fa99d08887d6cc	get:/paper/6:seven of the twenty-two services carry a circuit

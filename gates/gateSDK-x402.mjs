@@ -248,6 +248,41 @@ check('both non-chargeable codes are >= 400, which is what stops the SDK settlin
   check('the v1 header name reaches the same outcome as the v2 name', viaV1.status === viaV2.status, `v1 ${viaV1.status} vs v2 ${viaV2.status}`);
 }
 
+// ---- 5c. the compatibility fields the SDK drops, and the header it stopped reading ----
+//
+// Added 7 August after auditing the whitepaper against the live endpoint. The paper prints a block
+// captioned "what POST /api/perp-gate answers with today"; the SDK migration had quietly removed three
+// of its fields, and had stopped reading the header an x402 v1 client sends its payment in. None of it
+// was visible from a green 402. It is asserted here so a future SDK bump cannot take them away again.
+{
+  const r = await get(`http://127.0.0.1:${PORT}/api/perp-gate`);
+  const body = await r.json().catch(() => ({}));
+  const hdr = r.headers.get('payment-required');
+  const head = hdr ? decodeHeader(hdr) : null;
+  for (const [where, doc] of [['body', body], ['header', head || {}]]) {
+    const a = (doc.accepts || [])[0] || {};
+    check(`${where}: maxAmountRequired is present and equals amount (x402 v1 clients read it)`,
+      a.maxAmountRequired !== undefined && a.maxAmountRequired === a.amount, `${a.maxAmountRequired} vs ${a.amount}`);
+    check(`${where}: decimals is present at entry level (USD₮0 is not resolvable by a generic client)`,
+      a.decimals !== undefined);
+    check(`${where}: outputSchema tells a caller how to send the paid body (Bazaar discovery)`,
+      a.outputSchema?.input?.method === 'POST' && !!a.outputSchema?.input?.body);
+  }
+
+  // The X-PAYMENT copy is tested at the middleware, not over HTTP. A stub payload sent to the live route
+  // earns a 402 whether the header was ignored OR read and correctly refused, so that check cannot fail
+  // honestly and proves nothing.
+  const { challengeCompat } = await import('../src/x402.js');
+  const mw = challengeCompat({});
+  const run = (headers) => new Promise((resolve) => {
+    mw({ headers, method: 'POST', path: '/api/perp-gate' }, { setHeader() {} }, () => resolve(headers));
+  });
+  check('X-PAYMENT is copied into payment-signature for a v1 caller',
+    (await run({ 'x-payment': 'V1' }))['payment-signature'] === 'V1');
+  check('an existing payment-signature is never overwritten by X-PAYMENT',
+    (await run({ 'payment-signature': 'V2', 'x-payment': 'V1' }))['payment-signature'] === 'V2');
+}
+
 // ---- 6. BUG-011 is still enforced ----
 check('settleDecision: success with a tx hash settles', settleDecision({ success: true, transaction: '0xabc' }) === 'settled');
 check('settleDecision: success with NO tx hash retries, never settles', settleDecision({ success: true, transaction: null }) === 'retry');

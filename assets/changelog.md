@@ -47,6 +47,50 @@ with a real payment against the live service.
 
 Nothing here moves `q1-e1fa99d08887d6cc`, the endpoint, the service list or any price.
 
+## 7 August 2026 — the paper caught three things the SDK migration had quietly taken away
+
+**This entry exists because the whitepaper was audited against the live endpoint, and the endpoint lost.**
+Section 4 prints a block captioned *"what `POST /api/perp-gate` answers with today"*. It was accurate when
+it was written on 29 July. By 7 August three of its fields were gone, removed not by a decision but as a
+side effect of moving the payment layer onto the official OKX SDK.
+
+**What had disappeared, and why each one matters to somebody:**
+
+· `maxAmountRequired` is where an **x402 v1 client looks for the price**. Version 2 renamed the field to
+`amount`; a client written against v1 reads our challenge and finds no price in it at all.
+· `decimals` at the entry level lets a caller size the payment without first resolving the token. USD₮0
+is exactly the asset a generic resolver gets wrong, which is the reason we self-describe it.
+· `outputSchema` is the **x402 Bazaar discovery extension**: it tells a caller how to shape the body on
+the paid retry. Without it a discovery client can find this endpoint and still not know how to call it.
+
+**And one thing that had gone quiet rather than missing.** The old gate read
+`PAYMENT-SIGNATURE || X-PAYMENT`. The SDK reads only the first, so every v1 client that presents a
+perfectly valid payment under the older header name had been getting a 402 forever, with nothing in the
+response to say why. That is the worst shape a regression can take: correct-looking, silent, and only
+visible to the party it hurts.
+
+**All four are restored, and the restoration is one function.** `enrichEntry` puts the three fields back,
+and it is applied to the body mirror, to the offline fallback, and to the PAYMENT-REQUIRED header the SDK
+writes, by wrapping `res.setHeader`. One function for all three surfaces is deliberate: the gate asserts
+the header and the body are identical, so enriching them separately would be a divergence waiting for a
+quiet afternoon. The EIP-712 domain is untouched, which the gate also checks, because nothing about a
+compatibility field is worth risking the thing that makes a signature valid.
+
+**Two smaller pieces of housekeeping came out of the same read.** The v1 header copy existed in two places
+at once, in `app.js` and in the payment module; two owners for one behaviour on the payment path is how a
+later edit deletes it from one and leaves the other looking authoritative, so there is now one, in
+`src/x402.js`. And the rate limiter, which used to be a single 60/minute bucket covering the 402 challenge
+itself, is split by cost: a request that cannot reach an engine gets a far higher ceiling, because
+throttling a compliance sweep does not protect anything and a 429 is not a 402.
+
+**The general lesson is about the audit rather than the fields.** Every one of these passed a green 402,
+passed the platform's own compliance checker, and passed a full paid sweep of all twenty-two services.
+What found them was reading our own documentation back against the running service, line by line. A
+document that describes the system precisely enough to be **wrong** is worth more than one that stays
+vague enough to stay right.
+
+Suite 386/381/0/5, `gates/gateSDK-x402.mjs` now 34 checks, docs-consistency across 267 documents.
+
 ## 1 August 2026 (later) — one character in a header crashed the container, and the first full paid sweep found it
 
 **The migration entry below is still true and this one is its correction.** Once the payment layer was

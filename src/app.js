@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { config } from './config.js';
-import { paid, paymentGate, recurrenceProbe } from './x402.js';
+import { paid, paymentGate, recurrenceProbe, challengeCompat, buildRoutes } from './x402.js';
 import { rateLimit, cached } from './util/guard.js';
 import { getCard } from './util/cardstore.js';
 import { SERVICES, byName, refusalDetail, inputHint } from './services.js';
@@ -79,19 +79,12 @@ app.use((req, res, next) => {
   next();
 });
 
-// x402 v1 compatibility, restored after the migration to the official SDK removed it.
-//
-// The previous hand-rolled gate read `PAYMENT-SIGNATURE || X-PAYMENT`. The SDK reads only
-// `payment-signature`, so moving to it silently made every client that sends the v1 header unpayable:
-// they present a valid payment, the gate never sees it, and they get a 402 forever. Copying the header
-// across before the gate runs restores exactly what this service accepted before, and changes nothing
-// for a client that already sends the v2 name.
-app.use('/api', (req, _res, next) => {
-  if (!req.headers['payment-signature'] && req.headers['x-payment']) {
-    req.headers['payment-signature'] = req.headers['x-payment'];
-  }
-  next();
-});
+// x402 v1 header compatibility used to be restored HERE, and is not any more. It moved into
+// `challengeCompat` in src/x402.js, mounted with the payment gate further down, because that function
+// has to exist anyway to put the dropped challenge fields back and it was doing the identical copy.
+// Two owners for one behaviour on the payment path is how a future edit removes it from one place and
+// leaves the other looking authoritative. One owner, in the payment module, asserted by
+// gates/gateSDK-x402.mjs.
 
 // Machine-facing self-description: binds this domain to the ERC-8004 identity and advertises EVERY payment
 // rail (an automated screener must be able to link service ↔ agent #5152 ↔ payTo without leaving the domain).
@@ -707,7 +700,13 @@ app.use('/api', (req, res, next) => { res.set(API_CORS); if (req.method === 'OPT
 // `res.end` when IT is mounted, ends up calling ours last — after settlement, when PAYMENT-RESPONSE
 // exists. Mount it the other way round and the counter fires before the receipt and starts counting
 // unsettled calls as revenue, which is precisely the BUG-011 defect this project already paid for once.
+// `challengeCompat` sits between the two, and the sandwich is the point. `recurrenceProbe` wraps
+// `res.end` first so it runs LAST, after settlement. `challengeCompat` then wraps `res.setHeader`, so
+// when the SDK writes PAYMENT-REQUIRED further down the stack it writes through ours and the three
+// compatibility fields go back on. Mount it after the gate and the header is already gone.
+const PAY_ROUTES = buildRoutes(SERVICES);
 app.use(recurrenceProbe());
+app.use(challengeCompat(PAY_ROUTES));
 app.use(paymentGate(SERVICES));
 
 for (const s of SERVICES) {

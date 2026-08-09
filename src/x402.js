@@ -262,12 +262,42 @@ export function buildRoutes(services) {
       resource: s.path,
       description: s.blurb,
       mimeType: 'application/json',
+      inputSchema: s.inputSchema, // carried for the Bazaar `outputSchema` block, see enrichEntry
     };
     cfg.unpaidResponseBody = mirrorBody(cfg); // put the challenge in the body too, not only the header
     routes[`GET ${s.path}`] = cfg;
     routes[`POST ${s.path}`] = cfg;
   }
   return routes;
+}
+
+// Three fields the SDK does not emit, restored because this service had them and callers were told so.
+//
+// Found by auditing the whitepaper against the live endpoint on 7 August. The paper prints a block
+// captioned "what POST /api/perp-gate answers with today" and the migration to the official SDK had
+// silently dropped three of its fields. The paper was right when it was written; the service had moved.
+// Per the rule this project runs on, the service gets fixed rather than the claim reworded.
+//
+// What each one is for:
+//   · `maxAmountRequired` is where an x402 v1 client looks for the price. v2 renamed it to `amount`, and
+//     a client written against v1 reads a challenge with no price at all without it.
+//   · `decimals` lets a client size the amount without first resolving the token. USD₮0 is exactly the
+//     kind of asset a generic resolver gets wrong, which is why we self-describe it.
+//   · `outputSchema` is the x402 Bazaar discovery extension: it tells a caller HOW to send the body on
+//     the paid retry. Without it a discovery client can find the endpoint and still not call it.
+//
+// ONE function, applied to the body mirror, the fallback, AND the header the SDK wrote. That is
+// deliberate: the header and the body are asserted to be identical by gates/gateSDK-x402.mjs, so
+// enriching them from two places would be a divergence waiting to happen.
+export function enrichEntry(entry, route) {
+  const out = { ...entry };
+  if (out.amount !== undefined && out.maxAmountRequired === undefined) out.maxAmountRequired = out.amount;
+  const dec = out.extra && out.extra.decimals;
+  if (dec !== undefined && out.decimals === undefined) out.decimals = dec;
+  if (route && route.inputSchema && out.outputSchema === undefined) {
+    out.outputSchema = { input: { type: 'http', method: 'POST', bodyType: 'json', body: route.inputSchema } };
+  }
+  return out;
 }
 
 // The challenge, in the wire shape, derived from the PaymentOption list a route was configured with.
@@ -278,7 +308,7 @@ function challengePayload(route, resourceUrl, note) {
     x402Version: 2,
     error: note,
     resource: { url: resourceUrl, description: route.description, mimeType: 'application/json' },
-    accepts: route.accepts.map((o) => ({
+    accepts: route.accepts.map((o) => enrichEntry({
       scheme: o.scheme,
       network: o.network,
       asset: o.price.asset,
@@ -286,7 +316,7 @@ function challengePayload(route, resourceUrl, note) {
       payTo: o.payTo,
       maxTimeoutSeconds: o.maxTimeoutSeconds,
       extra: o.extra,
-    })),
+    }, route)),
   };
 }
 
@@ -388,6 +418,43 @@ export function paymentGate(services) {
 // PAYMENT-RESPONSE only after a settlement it accepted, so reading that header at response time is the
 // one signal that cannot count an unsettled call. Wrapping `res.end` is how we observe it without
 // taking the settle decision back off the SDK.
+// Backward compatibility for the two things the SDK migration silently took away from callers.
+// Mounted on /api ahead of the payment gate, so both are in place before the SDK sees the request.
+//
+// 1. THE HEADER. An x402 v1 client sends its payment in `X-PAYMENT`. The previous hand-rolled gate read
+//    `PAYMENT-SIGNATURE || X-PAYMENT`; the official SDK reads only `payment-signature`, so migrating to
+//    it made every v1 client permanently unpayable, with no error to tell them why. Copying the header
+//    across costs nothing and cannot affect a v2 caller, who never sets it.
+//
+// 2. THE CHALLENGE. The SDK writes PAYMENT-REQUIRED itself, so the only way to restore the three fields
+//    it drops is to rewrite the header after it is set. `res.setHeader` is wrapped rather than the
+//    response body, because that catches the write wherever in the SDK it happens, and because the same
+//    `enrichEntry` then feeds both the header and the body mirror. If it ever throws, the original
+//    header is passed through untouched: a missing compatibility field is a bad day for a v1 caller, and
+//    a thrown exception in a header writer is a dead container, which is a lesson this file already has.
+export function challengeCompat(routes) {
+  return (req, res, next) => {
+    if (!req.headers['payment-signature'] && req.headers['x-payment']) {
+      req.headers['payment-signature'] = req.headers['x-payment'];
+    }
+    const route = routes[`${req.method.toUpperCase()} ${req.path}`];
+    const original = res.setHeader.bind(res);
+    res.setHeader = (name, value) => {
+      try {
+        if (String(name).toLowerCase() === 'payment-required' && typeof value === 'string') {
+          const decoded = unb64(value);
+          if (Array.isArray(decoded.accepts)) {
+            decoded.accepts = decoded.accepts.map((a) => enrichEntry(a, route));
+            return original(name, b64(decoded));
+          }
+        }
+      } catch { /* fall through and write what the SDK produced */ }
+      return original(name, value);
+    };
+    next();
+  };
+}
+
 export function recurrenceProbe() {
   return (req, res, next) => {
     const originalEnd = res.end;
